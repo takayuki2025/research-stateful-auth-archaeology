@@ -137,8 +137,3 @@ WEBサイトにも良く反映されて景気の波にも負けないような�
   - phpMyAdmin:http://localhost:8080/
   - meilhog： http://localhost:8025/
 
-URL
-フリマアプリトップページ： https://localhost:3000/
-ユーザー登録： https://localhost:3000/register
-phpMyAdmin:http://localhost:8080/
-meilhog： http://localhost:8025/
