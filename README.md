@@ -1,10 +1,12 @@
-# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋　フロントエンドフレームワーク/ライブラリ（Nuxt, React, React+Next）
+# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋　フロントエンドフレームワーク/ライブラリ（Nuxt, React, React+Next）＋firebase<br>
+Laravel + フロントエンド/フレームワーク　学習プロジェクト<br>
 
 ブランチ名：<br>
 - main　　　　　　　　　　　　　　　- Laravel11　単体<br>
-- feature/login-logout　　　　　　　　- Laravel11 ＋　Nuxt４<br>
-- feature/react-develop　　　　　　　- Laravel11 ＋　React19<br>          
-- feature/react+next.js-develop　　　- Laravel11 ＋　React19 ＋　Next16<br>
+- feature/login-logout　　　　　　　　- Laravel11 + Nuxt４ + firebase<br>
+- feature/react-develop　　　　　　　- Laravel11 + React19 + firebase<br>          
+- feature/react+next.js-develop　　　- Laravel11 +　React19 + Next16 + firebase<br>
+それぞれのブランチのREADMEを参照してセットアップ<br>
 
 
 # 環境構築
@@ -14,7 +16,7 @@ Dockerビルド
 　1\. 　git cloneリンク（ターミナルコマンド） git clone https://github.com/takayuki2025/simulation1_upgrade.git  の実行
 <br>
 　2\. （ターミナルコマンド）cd simulation1　の実行。
-                         git checkout feature/react+next.js-develop の実行
+                        
 <br>
  　3\.   　ダミーデーターの商品画像ファイルをstrageディレクトリーの中にitem_imagesディレクトリーを作成して商品画像ファイルをコピーする。<br>
 　　　（ターミナルコマンド）cd backend (実行後) mkdir storage/app/public/item_images　の実行<br>
@@ -35,14 +37,13 @@ laravel環境構築
 <br>
 　3\. 　env.exampleファイルから.envを作成し、.envファイルの環境変数を変更<br>
 　(PHPコンテナー)  cp .env.example .env　の実行後.envの環境変数の変更<br>
-  その後　frontend_derに移動後、　cp .env.example .env　の実行後frontend.envの環境変数の追加<br>
 
 　・stripeの公開キーなどは個人情報保護のためgitで追跡していません。必要でしたらコード伝えます。<br>
 
   ・firebaseのAPIキーなど６項目（frontend .env　追記用）、firebaseのサービスアカウントキー（新規ファイル作成用）などは個人情報保護のためgitで追跡していません。（画面表示、新規登録もログインもできない状態です。）
   必要でしたら　frontend .env　追記用　と　./backend/config/firebase-service-account.json　ファイルに必要なコード伝えます。<br>
 
-  (.env追加後　カレントディレクトリーに戻り)　docker compose restart （frontend_dev）or（frontend_dev）　の実行   <br>
+  (.env修正後反映させるため　カレントディレクトリーに戻り)　docker compose restart　の実行   <br>
 
 <br>
 <br>
