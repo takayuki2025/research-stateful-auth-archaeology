@@ -1,5 +1,5 @@
 # アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋　フロントエンドフレームワーク/ライブラリ（Nuxt, React, React+Next）＋firebase<br>
-Laravel + フロントエンド/フレームワーク　学習プロジェクト<br>
+Laravel + フロントエンド/フレームワーク + firebase　学習プロジェクト<br>
 
 ブランチ名：<br>
 - main　　　　　　　　　　　　　　　- Laravel11　単体<br>
