@@ -8,7 +8,6 @@ Laravel + フロントエンド/フレームワーク　学習プロジェクト
 - feature/react+next.js-develop　　　- Laravel11 +　React19 + Next16 + firebase<br>
 それぞれのブランチのREADMEを参照してセットアップ<br>
 
-
 # 環境構築
 Dockerビルド
 <br>
