@@ -2,24 +2,14 @@
 
 namespace App\Modules\Auth\Presentation\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Modules\Auth\Presentation\Http\Presenters\AuthUserPresenter;
-use App\Modules\Auth\Application\UseCase\GetMyProfileUseCase;
-
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
 
 final class MeController extends Controller
 {
-    public function __construct(
-        private GetMyProfileUseCase $useCase
-    ) {
-    }
-
-    public function __invoke(): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
-        return response()->json(
-            $this->useCase->handle()->toArray()
-        );
+        return response()->json($request->user());
     }
 }

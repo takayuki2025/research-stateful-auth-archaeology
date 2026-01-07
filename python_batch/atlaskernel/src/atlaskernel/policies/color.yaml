@@ -1,0 +1,18 @@
+schema: decision_policy.v1
+extends: _base.yaml
+
+entity_type: color
+
+overrides:
+  actions:
+    auto_accept:
+      min_score: 0.50
+    needs_review:
+      min_score: 0.30
+
+rules:
+  - id: color_similarity_low
+    when:
+      score_lt: 0.60
+    decision: rejected
+    reason: "color_similarity_low"

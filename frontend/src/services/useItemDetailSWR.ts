@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import useSWR from "swr";
-import axios from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
-
 /**
  * API Response 型
  */
@@ -41,30 +39,17 @@ export type ItemDetailResponse = {
 };
 
 export const useItemDetailSWR = (itemId: number | null) => {
-  const { apiClient, isAuthenticated, isReady } = useAuth();
+  const { apiClient, isReady, isAuthenticated } = useAuth();
 
   const shouldFetch =
     typeof itemId === "number" && Number.isFinite(itemId) && isReady;
 
-  /**
-   * ✅ auth / guest を SWR Key に含める
-   * → 認証状態が変わったら必ず再取得
-   */
   const swrKey = shouldFetch
-    ? ["item-detail", itemId, apiClient ? "auth" : "guest"]
+    ? ["item-detail", itemId, isAuthenticated ? "auth" : "guest"]
     : null;
 
   const fetcher = async (): Promise<ItemDetailResponse> => {
-    if (!itemId) {
-      throw new Error("itemId is not available");
-    }
-
-    if (apiClient) {
-      const res = await apiClient.get<ItemDetailResponse>(`/items/${itemId}`);
-      return res.data;
-    }
-
-    const res = await axios.get<ItemDetailResponse>(`/api/items/${itemId}`);
+    const res = await apiClient.get(`/items/${itemId}`);
     return res.data;
   };
 
@@ -79,15 +64,12 @@ export const useItemDetailSWR = (itemId: number | null) => {
     }
   );
 
-  /**
-   * ✅ 認証が ready になった瞬間に再取得
-   * （guest → auth のズレを完全解消）
-   */
+  // guest → auth 切替時の再取得
   useEffect(() => {
-    if (isAuthenticated && apiClient && isReady) {
+    if (isAuthenticated && isReady) {
       mutate();
     }
-  }, [isAuthenticated, apiClient, isReady, mutate]);
+  }, [isAuthenticated, isReady, mutate]);
 
   return {
     item: data?.item ?? null,

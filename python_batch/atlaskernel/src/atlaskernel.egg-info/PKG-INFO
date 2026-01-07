@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: atlaskernel
+Version: 0.1.0
+Summary: AtlasKernel - Entity Analysis Engine (MVP)
+Requires-Python: >=3.10
+Requires-Dist: pydantic>=2.6
+Requires-Dist: rapidfuzz>=3.6
+Requires-Dist: jsonschema>=4.23
+Requires-Dist: PyYAML>=6.0

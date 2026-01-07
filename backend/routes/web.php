@@ -1,18 +1,13 @@
 <?php
-
+// web.php
 use Illuminate\Support\Facades\Route;
-// use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
-
-//メール認証送信
-// Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-// ->middleware(['signed'])->name('verification.verify');
+// use App\Modules\Auth\Presentation\Http\Controllers\LoginController;
+use App\Modules\Auth\Presentation\Http\Controllers\LogoutController;
 
 
-// ========== API サーバーとしての root ==========
-Route::get('/', function () {
-    return response()->json([
-        'message' => 'Laravel API is running.',
-        'time' => now()->toDateTimeString(),
-    ]);
-});
 
+Route::post('/logout', LogoutController::class)
+    ->middleware(['web']);
+
+// health（任意）
+Route::get('/health', fn () => ['status' => 'ok']);

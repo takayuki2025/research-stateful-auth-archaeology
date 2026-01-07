@@ -7,7 +7,7 @@ import { useAuth } from "@/ui/auth/useAuth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,11 +21,12 @@ export default function RegisterPage() {
     setApiError("");
     setIsSubmitting(true);
 
-    if (!email || !password || !name) {
+    if (!name || !email || !password) {
       setApiError("すべての必須項目を入力してください。");
       setIsSubmitting(false);
       return;
     }
+
     if (password !== passwordConfirmation) {
       setApiError("パスワードが一致しません。");
       setIsSubmitting(false);
@@ -33,27 +34,34 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await register({ name, email, password });
+      const res = await fetch("/register", {
+        method: "POST",
+        credentials: "include", // 🔥 Sanctum 必須
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          password_confirmation: passwordConfirmation,
+        }),
+      });
 
-      if (result.needsEmailVerification) {
-        router.push("/email/verify?from=register");
-      } else {
-        router.replace("/");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.message ?? "登録に失敗しました。");
       }
 
-      console.log("[RegisterPage] REGISTER result:", result);
-
-      // AuthService.register は { needsEmailVerification: true } を返す設計
-      if (result?.needsEmailVerification) {
-        router.push("/email/verify");
-        return;
-      }
-
-      // 既にメール認証済みの場合など
-      router.push("/mypage/profile");
+      /**
+       * Laravel 側で
+       * - register → login 済み
+       * - email_verified_at = null
+       */
+      router.replace("/email/verify?from=register");
     } catch (e: any) {
-      console.error("[RegisterPage] registration failed:", e);
-      setApiError(e?.message || "登録に失敗しました。もう一度お試しください。");
+      setApiError(e.message || "登録に失敗しました。");
     } finally {
       setIsSubmitting(false);
     }
@@ -72,14 +80,13 @@ export default function RegisterPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ユーザー名 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             ユーザー名
           </label>
           <input
             type="text"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border rounded-lg"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -87,14 +94,13 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* メール */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             メールアドレス
           </label>
           <input
             type="email"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border rounded-lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -102,14 +108,13 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* パスワード */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             パスワード
           </label>
           <input
             type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border rounded-lg"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -117,14 +122,13 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* 確認用パスワード */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             確認用パスワード
           </label>
           <input
             type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border rounded-lg"
             value={passwordConfirmation}
             onChange={(e) => setPasswordConfirmation(e.target.value)}
             required
@@ -132,23 +136,17 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* 登録ボタン */}
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting || isLoading}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition shadow-lg disabled:bg-gray-400"
-          >
-            {isSubmitting ? "登録中..." : "登録する"}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting || isLoading}
+          className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg"
+        >
+          {isSubmitting ? "登録中..." : "登録する"}
+        </button>
       </form>
 
       <div className="mt-6 text-center">
-        <Link
-          href="/login"
-          className="text-sm text-blue-500 hover:text-blue-700"
-        >
+        <Link href="/login" className="text-sm text-blue-500">
           ログインはこちら
         </Link>
       </div>

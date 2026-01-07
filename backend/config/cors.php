@@ -1,32 +1,23 @@
 <?php
 
-
 return [
-    'paths' => [
-        'api/*',
-        'sanctum/csrf-cookie',
-        'login',
-        'logout',
-        'register',
-    ],
+
+    'paths' => ['api/*', 'login', 'logout', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://localhost',
-        'https://localhost:3000',
-        'https://127.0.0.1',
-        'https://127.0.0.1:3000',
-        'https://laravel.test',
+        env('FRONTEND_URL', 'http://localhost:3000'),
     ],
 
     'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => ['*'],
+    'exposed_headers' => [],
 
     'max_age' => 0,
 
-    'supports_credentials' => true, // ★ Sanctum では絶対 true
+    'supports_credentials' => true,
+
 ];

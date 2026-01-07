@@ -1,4 +1,6 @@
-import { AuthProvider } from "@/ui/auth/AuthContext";
+import { AppProviders } from "./providers";
+
+import "./globals.css";
 
 export default function RootLayout({
   children,
@@ -8,7 +10,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

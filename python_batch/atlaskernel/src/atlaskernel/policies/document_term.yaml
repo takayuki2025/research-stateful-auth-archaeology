@@ -1,0 +1,21 @@
+schema: decision_policy.v1
+extends: _base.yaml
+
+entity_type: document_term
+
+rules:
+  - when:
+      has_alias: true
+      score_gte: 0.90
+    decision: auto_accept
+    reason: "alias_and_high_confidence"
+
+  - when:
+      score_gte: 0.75
+    decision: needs_review
+    reason: "medium_confidence_term"
+
+  - when:
+      score_lt: 0.75
+    decision: rejected
+    reason: "low_confidence_term"

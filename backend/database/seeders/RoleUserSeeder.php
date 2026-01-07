@@ -14,28 +14,41 @@ class RoleUserSeeder extends Seeder
     {
         DB::table('role_user')->truncate();
 
-        $ownerRoleId = Role::where('slug', 'owner')->value('id');
+        $ownerRole = Role::where('slug', 'owner')->first();
+        $adminRole = Role::where('slug', 'domain_lead_admin')->first();
 
-        // ユーザーID = 1〜4 をそれぞれショップID = 1〜4 のオーナーにする
-        foreach ([1, 2, 3, 4] as $i) {
+        if (! $ownerRole) {
+            return;
+        }
+
+        // owner: ユーザーとショップを「存在する分だけ」対応付け
+        $users = User::orderBy('id')->take(4)->get();
+        $shops = Shop::orderBy('id')->take(4)->get();
+
+        foreach ($users as $index => $user) {
+            $shop = $shops[$index] ?? null;
+
+            if (! $shop) {
+                continue;
+            }
+
             DB::table('role_user')->insert([
-                'user_id' => $i,
-                'role_id' => $ownerRoleId,
-                'shop_id' => $i, // ★ user_id と shop_id を対応させる
+                'user_id' => $user->id,
+                'role_id' => $ownerRole->id,
+                'shop_id' => $shop->id,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
         }
 
-        // domain_lead_admin（ユーザー5）
-        $domainLeadAdminRoleId = Role::where('slug', 'domain_lead_admin')->value('id');
-        $user5 = User::where('email', 't.principle.k2024@gmail.com')->first();
+        // domain_lead_admin（shop 非依存）
+        $adminUser = User::where('email', 't.principle.k2024@gmail.com')->first();
 
-        if ($user5) {
+        if ($adminUser && $adminRole) {
             DB::table('role_user')->insert([
-                'user_id' => $user5->id,
-                'role_id' => $domainLeadAdminRoleId,
-                'shop_id' => null, // ★ 全体管理者なので NULL
+                'user_id' => $adminUser->id,
+                'role_id' => $adminRole->id,
+                'shop_id' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///app/src/app/thanks/buy/stripe-card/W-StripeThankYou.module.css"],"sourcesContent":[".thankYouPage {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  min-height: 80vh;\n  background-color: #f7f7f7;\n  text-align: center;\n}\n\n.messageBox {\n  background: #ffffff;\n  padding: 40px 48px;\n  border-radius: 12px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);\n  max-width: 520px;\n  width: 100%;\n}\n\n.title {\n  font-size: 2rem;\n  font-weight: bold;\n  color: #ef4444; /* 赤 */\n  margin-bottom: 24px;\n}\n\n.message {\n  font-size: 1.05rem;\n  line-height: 1.8;\n  color: #333333;\n}\n\n.actions {\n  margin-top: 32px;\n}\n\n.backHomeLink {\n  color: #3b82f6; /* 青 */\n  text-decoration: underline;\n  font-weight: bold;\n  font-size: 1rem;\n}"],"names":[],"mappings":"AAAA;;;;;;;;;AASA;;;;;;;;;AASA;;;;;;;AAOA;;;;;;AAMA;;;;AAIA","debugId":null}}]
-}

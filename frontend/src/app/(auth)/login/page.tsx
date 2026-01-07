@@ -3,11 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/ui/auth/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,27 +18,53 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await login({ email, password });
+      // ① CSRF Cookie を取得（Sanctum必須）
+      await fetch("/sanctum/csrf-cookie", {
+        credentials: "include",
+      });
 
-      if (!result.user.email_verified) {
+      // ② ログイン（Cookie発行）
+      const loginRes = await fetch("/api/login", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!loginRes.ok) {
+        throw new Error("login failed");
+      }
+
+      // ③ 認証後のユーザー取得
+      const meRes = await fetch("/api/me", {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!meRes.ok) {
+        throw new Error("me failed");
+      }
+
+      const user = await meRes.json();
+
+      // ④ メール未認証なら verify へ
+      if (!user.email_verified_at) {
         router.replace("/email/verify");
         return;
       }
 
+      // ⑤ ログイン完了
       router.replace("/");
     } catch {
       setApiError("ログインに失敗しました");
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        認証状態を確認中...
-      </div>
-    );
   }
 
   return (

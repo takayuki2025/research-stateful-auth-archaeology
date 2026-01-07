@@ -6,30 +6,22 @@ type ItemSearchResponse = {
   items: PublicItem[];
 };
 
-export function useItemSearchByShopSWR(
-  shopCode?: string,
-  query?: string
-) {
+export function useItemSearchByShopSWR(shopCode?: string, query?: string) {
   const canFetch =
     typeof shopCode === "string" &&
     shopCode.length > 0 &&
     typeof query === "string" &&
     query.trim().length > 0;
 
-  const key = canFetch
-    ? ["shop-item-search", shopCode, query]
-    : null;
+  const key = canFetch ? ["shop-item-search", shopCode, query] : null;
 
   const fetcher = async (): Promise<ItemSearchResponse> => {
-    const res = await publicClient.get(
-      `/search/shop-items`,
-      {
-        params: {
-          shop_code: shopCode,
-          keyword: query,
-        },
-      }
-    );
+    const res = await publicClient.get(`/search/shop-items`, {
+      params: {
+        shop_code: shopCode,
+        keyword: query,
+      },
+    });
     return res.data;
   };
 

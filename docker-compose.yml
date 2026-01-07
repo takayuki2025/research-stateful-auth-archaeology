@@ -30,33 +30,12 @@ services:
     build: ./docker/php
     working_dir: /var/www/backend
     env_file:
-      - ./backend/.env
+    - ./backend/.env
     volumes:
-      # - /etc/localtime:/etc/localtime:ro
-      # - /etc/timezone:/etc/timezone:ro
-      - ./backend:/var/www/backend
-      - ./backend/public:/var/www/backend/public
-      - ./python_batch:/var/www/python_batch
-      - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
-      - ./docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf
-      - ./docker/supervisor/laravel-worker.conf:/etc/supervisor/conf.d/laravel-worker.conf:ro
-      - ./docker/supervisor/supervisord.conf:/etc/supervisord.conf:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: /bin/sh -c
-    command: >
-      "chmod -R 777 /var/www/backend/storage /var/www/backend/bootstrap/cache || true &&
-      /usr/bin/supervisord -c /etc/supervisord.conf"
-    environment:
-      - TZ=Asia/Tokyo # 🔥 追加: 明示的にタイムゾーンを設定
-      - APP_URL=https://localhost:9000
-      - DB_CONNECTION=mysql # 🔥 ハイフンをつけてインデントを揃える
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=laravel_db
-      - DB_USERNAME=laravel_user
-      - DB_PASSWORD=laravel_pass
+    - ./backend:/var/www/backend
+    command: php-fpm
     depends_on:
-      - mysql
+    - mysql
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.3
@@ -123,28 +102,23 @@ services:
   frontend_dev:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
     container_name: frontend_dev
     working_dir: /app
-
-    # Next.js は直接外へ公開しない
-    ports: []
-
     volumes:
       - ./frontend:/app
-      - /app/node_modules
 
-    # environment:
-    # NEXT_PUBLIC_API_BASE_URL: "/api"
+  # 👇 npx 直叩きではなく package.json に寄せる
+    command: npm run dev -- --port 3000 --hostname 0.0.0.0
 
-    # ★ Next.js は HTTP 3000 で動く（重要）
-    # command: sh -c "npm install && npm run dev -- --port 3000"
-    command: npm run dev -- --port 3000
-
+  # 👇 ★これが最重要
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.7
-
   # ============================================================
   # 7) Python
   # ============================================================

@@ -8,7 +8,6 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AxiosError } from "axios";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
@@ -43,61 +42,58 @@ export default function ProfilePage() {
 
   const {
     user: authUser,
-    apiClient,
+    authClient,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
-    reloadUser,
   } = useAuth();
 
   const isVerificationRedirect = useMemo(
     () => searchParams.get("verified") === "true",
-    [searchParams],
+    [searchParams]
   );
 
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
   const [form, setForm] = useState<ProfileForm>({
-  display_name: "",
-  post_number: "",
-  address: "",
-  building: "",
-});
+    display_name: "",
+    post_number: "",
+    address: "",
+    building: "",
+  });
 
   const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
-  const [imageError, setImageError] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [imageError, setImageError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isFetching, setIsFetching] = useState<boolean>(false);
-  const [isRecovering, setIsRecovering] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
 
-  const verificationHandledRef = useRef<boolean>(false);
+  const verificationHandledRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const profileImageUrl = useMemo(() => {
     return getImageUrl(
       profileUser?.user_image ?? null,
       IMAGE_TYPE.USER,
-      Date.now(),
+      Date.now()
     );
   }, [profileUser?.user_image]);
 
   const initializeProfileFromResponse = useCallback((src: any) => {
-  const data: ProfileUser = src?.user ?? src;
+    const data: ProfileUser = src?.user ?? src;
 
-  setProfileUser(data);
-  setForm({
-    display_name: data.display_name ?? "",
-    post_number: data.post_number ?? "",
-    address: data.address ?? "",
-    building: data.building ?? "",
-  });
-}, []);
+    setProfileUser(data);
+    setForm({
+      display_name: data.display_name ?? "",
+      post_number: data.post_number ?? "",
+      address: data.address ?? "",
+      building: data.building ?? "",
+    });
+  }, []);
 
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
-      if (!apiClient) return;
-
       if (!isRetry) {
         setIsFetching(true);
         setSuccessMessage("");
@@ -105,31 +101,25 @@ export default function ProfilePage() {
       }
 
       try {
-        const res = await apiClient.get("/mypage/profile");
-        initializeProfileFromResponse(res.data);
-
+        const data = await authClient.get("/mypage/profile");
+        initializeProfileFromResponse(data);
         setIsLoading(false);
         setIsRecovering(false);
-      } catch (err) {
-        const axiosErr = err as AxiosError<any>;
-        const status = axiosErr.response?.status;
-
-        if (status === 401) {
-          // 認証切れ → ログアウトしてログインページへ
+      } catch (err: any) {
+        if (err?.message === "Unauthenticated") {
           await logout();
           router.replace("/login");
           return;
         }
-
         setIsLoading(false);
       } finally {
         if (!isRetry) setIsFetching(false);
       }
     },
-    [apiClient, initializeProfileFromResponse, logout, router],
+    [authClient, initializeProfileFromResponse, logout, router]
   );
 
-  // メール認証完了後の再同期（verified=true で遷移してきた場合）
+  // メール認証完了後の再同期
   useEffect(() => {
     if (!isVerificationRedirect) return;
     if (verificationHandledRef.current) return;
@@ -139,19 +129,23 @@ export default function ProfilePage() {
     const run = async () => {
       try {
         setIsRecovering(true);
-        await reloadUser();
+        const me = await authClient.me();
+        if (!me) {
+          await logout();
+          router.replace("/login");
+        }
       } finally {
         setIsRecovering(false);
       }
     };
     run();
-  }, [isVerificationRedirect, reloadUser]);
+  }, [isVerificationRedirect, authClient, logout, router]);
 
-  // 認証状態 & apiClient が揃ったらプロフィール取得
+  // 初期ロード
   useEffect(() => {
     if (isAuthLoading || isRecovering) return;
 
-    if (!isAuthenticated || !apiClient) {
+    if (!isAuthenticated) {
       router.replace("/login");
       return;
     }
@@ -163,7 +157,6 @@ export default function ProfilePage() {
     isAuthLoading,
     isRecovering,
     isAuthenticated,
-    apiClient,
     profileUser,
     isFetching,
     fetchUserProfile,
@@ -173,7 +166,7 @@ export default function ProfilePage() {
   // プロフィール画像アップロード
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !apiClient) return;
+    if (!file) return;
 
     setImageError("");
     setIsLoading(true);
@@ -182,17 +175,21 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      const res = await apiClient.post("/mypage/profile/image", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const res = await fetch("/mypage/profile/image", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
       });
 
-      initializeProfileFromResponse(res.data);
+      if (!res.ok) throw await res.json();
+
+      const data = await res.json();
+      initializeProfileFromResponse(data);
       setSuccessMessage("画像を更新しました！");
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.errors?.user_image?.[0] ??
-        "画像アップロードに失敗しました。";
-      setImageError(msg);
+      setImageError(
+        err?.errors?.user_image?.[0] ?? "画像アップロードに失敗しました。"
+      );
     } finally {
       setIsLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -201,40 +198,34 @@ export default function ProfilePage() {
 
   // プロフィール更新
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  if (!apiClient) return;
+    e.preventDefault();
 
-  setProfileErrors({});
-  setIsLoading(true);
+    setProfileErrors({});
+    setIsLoading(true);
 
-  try {
-    const res = profileUser
-      ? await apiClient.patch("/mypage/profile", form) // 既存 → 更新
-      : await apiClient.post("/mypage/profile", form); // 初回 → 作成
-
-    initializeProfileFromResponse(res.data);
-    setSuccessMessage(
-      profileUser
-        ? "プロフィールを更新しました！"
-        : "プロフィールを作成しました！",
-    );
-  } catch (err: any) {
-    const status = err.response?.status;
-
-    if (status === 422) {
-      setProfileErrors(err.response?.data?.errors ?? {});
-    } else if (status === 401) {
-      await logout();
-      router.replace("/login");
-    } else {
-      setSuccessMessage("更新時にエラーが発生しました。");
+    try {
+      const res = await authClient.post("/mypage/profile", form);
+      initializeProfileFromResponse(res);
+      setSuccessMessage(
+        profileUser
+          ? "プロフィールを更新しました！"
+          : "プロフィールを作成しました！"
+      );
+    } catch (err: any) {
+      if (err?.errors) {
+        setProfileErrors(err.errors);
+      } else {
+        setSuccessMessage("更新時にエラーが発生しました。");
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
-  // ローディング状態
+  /* =========================
+     Render
+  ========================= */
+
   if (isAuthLoading || isLoading || isRecovering) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
@@ -249,7 +240,6 @@ export default function ProfilePage() {
     );
   }
 
-  // 認証エラー
   if (!isAuthenticated || !profileUser) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
@@ -318,11 +308,11 @@ export default function ProfilePage() {
               id="display_name"
               name="display_name"
               type="text"
-              className={styles.name_form} 
+              className={styles.name_form}
               value={form.display_name}
               onChange={(e) =>
-            setForm((prev) => ({ ...prev, display_name: e.target.value }))
-            }
+                setForm((prev) => ({ ...prev, display_name: e.target.value }))
+              }
             />
             <div className={styles.profile__error}>
               {profileErrors.name ? profileErrors.name[0] : ""}
@@ -405,4 +395,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

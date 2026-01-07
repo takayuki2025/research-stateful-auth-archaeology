@@ -2,51 +2,54 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AxiosError } from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const { user, apiClient, isLoading, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
 
   /**
-   * ★ 最重要：
-   * すでに認証済みなら、このページに居させない
+   * すでに認証済みなら追い出す
    */
   useEffect(() => {
-    if (!isReady || isLoading) return;
+    if (isLoading) return;
     if (!user) return;
 
     if (user.email_verified_at) {
-      router.replace("/"); // or /mypage/profile
+      router.replace("/");
     }
-  }, [isReady, isLoading, user, router]);
+  }, [isLoading, user, router]);
 
   const handleResend = async () => {
-    if (!apiClient) return;
-
     setIsResending(true);
     setStatusMessage(null);
 
     try {
-      await apiClient.post("/email/verification-notification");
+      const res = await fetch("/email/verification-notification", {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.message ?? "再送に失敗しました。");
+      }
+
       setStatusMessage("認証メールを再送しました。メールをご確認ください。");
-    } catch (e) {
-      const err = e as AxiosError<any>;
-      setStatusMessage(err.response?.data?.message ?? "再送に失敗しました。");
+    } catch (e: any) {
+      setStatusMessage(e.message || "再送に失敗しました。");
     } finally {
       setIsResending(false);
     }
   };
 
-  if (isLoading || !isReady) {
+  if (isLoading) {
     return <div className="mt-20 text-center">読み込み中...</div>;
   }
-
-  const canResend = !!user;
 
   return (
     <div className="min-h-screen flex justify-center items-start pt-20 bg-gray-50">
@@ -74,7 +77,7 @@ export default function VerifyEmailPage() {
         <div className="mt-8 space-y-3">
           <button
             onClick={handleResend}
-            disabled={isResending || !canResend}
+            disabled={isResending || !user}
             className="w-full bg-indigo-600 text-white py-3 rounded font-bold disabled:opacity-50"
           >
             認証メールを再送
@@ -86,6 +89,7 @@ export default function VerifyEmailPage() {
           >
             ログインページへ
           </button>
+
           {!user && (
             <div className="mt-4 p-3 bg-yellow-50 text-yellow-700 text-sm rounded text-center">
               認証メールを再送するには、一度ログインしてください。

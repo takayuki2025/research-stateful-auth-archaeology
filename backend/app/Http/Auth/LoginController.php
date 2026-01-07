@@ -1,15 +1,14 @@
 <?php
 
-
-
 namespace App\Http\Controllers\Auth;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 
 final class LoginController
 {
-    public function __invoke(Request $request)
+    public function __invoke(Request $request): JsonResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
@@ -17,15 +16,14 @@ final class LoginController
         ]);
 
         if (! Auth::attempt($credentials)) {
-            return response()->json([
-                'message' => 'Invalid credentials',
-            ], 401);
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
+        // セッション固定攻撃対策
         $request->session()->regenerate();
 
         return response()->json([
-            'user' => Auth::user(),
+            'user' => $request->user(), // Auth::user()でも可
         ]);
     }
 }

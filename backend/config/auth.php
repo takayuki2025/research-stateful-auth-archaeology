@@ -3,13 +3,19 @@
 return [
 
     'defaults' => [
-        'guard' => 'web',
-        'passwords' => 'users',
+        'guard' => env('AUTH_GUARD', 'web'),
+        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
     'guards' => [
         'web' => [
             'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        // SPA は session(cookie)で認証、API は sanctum guard で user を解決
+        'sanctum' => [
+            'driver' => 'sanctum',
             'provider' => 'users',
         ],
     ],
@@ -29,4 +35,5 @@ return [
             'throttle' => 60,
         ],
     ],
+
 ];

@@ -1,216 +1,263 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import type { AxiosResponse } from "axios";
+import { mutate } from "swr";
+import { useSearchParams, useRouter } from "next/navigation";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useItemListSWR } from "@/services/useItemListSWR";
+import { useItemSearchSWR } from "@/services/useItemSearchSWR";
+import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
+
+import type { PublicItem } from "@/types/publicItem";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
-import styles from "./W-Mypage.module.css";
+import { useAuth } from "@/ui/auth/useAuth";
 
-/**
- * sell: 出品商品一覧（/item/[item_id]）
- * buy : 購入商品一覧（/mypage/orders/[order_id]）
- */
+import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
-type PageMode = "sell" | "buy";
-
-/**
- * ★ API から返る前提の完成形
- * - row_id: React key 用（order_id-item_id など）
- * - item_id: 商品ID
- * - order_id: 購入時のみ存在
- */
-type MypageItem = {
-  row_id: string;
-  item_id: number;
-  name: string;
-  item_image: string | null;
-  order_id?: number | null;
-  price?: number | null;
-};
-
-type ProfileUser = {
-  id: number;
-  display_name: string | null;
-  user_image: string | null;
-};
-
-export default function Mypage() {
+export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading: isAuthLoading, authClient } = useAuth();
 
-  const {
-    isAuthenticated,
-    isLoading: isAuthLoading,
-    apiClient,
-    logout,
-  } = useAuth();
+  /* =========================
+     🔐 Profile Gate
+  ========================= */
+  const [profileChecked, setProfileChecked] = useState(false);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
 
-  const [user, setUser] = useState<ProfileUser | null>(null);
-  const [items, setItems] = useState<MypageItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  // =============================
-  // page 判定
-  // =============================
-  const page: PageMode = useMemo(() => {
-    return searchParams.get("page") === "buy" ? "buy" : "sell";
-  }, [searchParams]);
+    let cancelled = false;
 
-  // =============================
-  // プロフィール取得
-  // =============================
-  const fetchProfile = useCallback(async () => {
-    if (!apiClient) return;
-
-    try {
-      const res: AxiosResponse<any> = await apiClient.get("/mypage/profile");
-      console.log(res.data.user.display_name);
-      const data = res.data.user;
-      setUser(data);
-    } catch (e: any) {
-      if (e.response?.status === 401) {
-        await logout();
-        router.replace("/login");
+    (async () => {
+      try {
+        const data = await authClient.get("/mypage/profile");
+        if (cancelled) return;
+        setHasProfile(!!data?.has_profile);
+        setProfileChecked(true);
+      } catch {
+        setHasProfile(false);
+        setProfileChecked(true);
       }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authClient]);
+
+  useEffect(() => {
+    if (isAuthenticated && profileChecked && hasProfile === false) {
+      router.replace("/mypage/profile");
     }
-  }, [apiClient, logout, router]);
+  }, [isAuthenticated, profileChecked, hasProfile, router]);
 
-  // =============================
-  // 出品 / 購入商品取得
-  // =============================
-  const fetchItems = useCallback(async () => {
-    if (!apiClient) return;
+  /* =========================
+     🔖 Tab / Search
+  ========================= */
+  const currentTab = useMemo(
+    () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
+    [searchParams]
+  );
 
-    setIsLoading(true);
+  const currentSearchQuery = useMemo(
+    () => searchParams.get("all_item_search") || "",
+    [searchParams]
+  );
+
+  const isSearch = currentSearchQuery.trim().length > 0;
+
+  /* =========================
+     📦 Data Hooks
+  ========================= */
+  const listResult = useItemListSWR();
+  const searchResult = useItemSearchSWR(currentSearchQuery);
+  const favoriteResult = useFavoriteItemsSWR();
+
+  const isItemsLoading =
+    currentTab === "mylist"
+      ? favoriteResult.isLoading
+      : isSearch
+        ? searchResult.isLoading
+        : listResult.isLoading;
+
+  const items: PublicItem[] = useMemo(() => {
+    const raw =
+      currentTab === "mylist"
+        ? favoriteResult.items
+        : isSearch
+          ? searchResult.items
+          : listResult.items;
+
+    return raw.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      price: isSearch ? item.price.amount : item.price,
+      itemImagePath: isSearch
+        ? null
+        : (item.itemImagePath ?? item.item_image ?? null),
+      displayType: item.displayType ?? null,
+      isFavorited: item.isFavorited ?? false,
+    }));
+  }, [
+    currentTab,
+    isSearch,
+    favoriteResult.items,
+    searchResult.items,
+    listResult.items,
+  ]);
+
+  const isGateLoading =
+    isAuthenticated && (!profileChecked || hasProfile === null);
+
+  const isPageLoading = isAuthLoading || isItemsLoading || isGateLoading;
+
+  /* =========================
+     ❤️ Favorite
+  ========================= */
+  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
     try {
-      const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
-      const res: AxiosResponse<any> = await apiClient.get(endpoint);
-      const list = (res.data?.items ?? []) as MypageItem[];
-      setItems(list);
-    } finally {
-      setIsLoading(false);
+      if (isFavorited) {
+        await authClient.delete(`/reactions/items/${item.id}/favorite`);
+      } else {
+        await authClient.post(`/reactions/items/${item.id}/favorite`);
+      }
+      mutate("/items/favorite");
+      await favoriteResult.refetchFavorites();
+    } catch (e) {
+      console.error(e);
     }
-  }, [apiClient, page]);
+  };
 
-  // =============================
-  // 初期ロード
-  // =============================
-  useEffect(() => {
-    if (isAuthLoading) return;
-
-    if (!isAuthenticated) {
-      router.replace("/login");
-      return;
-    }
-
-    fetchProfile();
-  }, [isAuthLoading, isAuthenticated, fetchProfile, router]);
-
-  useEffect(() => {
-    if (user) {
-      fetchItems();
-    }
-  }, [user, fetchItems]);
-
-  if (isAuthLoading || isLoading) {
-    return <div className="text-center p-10">読み込み中...</div>;
+  /* =========================
+     🎨 Render
+  ========================= */
+  if (isGateLoading) {
+    return (
+      <div className={styles.main_contents}>
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>確認中...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (!user) return null;
-
-  // =============================
-  // Render
-  // =============================
   return (
-    <div className={styles.profile_page}>
-      {/* =============================
-          Header
-      ============================== */}
-      <div className={styles.profile_header}>
-        <div className={styles.profile_header_1}>
-          <img
-            src={getImageUrl(user.user_image, IMAGE_TYPE.USER)}
-            onError={onImageError}
-            className={styles.user_image_css}
-            alt="ユーザー画像"
-          />
-
-          <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
-            {user.display_name ?? ""}
-          </h2>
-
-          <button
-            onClick={() => router.push("/mypage/profile")}
-            className="ml-auto px-4 py-2 border border-red-500 text-red-500 rounded"
-          >
-            プロフィールを編集
-          </button>
+    <div className={styles.main_contents}>
+      {isPageLoading && (
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>読み込み中...</p>
         </div>
+      )}
 
-        <div className={styles.profile_header_2}>
-          <Link
-            href="/mypage?page=sell"
-            className={
-              page === "sell" ? styles.active_tab : styles.inactive_tab
-            }
-          >
-            出品した商品
-          </Link>
-
-          <Link
-            href="/mypage?page=buy"
-            className={page === "buy" ? styles.active_tab : styles.inactive_tab}
-          >
-            購入した商品
-          </Link>
-        </div>
-      </div>
-
-      {/* =============================
-          Items
-      ============================== */}
-      <div className={styles.items_select}>
-        {items.length === 0 ? (
-          <p className="text-center text-gray-500">
-            {page === "sell"
-              ? "出品した商品はありません"
-              : "購入した商品はありません"}
-          </p>
-        ) : (
-          items.map((item) => (
-            <div key={item.row_id} className={styles.items_select_all}>
-              <Link
-                href={
-                  page === "buy" && item.order_id
-                    ? `/mypage/orders/${item.order_id}`
-                    : `/item/${item.item_id}`
-                }
+      {!isPageLoading && (
+        <>
+          {/* 🏪 テスト用ショップリンク */}
+          <div className={styles.shopButtons}>
+            {["a", "b", "c", "d"].map((code) => (
+              <button
+                key={code}
+                onClick={() => router.push(`/shops/shop-${code}`)}
+                className={styles.shopButton}
               >
-                <img
-                  src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
-                  onError={onImageError}
-                  alt={item.name}
-                />
-                <div>{item.name}</div>
-              </Link>
+                テストリンク ショップ{code.toUpperCase()}
+              </button>
+            ))}
+          </div>
 
-              {page === "buy" && item.order_id && (
-                <div className="mt-1">
-                  <Link
-                    href={`/mypage/orders/${item.order_id}`}
-                    className="text-xs text-blue-600 underline"
-                  >
-                    配送状況を見る
-                  </Link>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+          {/* Tabs */}
+          <div className={styles.main_select}>
+            <Link
+              href={{
+                pathname: "/",
+                query: { tab: "all", all_item_search: currentSearchQuery },
+              }}
+              className={`${styles.recs} ${
+                currentTab === "all" ? styles.active : ""
+              }`}
+            >
+              すべて
+            </Link>
+
+            <Link
+              href={{ pathname: "/", query: { tab: "mylist" } }}
+              className={`${styles.mylists} ${
+                currentTab === "mylist" ? styles.active : ""
+              }`}
+            >
+              マイリスト
+            </Link>
+          </div>
+
+          {/* Items */}
+          <div className={styles.items_select}>
+            {items.length > 0 ? (
+              items.map((item) => {
+                const isFavorited = item.isFavorited === true;
+
+                return (
+                  <div key={item.id} className={styles.items_select_all}>
+                    <div
+                      className={styles.cardLink}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/item/${item.id}`)}
+                    >
+                      <div className={styles.itemImageWrapper}>
+                        {item.displayType &&
+                          item.displayType !== "FAVORITE" && (
+                            <span className={styles.ownStar}>
+                              {item.displayType === "STAR" ? "⭐️" : "💫"}
+                            </span>
+                          )}
+
+                        {isAuthenticated && (
+                          <button
+                            className={styles.favoriteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(item, isFavorited);
+                            }}
+                          >
+                            {isFavorited ? "❤️" : "🤍"}
+                          </button>
+                        )}
+
+                        <img
+                          src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
+                          alt={item.name}
+                          className={styles.itemImage}
+                          onError={onImageError}
+                        />
+                      </div>
+
+                      <div className={styles.item_info}>
+                        <p className={styles.item_name}>{item.name}</p>
+                        <p className={styles.item_price}>
+                          ¥
+                          {typeof item.price === "number"
+                            ? item.price.toLocaleString()
+                            : "-"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className={styles.no_items}>
+                {currentTab === "mylist" && !isAuthenticated
+                  ? "マイリストを見るにはログインが必要です。"
+                  : "該当する商品が見つかりませんでした。"}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

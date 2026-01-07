@@ -7,3 +7,8 @@ export const apiClient = axios.create({
     "X-Requested-With": "XMLHttpRequest",
   },
 });
+
+apiClient.interceptors.response.use(
+  (res) => res,
+  (err) => Promise.reject(err)
+);

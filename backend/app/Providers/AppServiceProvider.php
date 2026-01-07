@@ -68,7 +68,9 @@ use App\Modules\User\Domain\Port\ShopAddressSyncPort;
 // この2つはセット：NullShopAddressSyncAdapter＝開発用
 use App\Modules\User\Infrastructure\Adapter\ShopAddressSyncAdapter;
 use App\Modules\User\Infrastructure\External\NullShopAddressSyncAdapter;
-
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request;
 class AppServiceProvider extends ServiceProvider
 {
     public function register()
@@ -192,20 +194,12 @@ class AppServiceProvider extends ServiceProvider
     }
 
 
-    public function boot()
-    {
-        // ここには一切リスナーなど記入しない。
-        // Event::listen(
-        //     OrderPaid::class,
-        //     CreateShipmentOnOrderPaidListener::class
-        // );
-
-
-        // Event::listen(
-        //     OrderPaid::class,
-        //     OnOrderPaidRecordOrderHistory::class
-        // );
-
-
-    }
+public function boot(): void
+{
+    RateLimiter::for('login', function (Request $request) {
+        return Limit::perMinute(5)->by(
+            $request->ip() . '|' . $request->input('email')
+        );
+    });
+}
 }

@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { useAuth } from "@/ui/auth/useAuth";
+import { useAuthedFetcher } from "@/ui/auth/useAuthedFetcher";
 
 export type UserPrimaryAddress = {
   id: number;
@@ -12,15 +13,16 @@ export type UserPrimaryAddress = {
 };
 
 export function useUserPrimaryAddressSWR() {
-  const { apiClient, isAuthenticated } = useAuth();
+  const { isAuthenticated, isReady } = useAuth();
+  const fetcher = useAuthedFetcher();
 
-  const shouldFetch = isAuthenticated && apiClient;
+  const swrKey = isReady && isAuthenticated ? "/me/addresses/primary" : null;
 
-  const { data, error, isLoading } = useSWR(
-    shouldFetch ? "/me/addresses/primary" : null,
-    async (url) => {
-      const res = await apiClient!.get(url);
-      const a = res.data?.data;
+  const { data, error, isLoading } = useSWR<UserPrimaryAddress | null>(
+    swrKey,
+    async () => {
+      const res = await fetcher.get<any>("/me/addresses/primary");
+      const a = res?.data ?? null;
 
       if (!a) return null;
 
@@ -30,13 +32,13 @@ export function useUserPrimaryAddressSWR() {
         prefecture: a.prefecture,
         city: a.city,
         addressLine1: a.address_line1,
-        addressLine2: a.address_line2,
+        addressLine2: a.address_line2 ?? null,
         recipientName: a.recipient_name,
-      } as UserPrimaryAddress;
+      };
     },
     {
       revalidateOnFocus: false,
-    },
+    }
   );
 
   return {

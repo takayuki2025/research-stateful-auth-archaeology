@@ -1,41 +1,25 @@
 import useSWR from "swr";
-import axios from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
-import type { PublicItem } from "@/types/publicItem";
+import { useAuthedFetcher } from "@/ui/auth/useAuthedFetcher";
 import type { SearchItem } from "@/types/searchItem";
+
 type ItemSearchResponse = {
   items: SearchItem[];
 };
 
 export const useItemSearchSWR = (query: string) => {
-  const { apiClient, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isReady } = useAuth();
+  const fetcher = useAuthedFetcher();
 
-  const shouldFetch = !authLoading && query.trim().length > 0;
+  const shouldFetch = isReady && query.trim().length > 0;
 
-  /**
-   * ★ 超重要：auth 状態で key を分離
-   */
   const key = shouldFetch
     ? ["search-items", query, isAuthenticated ? "auth" : "guest"]
     : null;
 
-  const fetcher = async (): Promise<ItemSearchResponse> => {
-    // 🔑 認証あり
-    if (apiClient) {
-      const res = await apiClient.get(
-  `/search/items?q=${encodeURIComponent(query)}`
-);
-      return res.data;
-    }
-
-    // 👤 ゲスト（同じエンドポイント）
-    const res = await axios.get(
-  `/api/search/items?q=${encodeURIComponent(query)}`
-);
-    return res.data;
-  };
-
-  const { data, error, isLoading } = useSWR<ItemSearchResponse>(key, fetcher);
+  const { data, error, isLoading } = useSWR<ItemSearchResponse>(key, () =>
+    fetcher.get(`/search/items?q=${encodeURIComponent(query)}`)
+  );
 
   return {
     items: data?.items ?? [],

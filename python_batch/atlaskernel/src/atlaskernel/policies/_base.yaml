@@ -1,0 +1,6 @@
+schema: decision_policy.v1
+defaults:
+  actions:
+    auto_accept: { min_score: 0.92 }
+    needs_review: { min_score: 0.75 }
+    rejected: { max_score: 0.75 }

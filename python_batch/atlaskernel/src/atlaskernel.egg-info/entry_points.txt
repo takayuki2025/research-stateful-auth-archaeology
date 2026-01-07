@@ -1,0 +1,2 @@
+[console_scripts]
+atlaskernel = atlaskernel.cli:main

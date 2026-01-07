@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
 
   // PPR / RSC キャッシュ
-  cacheComponents: false,
+  // cacheComponents: false,
 
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,27 +22,27 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "https",
+        protocol: "http",
         hostname: "localhost",
-        port: "9000",
+        port: "80",
         pathname: "/storage/**",
       },
     ],
   },
 
   // 🔥🔥 これが Origin 統一の最重要ポイント（API プロキシ）
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "https://localhost:9000/api/:path*",
-      },
-      {
-        source: "/sanctum/:path*",
-        destination: "https://localhost:9000/sanctum/:path*",
-      },
-    ];
-  },
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: "/api/:path*",
+  //       destination: "https://localhost:9000/api/:path*",
+  //     },
+  //     {
+  //       source: "/sanctum/:path*",
+  //       destination: "https://localhost:9000/sanctum/:path*",
+  //     },
+  //   ];
+  // },
 
   // 🔥 mkcert を使用している場合に必須
   // Next.js dev server 自身も HTTPS として動けるようにする

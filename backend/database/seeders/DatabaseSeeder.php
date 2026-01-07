@@ -6,21 +6,19 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     *
-     * @return void
-     */
     public function run()
     {
-
-
-
-
-
         $this->call([
             RoleSeeder::class,
-            UsersTableSeeder::class,
+        ]);
+
+        if (app()->environment('local')) {
+            $this->call(LocalUsersSeeder::class);
+        } else {
+            $this->call(UsersTableSeeder::class); // Firebase前提
+        }
+
+        $this->call([
             UserAddressesTableSeeder::class,
             ProfilesTableSeeder::class,
             ShopsTableSeeder::class,
@@ -31,9 +29,5 @@ class DatabaseSeeder extends Seeder
             ConditionEntitySeeder::class,
             ColorEntitySeeder::class,
         ]);
-
-
-
-
     }
 }

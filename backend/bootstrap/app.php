@@ -6,7 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\Container\BindingResolutionException;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
 
@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\AuthContextServiceProvider::class,
+
         App\Modules\Shop\ShopServiceProvider::class,
         App\Modules\Item\Infrastructure\Providers\ItemModuleServiceProvider::class,
         App\Modules\Item\Infrastructure\Providers\ItemEventServiceProvider::class,
@@ -39,15 +40,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
     /*
     |--------------------------------------------------------------------------
-    | Middleware（★ここが Laravel 11 の正解位置）
+    | Middleware（Laravel 11）
     |--------------------------------------------------------------------------
     */
     ->withMiddleware(function (Middleware $middleware) {
 
-        // Global
+        /*
+         * Global middleware
+         */
         $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
         $middleware->append(\App\Http\Middleware\AddTenantInfoToLogs::class);
 
+        /*
+         * Proxies
+         */
         $middleware->trustProxies(
             at: explode(',', env(
                 'TRUSTED_PROXIES',
@@ -61,39 +67,60 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_FORWARDED
         );
 
+        /*
+         * CSRF
+         * - SPA(Sanctum)でも web login を使うなら /login は web 扱いになることがある
+         * - ただしあなたの設計は「Next.js -> /login を叩く」ので CSRF が必要
+         * - api/* は除外のままでOK
+         */
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
 
-        // Alias（★ここで定義しないと一切効かない）
+        /*
+         * Aliases
+         */
         $middleware->alias([
-            'auth'              => \Illuminate\Auth\Middleware\Authenticate::class,
-            'sanctum.auth'      => \Laravel\Sanctum\Http\Middleware\Authenticate::class,
-            'throttle'          => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+            'auth'              => \App\Http\Middleware\Authenticate::class,
             'verified'          => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'throttle'          => \Illuminate\Routing\Middleware\ThrottleRequests::class,
 
+            // Sanctum
+            'sanctum.auth'      => \Laravel\Sanctum\Http\Middleware\Authenticate::class,
+
+            // Tenant
             'tenant'            => \App\Http\Middleware\ResolveTenant::class,
 
+            // JWT
             'auth.jwt'          => \App\Http\Middleware\JwtAuthenticate::class,
             'auth.jwt.optional' => \App\Http\Middleware\OptionalJwtAuth::class,
 
+            // Roles
             'role'              => \App\Http\Middleware\RoleMiddleware::class,
             'shop.role'         => \App\Http\Middleware\CheckShopRole::class,
             'shop.context'      => \App\Modules\Shop\Presentation\Http\Middleware\ShopContextMiddleware::class,
         ]);
 
-        // API group
+        /*
+         * API group
+         * - EnsureFrontendRequestsAreStateful を「先頭」に置くのが基本
+         * - SubstituteBindings は1回でOK（重複していたので整理）
+         */
         $middleware->api(
             prepend: [
-                \Illuminate\Routing\Middleware\SubstituteBindings::class,
-                // ✅ ここに Sanctum のステートフル Middleware を追加
                 \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-                \Illuminate\Routing\Middleware\SubstituteBindings::class,
             ],
             append: [
                 'throttle:api',
+                \Illuminate\Routing\Middleware\SubstituteBindings::class,
             ]
         );
+
+        /*
+         * もし「web でも未認証を JSON で返したい」なら、
+         * ここで Accept: application/json を強制する middleware を global に入れる選択肢もある。
+         * ただし通常は例外レンダリング側で api/* を確実に JSON 化すれば十分。
+         */
     })
 
     /*
@@ -105,8 +132,16 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (\Throwable $e, Request $request) {
 
-            if (!($request->expectsJson() || $request->is('api/*'))) {
-                return null;
+            /**
+             * ✅ 重要：SPA + API 前提
+             * - api/* は常に JSON
+             * - expectsJson() だけに依存すると Accept ヘッダ不備で web 扱いになる
+             */
+            $isApi = $request->is('api/*');
+            $wantsJson = $request->expectsJson() || $isApi;
+
+            if (!$wantsJson) {
+                return null; // web は Laravel 標準の HTML を許可
             }
 
             if ($e instanceof AuthenticationException) {
@@ -132,7 +167,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 500);
             }
 
-            $statusCode = $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+            $statusCode = $e instanceof HttpExceptionInterface
                 ? $e->getStatusCode()
                 : 500;
 

@@ -1,13 +1,12 @@
 "use client";
 
-// import HeaderAuth from "@/components/layout/HeaderAuth";
-import type { ReactNode } from "react";
+import HeaderMain from "@/components/layout/HeaderMain";
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      {/* <HeaderAuth /> */}
-      <main className="mx-auto max-w-[1300px] min-h-screen">{children}</main>
+      <HeaderMain />
+      <main className="pt-[70px]">{children}</main>
     </>
   );
 }
