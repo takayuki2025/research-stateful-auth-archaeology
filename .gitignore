@@ -44,4 +44,4 @@ yarn-error.log*
 # =====================================
 # Docker
 # =====================================
-docker/**/.env
+docker/**/.envbackend/config/firebase-service-account.json
