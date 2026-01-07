@@ -52,9 +52,18 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+
+    // 'url' => env('APP_URL', 'http://localhost'),
+    'url' => env('APP_URL', 'https://laravel.test'),
 
     'asset_url' => env('ASSET_URL', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Frontend URL (for redirects) ★ 追加
+    |--------------------------------------------------------------------------
+    */
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
 
     /*
     |--------------------------------------------------------------------------
@@ -136,6 +145,7 @@ return [
 
     'providers' => [
 
+        \Kreait\Laravel\Firebase\ServiceProvider::class, // ★★★ この行を追加 ★★★
         /*
          * Laravel Framework Service Providers...
          */
@@ -161,7 +171,6 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
-        
 
         /*
          * Package Service Providers...
@@ -175,7 +184,17 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
-        App\Providers\FortifyServiceProvider::class,
+        // App\Providers\FortifyServiceProvider::class,
+        App\Providers\AuthModuleServiceProvider::class,
+        App\Providers\JwtAuthProvider::class,
+        App\Modules\Reaction\Infrastructure\ReactionServiceProvider::class,
+        App\Modules\Comment\Infrastructure\CommentServiceProvider::class,
+        App\Modules\Item\Infrastructure\Providers\ItemModuleServiceProvider::class,
+        App\Providers\OrderModuleServiceProvider::class,
+        App\Providers\PaymentModuleServiceProvider::class,
+        App\Providers\ShopModuleServiceProvider::class,
+        App\Modules\Item\Infrastructure\Providers\ItemEventServiceProvider::class,
+        App\Modules\Shop\ShopServiceProvider::class,
     ],
 
     /*

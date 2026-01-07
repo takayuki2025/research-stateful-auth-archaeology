@@ -1,11 +1,8 @@
-# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋　フロントエンドフレームワーク/ライブラリ（Nuxt, React, React+Next）＋firebase<br>
-Laravel + フロントエンド/フレームワーク + firebase　学習プロジェクト<br>
+# アプリケーション名： sanctum ステートフル　Auth 　学習プロジェクト<br>
 
 ブランチ名：<br>
 - main　　　　　　　　　　　　　　　- Laravel11　単体<br>
-- feature/login-logout　　　　　　　　- Laravel11 + Nuxt４ + firebase<br>
-- feature/react-develop　　　　　　　- Laravel11 + React19 + firebase<br>          
-- feature/react+next.js-develop　　　- Laravel11 +　React19 + Next16 + firebase<br>
+
 それぞれのブランチのREADMEを参照してセットアップ<br>
 
 # 環境構築

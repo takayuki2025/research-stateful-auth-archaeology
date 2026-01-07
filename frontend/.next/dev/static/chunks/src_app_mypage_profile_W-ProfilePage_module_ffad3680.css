@@ -1,0 +1,146 @@
+/* [project]/src/app/mypage/profile/W-ProfilePage.module.css [app-client] (css) */
+.W-ProfilePage-module__ZcCojq__login_page {
+  text-align: center;
+}
+
+.W-ProfilePage-module__ZcCojq__title {
+  color: #4f46e5;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.W-ProfilePage-module__ZcCojq__form-wrapper {
+  text-align: center;
+  display: inline-block;
+}
+
+.W-ProfilePage-module__ZcCojq__alert-success2 {
+  color: #065f46;
+  background-color: #d1fae5;
+  border: 1px solid #34d399;
+  border-radius: .5rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+
+.W-ProfilePage-module__ZcCojq__profile__error, .W-ProfilePage-module__ZcCojq__user_image_error_message {
+  color: #f55;
+  text-align: left;
+  width: 400px;
+  margin: -5px auto 5px;
+  padding-left: 5px;
+  font-size: 15px;
+}
+
+.W-ProfilePage-module__ZcCojq__user_image_error_message {
+  text-align: center;
+  position: relative;
+  bottom: 20px;
+}
+
+.W-ProfilePage-module__ZcCojq__item_sell_contents_box_line {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  display: block;
+}
+
+.W-ProfilePage-module__ZcCojq__image_name {
+  justify-content: center;
+  align-items: center;
+  padding-top: 35px;
+  padding-bottom: 60px;
+  display: flex;
+  position: relative;
+}
+
+.W-ProfilePage-module__ZcCojq__image_button_row {
+  align-items: center;
+  gap: 30px;
+  display: flex;
+  position: relative;
+  right: 50px;
+}
+
+.W-ProfilePage-module__ZcCojq__user_image_css {
+  -o-object-fit: cover;
+  object-fit: cover;
+  -o-object-position: center;
+  object-position: center;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  position: static;
+  overflow: hidden;
+}
+
+.W-ProfilePage-module__ZcCojq__upload_submit {
+  color: #f55;
+  cursor: pointer;
+  white-space: nowrap;
+  background-color: #fff;
+  border: 1px solid #f55;
+  border-radius: 5px;
+  margin: 0;
+  padding: 5px 10px;
+  font-weight: 700;
+  position: static;
+}
+
+.W-ProfilePage-module__ZcCojq__form-group {
+  text-align: center;
+  width: 400px;
+  margin: 0 auto;
+}
+
+.W-ProfilePage-module__ZcCojq__label_form_1, .W-ProfilePage-module__ZcCojq__label_form_2, .W-ProfilePage-module__ZcCojq__label_form_3, .W-ProfilePage-module__ZcCojq__label_form_4 {
+  text-align: left;
+  font-weight: 700;
+  display: block;
+  position: relative;
+  left: 0;
+}
+
+.W-ProfilePage-module__ZcCojq__label_form_2, .W-ProfilePage-module__ZcCojq__label_form_3, .W-ProfilePage-module__ZcCojq__label_form_4 {
+  margin-top: 30px;
+}
+
+.W-ProfilePage-module__ZcCojq__name_form, .W-ProfilePage-module__ZcCojq__email_form, .W-ProfilePage-module__ZcCojq__password_form {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  width: 400px;
+  height: 30px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+}
+
+.W-ProfilePage-module__ZcCojq__submit {
+  margin-top: 10px;
+}
+
+.W-ProfilePage-module__ZcCojq__submit_form {
+  color: #fff;
+  cursor: pointer;
+  background-color: #f55;
+  border: #f55;
+  border-radius: 5px;
+  width: 400px;
+  height: 40px;
+  margin: 30px auto;
+  font-weight: 700;
+  transition: background-color .1s;
+  position: relative;
+  top: 20px;
+}
+
+.W-ProfilePage-module__ZcCojq__submit_form:hover {
+  background-color: #e54c4c;
+}
+
+.W-ProfilePage-module__ZcCojq__submit_form:disabled {
+  cursor: not-allowed;
+  background-color: #9ca3af;
+}
+
+/*# sourceMappingURL=src_app_mypage_profile_W-ProfilePage_module_ffad3680.css.map*/

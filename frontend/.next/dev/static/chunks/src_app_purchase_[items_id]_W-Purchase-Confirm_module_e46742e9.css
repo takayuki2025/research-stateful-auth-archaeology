@@ -1,0 +1,124 @@
+/* [project]/src/app/purchase/[items_id]/W-Purchase-Confirm.module.css [app-client] (css) */
+.W-Purchase-Confirm-module__r3YFlG__item_buy_wrapper {
+  background: #f3f4f6;
+  min-height: 100vh;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_contents {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 1280px;
+  margin: 56px auto;
+  padding: 40px;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__loadingOverlay {
+  text-align: center;
+  padding: 80px 0;
+  font-weight: bold;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_lr {
+  gap: 64px;
+  display: flex;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_l {
+  width: 65%;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_r {
+  width: 35%;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_content_section {
+  border-bottom: 1px solid #d1d5db;
+  flex-direction: column;
+  gap: 16px;
+  padding: 40px 0;
+  display: flex;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_content_section select {
+  background-color: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 14px;
+  font-size: .95rem;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_content_section select:disabled {
+  cursor: not-allowed;
+  background-color: #e5e7eb;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__addressHeader {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  display: flex;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_image img {
+  -o-object-fit: cover;
+  object-fit: cover;
+  border-radius: 6px;
+  width: 96px;
+  height: 96px;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_name {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_price {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_summary_box {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 32px;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_summary_box p {
+  margin-bottom: 12px;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_summary_box button {
+  color: #fff;
+  background: #ef4444;
+  border-radius: 6px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  font-weight: bold;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__item_buy_summary_box button:disabled {
+  background: #9ca3af;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__warnText {
+  color: #dc2626;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__linkBtn {
+  color: #2563eb;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.W-Purchase-Confirm-module__r3YFlG__soldText {
+  text-align: center;
+  color: #6b7280;
+  font-weight: bold;
+}
+
+/*# sourceMappingURL=src_app_purchase_%5Bitems_id%5D_W-Purchase-Confirm_module_e46742e9.css.map*/

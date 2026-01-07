@@ -1,0 +1,144 @@
+/* =========================
+   Page Layout
+========================= */
+.main_contents {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+/* =========================
+   Title
+========================= */
+.title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #222;
+}
+
+/* =========================
+   Loading
+========================= */
+.loadingBox {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+/* =========================
+   Item Grid
+========================= */
+.items_select {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+/* =========================
+   Item Card
+========================= */
+.items_select_all {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.items_select_all:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* =========================
+   Card Link
+========================= */
+.cardLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* =========================
+   Image
+========================= */
+.cardLink img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #f5f5f5;
+}
+
+/* =========================
+   Item Info
+========================= */
+.cardLink > div {
+  padding: 12px;
+}
+
+.cardLink p {
+  margin: 0;
+}
+
+.cardLink p:first-child {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.cardLink p:last-child {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* =========================
+   Notice
+========================= */
+.notice {
+  margin-top: 32px;
+  padding: 16px;
+  background: #fff7e6;
+  border: 1px solid #ffe0a3;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #7a5200;
+  text-align: center;
+}
+
+/* =========================
+   Responsive
+========================= */
+@media (max-width: 480px) {
+  .title {
+    font-size: 1.2rem;
+  }
+
+  .items_select {
+    gap: 12px;
+  }
+}
+
+.shopHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.dashboardButton {
+  padding: 8px 14px;
+  background-color: #111;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.dashboardButton:hover {
+  background-color: #333;
+}

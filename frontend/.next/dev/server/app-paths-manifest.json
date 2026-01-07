@@ -1,0 +1,15 @@
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/item/[items_id]/page": "app/item/[items_id]/page.js",
+  "/mypage/orders/[order_id]/page": "app/mypage/orders/[order_id]/page.js",
+  "/mypage/page": "app/mypage/page.js",
+  "/mypage/profile/page": "app/mypage/profile/page.js",
+  "/page": "app/page.js",
+  "/purchase/[items_id]/page": "app/purchase/[items_id]/page.js",
+  "/sell/page": "app/sell/page.js",
+  "/shops/[shop_code]/dashboard/orders/[order_id]/shipment/page": "app/shops/[shop_code]/dashboard/orders/[order_id]/shipment/page.js",
+  "/shops/[shop_code]/dashboard/orders/page": "app/shops/[shop_code]/dashboard/orders/page.js",
+  "/shops/[shop_code]/dashboard/page": "app/shops/[shop_code]/dashboard/page.js",
+  "/shops/[shop_code]/page": "app/shops/[shop_code]/page.js",
+  "/thanks/buy/stripe-card/page": "app/thanks/buy/stripe-card/page.js"
+}

@@ -5,23 +5,45 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class OrderHistory extends Model
+final class OrderHistory extends Model
 {
     use HasFactory;
 
-        protected $fillable = [
-            'item_id',
-            'user_id',
-            'payment',
-            'buy_address'
+    protected $fillable = [
+        'shop_id',
+        'order_id',
+        'item_id',
+        'user_id',
+
+        // snapshot
+        'item_name',
+        'item_image',
+        'price_amount',
+        'price_currency',
+        'payment_method',
+        'buy_address',
+        'quantity',
     ];
+
+    protected $casts = [
+        'buy_address' => 'array',
+    ];
+
+    // 🔽 関係は「あってもなくてもいい」
+    // Query 用なので必須ではない
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function item()
     {
         return $this->belongsTo(Item::class);
     }
-    public function user()
+
+    public function shop()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Shop::class);
     }
 }

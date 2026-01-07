@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 
+error_log("INFO: [ENTRY POINT] Request hit public/index.php at " . date('Y-m-d H:i:s'));
+
 define('LARAVEL_START', microtime(true));
 
 // Determine if the application is in maintenance mode...

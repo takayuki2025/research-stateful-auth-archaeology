@@ -21,6 +21,7 @@ class Comment extends Model
         'user_id', // コメント投稿者ID
         'item_id', // 商品ID
         'comment', // コメント本文
+        'shop_id',
     ];
 
     // --- リレーションシップの定義 ---
@@ -43,5 +44,10 @@ class Comment extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    public function shop()
+    {
+        return $this->belongsTo(Shop::class);
     }
 }

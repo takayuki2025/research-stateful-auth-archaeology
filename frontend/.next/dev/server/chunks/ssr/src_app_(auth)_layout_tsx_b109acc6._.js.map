@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///app/src/app/%28auth%29/layout.tsx"],"sourcesContent":["\"use client\";\n\n// import HeaderAuth from \"@/components/layout/HeaderAuth\";\nimport type { ReactNode } from \"react\";\n\nexport default function AuthLayout({ children }: { children: ReactNode }) {\n  return (\n    <>\n      {/* <HeaderAuth /> */}\n      <main className=\"mx-auto max-w-[1300px] min-h-screen\">{children}</main>\n    </>\n  );\n}\n"],"names":[],"mappings":";;;;;AAAA;;AAKe,SAAS,WAAW,EAAE,QAAQ,EAA2B;IACtE,qBACE;kBAEE,cAAA,8OAAC;YAAK,WAAU;sBAAuC;;;;;;;AAG7D","debugId":null}}]
+}

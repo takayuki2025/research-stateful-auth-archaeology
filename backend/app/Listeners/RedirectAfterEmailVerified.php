@@ -23,9 +23,13 @@ class RedirectAfterEmailVerified
      * @param  \IlluminateAuthEventsVerified  $event
      * @return void
      */
-    public function handle(Verified $event)
+    public function handle(Verified $event): void
     {
-        // 認証後にprofile.editページにリダイレクト
-        return redirect()->route('profile_edit');
+        // Next.js のプロフィール設定ページへ移動させる
+        $frontendUrl = config('app.frontend_url') . '/mypage/profile?verified=true';
+
+        // ブラウザリダイレクトではなく、コントローラで return redirect() させるために
+        // ここでは URL 文字列だけをセットしておけば十分
+        session(['redirect_after_verify' => $frontendUrl]);
     }
 }

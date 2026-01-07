@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Session\Middleware\AuthenticateSession;
+use Laravel\Sanctum\Sanctum;
+
 return [
 
     /*
@@ -13,11 +17,21 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        env('APP_URL') ? ','.parse_url(env('APP_URL'), PHP_URL_HOST) : ''
-    ))),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost')),
+
+    // 'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
+    //     'localhost',
+    //     'localhost:3000',
+    //     'localhost:9000',
+    //     // '127.0.0.1',
+    //     // '127.0.0.1:8000',
+    //     // '::1',
+    //     // 'nuxt.test',
+    //     // 'nuxt.test:4440',
+    //     // 'laravel.test',
+    //     // 'laravel.test:4430',
+    //     // 'laravel.test:4431',
+    // ]))),
 
     /*
     |--------------------------------------------------------------------------
@@ -57,9 +71,23 @@ return [
     |
     */
 
+
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS')),
+
     'middleware' => [
-        'verify_csrf_token' => App\Http\Middleware\VerifyCsrfToken::class,
-        'encrypt_cookies' => App\Http\Middleware\EncryptCookies::class,
+        'encrypt_cookies' => Illuminate\Cookie\Middleware\EncryptCookies::class,
     ],
+    /*
+    |--------------------------------------------------------------------------
+    | Secure Cookies
+    |--------------------------------------------------------------------------
+    |
+    | This value controls whether the cookies set by Sanctum will be set with
+    | the `secure` flag, which requires a HTTPS connection to transmit.
+    | This is generally only needed in a production environment.
+    |
+    */
+    // ★★★ 修正箇所: ここを修正し、.envの値（SESSION_SECURE_COOKIE）を参照するように変更 ★★★
+    'secure_cookies' => env('SANCTUM_SECURE_COOKIES', env('SESSION_SECURE_COOKIE', false)),
 
 ];

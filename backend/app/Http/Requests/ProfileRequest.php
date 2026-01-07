@@ -24,9 +24,9 @@ class ProfileRequest extends FormRequest
     public function rules()
     {
         return [
-            'name' => 'required|max:20',
-            'post_number' => 'required||regex:/^\d{3}-\d{4}$/',
-            'address' => ['required'],
+            // 'name' => 'required|max:20',
+            // 'post_number' => 'required||regex:/^\d{3}-\d{4}$/',
+            // 'address' => ['required'],
         ];
     }
 

@@ -1,0 +1,138 @@
+.login_page {
+  text-align: center;
+}
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  color: #4f46e5;
+}
+.form-wrapper {
+  display: inline-block;
+  text-align: center;
+}
+.alert-success2 {
+  background-color: #d1fae5;
+  color: #065f46;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #34d399;
+}
+.profile__error,
+.user_image_error_message {
+  color: #ff5555;
+  font-size: 15px;
+  text-align: left;
+  margin-top: -5px;
+  margin-bottom: 5px;
+  padding-left: 5px;
+  width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.user_image_error_message {
+  text-align: center;
+  position: relative;
+  bottom: 20px;
+}
+.item_sell_contents_box_line {
+  display: block;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+.image_name {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 35px;
+  padding-bottom: 60px;
+  position: relative;
+}
+.image_button_row {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  position: relative;
+  right: 50px;
+}
+.user_image_css {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  object-fit: cover;
+  object-position: center;
+  position: static;
+}
+.upload_submit {
+  position: static;
+  margin: 0;
+  color: #ff5555;
+  font-weight: 700;
+  background-color: white;
+  border: 1px solid #ff5555;
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.form-group {
+  width: 400px;
+  margin: 0 auto;
+  text-align: center;
+}
+.label_form_1,
+.label_form_2,
+.label_form_3,
+.label_form_4 {
+  font-weight: 700;
+  display: block;
+  text-align: left;
+  position: relative;
+  left: 0;
+}
+.label_form_2 {
+  margin-top: 30px;
+}
+.label_form_3 {
+  margin-top: 30px;
+}
+.label_form_4 {
+  margin-top: 30px;
+}
+.name_form,
+.email_form,
+.password_form {
+  width: 400px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  margin-bottom: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+}
+.submit {
+  margin-top: 10px;
+}
+.submit_form {
+  position: relative;
+  top: 20px;
+  width: 400px;
+  height: 40px;
+  margin: 30px auto;
+  background-color: #ff5555;
+  border: #ff5555;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.1s;
+}
+.submit_form:hover {
+  background-color: #e54c4c;
+}
+.submit_form:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}

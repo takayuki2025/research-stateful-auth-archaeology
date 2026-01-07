@@ -2,73 +2,116 @@
 
 namespace App\Models;
 
+use App\Models\ItemEntityTag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo; // 追加
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Item extends Model
 {
     use HasFactory;
 
-    /**
-     * プライマリキー
-     * @var string
-     */
-    protected $primaryKey = 'id';
-
-    /**
-     * 複数代入可能な属性 (テストが期待するカラム名に修正)
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'user_id',
+        'item_origin',
+        'shop_id',
+        'created_by_user_id',
+        'published_at',
         'name',
         'price',
-        
-        // 🌟 修正: テストが期待するカラム名 (explain, condition, category, item_image, brand, remain) に合わせる 🌟
-        'explain',      
-        'condition',    
-        'category',     
-        'item_image',   
-        'brand',        
-        'remain',       
+        'brand',
+        'explain',
+        'condition',
+        'category',
+        'item_image',
+        'remain',
     ];
-    
-    /**
-     * ネイティブタイプへキャストする属性
-     * categoryフィールドの配列/JSON変換を復活させます。
-     * @var array
-     */
+
     protected $casts = [
         'category' => 'array',
     ];
 
-
-    /**
-     * モデルが属するUserを取得します。
-     * @return BelongsTo
-     */
-    public function user(): BelongsTo
+    /** 画像URLアクセサ（既存コードそのまま） */
+    public function getItemImageAttribute($value): string
     {
-        return $this->belongsTo(User::class);
+        return $value ?? '';
     }
 
-    /**
-     * 商品に付けられたGoodを取得します。
-     * @return HasMany
-     */
-    public function goods(): HasMany
+    /** 出品者 */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /** ⭐ お気に入り */
+    public function favorites(): HasMany
     {
         return $this->hasMany(Good::class);
     }
 
-    /**
-     * 商品に付けられたCommentを取得します。
-     * @return HasMany
-     */
+    /** コメント */
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
+    }
+
+    /** カート */
+    public function usersInCart()
+    {
+        return $this->belongsToMany(User::class, 'cart_items')
+            ->withPivot('quantity')
+            ->withTimestamps();
+    }
+
+    /** ショップ */
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class);
+    }
+
+    // ==================================================
+    // 🔥 AtlasKernel 用リレーション（ここを追加）
+    // ==================================================
+
+    /** すべての解析エンティティ履歴 */
+    public function entities(): HasMany
+    {
+        return $this->hasMany(
+            ItemEntity::class,
+            'item_id'
+        );
+    }
+
+    /** 最新の解析結果（表示用） */
+    public function latestEntity(): HasOne
+    {
+        return $this->hasOne(
+            ItemEntity::class,
+            'item_id'
+        )->where('is_latest', true);
+    }
+
+    /** 抽出タグ（brand / color / condition など） */
+    public function entityTags(): HasMany
+    {
+        return $this->hasMany(
+            ItemEntityTag::class,
+            'item_id'
+        );
+    }
+
+    /* =====================
+     * Semantic Helpers（重要）
+     * ===================== */
+
+    public function isUserPersonal(): bool
+    {
+        return $this->item_origin === 'USER_PERSONAL';
+    }
+
+    public function isShopManaged(): bool
+    {
+        return $this->item_origin === 'SHOP_MANAGED';
     }
 }

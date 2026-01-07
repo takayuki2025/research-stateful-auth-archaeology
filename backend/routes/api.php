@@ -1,19 +1,25 @@
 <?php
 
-use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\MeController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
-|
-*/
+// ==========================
+// Auth (Stateful SPA)
+// ==========================
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+// CSRF Cookie（最初に必ず叩く）
+Route::get('/sanctum/csrf-cookie', fn () => response()->noContent());
+
+// Login
+Route::post('/login', LoginController::class);
+
+// Logout
+Route::post('/logout', LogoutController::class)
+    ->middleware('auth:web');
+
+// Me（認証起点）
+Route::get('/me', MeController::class)
+    ->middleware('auth:web');

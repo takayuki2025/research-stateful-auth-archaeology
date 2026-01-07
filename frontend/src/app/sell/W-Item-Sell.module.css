@@ -1,0 +1,181 @@
+.wrapper {
+  max-width: 780px; /* ★ 横だけ広げる（720 → 780） */
+  margin: 48px auto;
+  padding: 40px 48px; /* ★ 左右だけ広げる */
+  background: #fff;
+  border-radius: 8px;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-bottom: 32px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.centerTitle {
+  text-align: center;
+}
+
+/* =========================
+   Image
+========================= */
+.imageBox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imageBoxWide {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  min-height: 120px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+}
+
+.imageInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.imagePlaceholder {
+  width: 120px;
+  height: 120px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.preview {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.imageButton {
+  width: fit-content;
+  background: #e5e7eb;
+  padding: 6px 14px; /* ★ 横だけ少し */
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+/* =========================
+   Form
+========================= */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroup label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.formGroup input,
+.formGroup textarea,
+.formGroup select {
+  padding: 12px 16px; /* ★ 横だけ広げる */
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+/* =========================
+   Category Buttons
+========================= */
+.categoryButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px; /* ★ 横方向だけ */
+  max-width: 100%;
+}
+
+.categoryButton,
+.categoryActive {
+  display: inline-flex;
+  align-items: center;
+
+  /* ★ 横だけ 18px → 21px（約 +15〜17%） */
+  padding: 5px 35px;
+  line-height: 1.3;
+
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.categoryButton {
+  border: 1.5px solid #ef4444;
+  background: #fff;
+  color: #ef4444;
+}
+
+.categoryButton:hover {
+  background: #fee2e2;
+}
+
+.categoryActive {
+  border: 1.5px solid #ef4444;
+  background: #ef4444;
+  color: #fff;
+}
+
+/* =========================
+   Hint
+========================= */
+.hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* =========================
+   Actions
+========================= */
+.actions {
+  margin-top: 24px;
+}
+
+.actions button {
+  width: 100%;
+  background: #ef4444;
+  color: #fff;
+  padding: 14px 16px; /* ★ 横だけ */
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.actions button:disabled {
+  background: #9ca3af;
+}
+
+/* =========================
+   Error
+========================= */
+.error {
+  color: #dc2626;
+  font-size: 0.9rem;
+}

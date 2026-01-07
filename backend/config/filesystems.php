@@ -38,7 +38,9 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            'url' => 'https://laravel.test/storage', // ★★★ APP_URLの影響を完全に排除するため、一時的にハードコード ★★★
+            // 'url' => 'storage',
+            // 'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
         ],
 
