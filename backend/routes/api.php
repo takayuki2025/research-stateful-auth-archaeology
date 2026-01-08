@@ -11,3 +11,10 @@ Route::post('/login', LoginController::class);
 
 
 
+
+
+use App\Modules\Auth\Presentation\Http\Controllers\ConfirmFirstLoginController;
+
+Route::post('/auth/first-login', ConfirmFirstLoginController::class)
+  ->middleware(['auth:sanctum']);
+

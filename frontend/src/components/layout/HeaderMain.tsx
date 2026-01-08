@@ -7,24 +7,19 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export default function HeaderMain() {
-  const { isAuthenticated, logout, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleLogout = async () => {
     await logout();
-    router.push("/login");
+    router.replace("/login");
   };
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
-
-    if (searchTerm.trim().length === 0) {
-      router.push("/");
-      return;
-    }
-
-    router.push(`/?all_item_search=${encodeURIComponent(searchTerm.trim())}`);
+    if (!searchTerm.trim()) return;
+    router.push(`/?q=${encodeURIComponent(searchTerm)}`);
   };
 
   return (
@@ -37,47 +32,34 @@ export default function HeaderMain() {
         >
           <Image
             src="/image_icon/logo.svg"
-            alt="会社名"
+            alt="ロゴ"
             width={200}
             height={40}
-            className="object-contain"
             priority
           />
         </div>
 
-        {/* 検索フォーム */}
-        <form onSubmit={handleSearch} className="flex items-center ml-8">
-          <input
-            type="text"
-            className="
-              h-[36px]
-              w-[360px]
-              px-4
-              rounded
-              text-gray-900
-              focus:outline-none
-            "
-            placeholder="なにをお探しですか？"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </form>
+        {/* 🔍 検索（ログイン時のみ） */}
+        {!isLoading && isAuthenticated && (
+          <form onSubmit={handleSearch} className="flex items-center ml-8">
+            <input
+              className="h-[36px] w-[360px] px-4 rounded"
+              placeholder="なにをお探しですか？"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </form>
+        )}
 
-        {/* 右側メニュー */}
+        {/* 右側 */}
         <div className="flex items-center ml-auto space-x-6 pr-2">
           {isLoading ? null : isAuthenticated ? (
             <>
               <button onClick={handleLogout} className="text-white">
                 ログアウト
               </button>
-              <Link href="/mypage?page=sell" className="text-white">
+              <Link href="/mypage/profile" className="text-white">
                 マイページ
-              </Link>
-              <Link
-                href="/sell"
-                className="bg-white text-black px-4 py-1 rounded font-semibold"
-              >
-                出品
               </Link>
             </>
           ) : (

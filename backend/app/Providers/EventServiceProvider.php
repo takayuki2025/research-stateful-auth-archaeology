@@ -31,6 +31,9 @@ final class EventServiceProvider extends ServiceProvider
             \App\Listeners\RedirectAfterEmailVerified::class,
         ],
 
+        \Illuminate\Auth\Events\Verified::class => [
+        \App\Listeners\SetFirstLoginAtOnVerified::class,
+    ],
         /*
         |--------------------------------------------------------------------------
         | Domain Events（唯一の定義）

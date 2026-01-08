@@ -34,7 +34,7 @@ export default function RegisterPage() {
     }
 
     try {
-      const res = await fetch("/register", {
+      const res = await fetch("/api/register", {
         method: "POST",
         credentials: "include", // 🔥 Sanctum 必須
         headers: {

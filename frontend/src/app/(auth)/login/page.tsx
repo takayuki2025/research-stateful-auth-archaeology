@@ -18,12 +18,10 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // ① CSRF Cookie を取得（Sanctum必須）
-      await fetch("/sanctum/csrf-cookie", {
-        credentials: "include",
-      });
+      // ① CSRF Cookie
+      await fetch("/sanctum/csrf-cookie", { credentials: "include" });
 
-      // ② ログイン（Cookie発行）
+      // ② Login
       const loginRes = await fetch("/api/login", {
         method: "POST",
         credentials: "include",
@@ -38,12 +36,10 @@ export default function LoginPage() {
         throw new Error("login failed");
       }
 
-      // ③ 認証後のユーザー取得
+      // ③ 最新ユーザー取得（重要：この user が真実）
       const meRes = await fetch("/api/me", {
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
 
       if (!meRes.ok) {
@@ -52,13 +48,21 @@ export default function LoginPage() {
 
       const user = await meRes.json();
 
-      // ④ メール未認証なら verify へ
+      // ===== Profile Gate =====
+
+      // A. メール未認証
       if (!user.email_verified_at) {
-        router.replace("/email/verify");
+        router.replace("/email/verify?from=login");
         return;
       }
 
-      // ⑤ ログイン完了
+      // B. 初回ログイン or プロフィール未作成
+      if (!user.profile_completed) {
+        router.replace("/mypage/profile");
+        return;
+      }
+
+      // C. 通常ログイン
       router.replace("/");
     } catch {
       setApiError("ログインに失敗しました");

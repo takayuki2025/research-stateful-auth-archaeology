@@ -1,72 +1,60 @@
 "use client";
 
-import React, { useMemo, useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { mutate } from "swr";
-import { useSearchParams, useRouter } from "next/navigation";
 
-import { HeaderMainFrame } from "@/components/layout/HeaderMainFrame";
 import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
+import { useAuth } from "@/ui/auth/useAuth";
 import type { PublicItem } from "@/types/publicItem";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
-import { useAuth } from "@/ui/auth/useAuth";
+
 import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: isAuthLoading, authClient } = useAuth();
+
+  const {
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    authClient,
+  } = useAuth();
 
   /* =========================
-     🔐 Profile Gate
+     🔐 Profile Gate（最小・安定）
   ========================= */
-  const [profileChecked, setProfileChecked] = useState(false);
-  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
-
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (isAuthLoading) return;
 
-    let cancelled = false;
+    // トップは未ログインでも表示OK
+    if (!isAuthenticated || !user) return;
 
-    (async () => {
-      try {
-        const data = await authClient.get("/mypage/profile");
-        if (!cancelled) {
-          setHasProfile(!!data?.has_profile);
-          setProfileChecked(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setHasProfile(false);
-          setProfileChecked(true);
-        }
-      }
-    })();
+    if (!user.email_verified_at) {
+      router.replace("/email/verify");
+      return;
+    }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, authClient]);
-
-  useEffect(() => {
-    if (isAuthenticated && profileChecked && hasProfile === false) {
+    if (!user.profile_completed) {
       router.replace("/mypage/profile");
     }
-  }, [isAuthenticated, profileChecked, hasProfile, router]);
+  }, [isAuthLoading, isAuthenticated, user, router]);
 
   /* =========================
      🔖 Tab / Search
   ========================= */
-  const currentTab = useMemo(
+  const currentTab = useMemo<"all" | "mylist">(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
     [searchParams]
   );
 
   const currentSearchQuery = useMemo(
-    () => searchParams.get("all_item_search") || "",
+    () => searchParams.get("all_item_search") ?? "",
     [searchParams]
   );
 
@@ -83,24 +71,22 @@ export default function Home() {
     currentTab === "mylist"
       ? favoriteResult.isLoading
       : isSearch
-      ? searchResult.isLoading
-      : listResult.isLoading;
+        ? searchResult.isLoading
+        : listResult.isLoading;
 
   const items: PublicItem[] = useMemo(() => {
     const raw =
       currentTab === "mylist"
         ? favoriteResult.items
         : isSearch
-        ? searchResult.items
-        : listResult.items;
+          ? searchResult.items
+          : listResult.items;
 
     return raw.map((item: any) => ({
       id: item.id,
       name: item.name,
-      price: isSearch ? item.price.amount : item.price,
-      itemImagePath: isSearch
-        ? null
-        : item.itemImagePath ?? item.item_image ?? null,
+      price: isSearch ? item.price?.amount : item.price,
+      itemImagePath: item.itemImagePath ?? item.item_image ?? null,
       displayType: item.displayType ?? null,
       isFavorited: item.isFavorited ?? false,
     }));
@@ -112,142 +98,142 @@ export default function Home() {
     listResult.items,
   ]);
 
-  const isGateLoading =
-    isAuthenticated && (!profileChecked || hasProfile === null);
+  const isPageLoading = isAuthLoading || isItemsLoading;
 
-  const isPageLoading = isAuthLoading || isItemsLoading || isGateLoading;
+  /* =========================
+     ❤️ Favorite toggle（ローカル定義）
+  ========================= */
+  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
+    if (!authClient) return;
+
+    try {
+      if (isFavorited) {
+        await authClient.delete(`/favorites/${item.id}`);
+      } else {
+        await authClient.post(`/favorites/${item.id}`);
+      }
+      mutate();
+    } catch (e) {
+      console.error("favorite error", e);
+    }
+  };
 
   /* =========================
      🎨 Render
   ========================= */
-  if (isGateLoading) {
-    return (
-      // <HeaderMainFrame>
-        <div className={styles.main_contents}>
-          <p>確認中...</p>
-        </div>
-      // </HeaderMainFrame>
-    );
-  }
-
   return (
-    // <HeaderMainFrame>
-      <div className={styles.main_contents}>
-        {isPageLoading && (
-          <div className={styles.loadingBox}>
-            <div className={styles.spinner}></div>
-            <p className={styles.loadingText}>読み込み中...</p>
+    <div className={styles.main_contents}>
+      {isPageLoading && (
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner} />
+          <p className={styles.loadingText}>読み込み中...</p>
+        </div>
+      )}
+
+      {!isPageLoading && (
+        <>
+          {/* 🏪 テスト用ショップリンク */}
+          <div className={styles.shopButtons}>
+            {["a", "b", "c", "d"].map((code) => (
+              <button
+                key={code}
+                onClick={() => router.push(`/shops/shop-${code}`)}
+                className={styles.shopButton}
+              >
+                テストリンク ショップ{code.toUpperCase()}
+              </button>
+            ))}
           </div>
-        )}
 
-        {!isPageLoading && (
-          <>
-            {/* 🏪 テスト用ショップリンク */}
-            <div className={styles.shopButtons}>
-              {["a", "b", "c", "d"].map((code) => (
-                <button
-                  key={code}
-                  onClick={() => router.push(`/shops/shop-${code}`)}
-                  className={styles.shopButton}
-                >
-                  テストリンク ショップ{code.toUpperCase()}
-                </button>
-              ))}
-            </div>
+          {/* Tabs */}
+          <div className={styles.main_select}>
+            <Link
+              href={{
+                pathname: "/",
+                query: { tab: "all", all_item_search: currentSearchQuery },
+              }}
+              className={`${styles.recs} ${
+                currentTab === "all" ? styles.active : ""
+              }`}
+            >
+              すべて
+            </Link>
 
-            {/* Tabs */}
-            <div className={styles.main_select}>
-              <Link
-                href={{
-                  pathname: "/",
-                  query: { tab: "all", all_item_search: currentSearchQuery },
-                }}
-                className={`${styles.recs} ${
-                  currentTab === "all" ? styles.active : ""
-                }`}
-              >
-                すべて
-              </Link>
+            <Link
+              href={{ pathname: "/", query: { tab: "mylist" } }}
+              className={`${styles.mylists} ${
+                currentTab === "mylist" ? styles.active : ""
+              }`}
+            >
+              マイリスト
+            </Link>
+          </div>
 
-              <Link
-                href={{ pathname: "/", query: { tab: "mylist" } }}
-                className={`${styles.mylists} ${
-                  currentTab === "mylist" ? styles.active : ""
-                }`}
-              >
-                マイリスト
-              </Link>
-            </div>
+          {/* Items */}
+          <div className={styles.items_select}>
+            {items.length > 0 ? (
+              items.map((item) => {
+                const isFavorited = item.isFavorited === true;
 
-            {/* Items */}
-            <div className={styles.items_select}>
-              {items.length > 0 ? (
-                items.map((item) => {
-                  const isFavorited = item.isFavorited === true;
-
-                  return (
-                    <div key={item.id} className={styles.items_select_all}>
-                      <div
-                        className={styles.cardLink}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => router.push(`/item/${item.id}`)}
-                      >
-                        <div className={styles.itemImageWrapper}>
-                          {item.displayType &&
-                            item.displayType !== "FAVORITE" && (
-                              <span className={styles.ownStar}>
-                                {item.displayType === "STAR" ? "⭐️" : "💫"}
-                              </span>
-                            )}
-
-                          {isAuthenticated && (
-                            <button
-                              className={styles.favoriteButton}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavorite(item, isFavorited);
-                              }}
-                            >
-                              {isFavorited ? "❤️" : "🤍"}
-                            </button>
+                return (
+                  <div key={item.id} className={styles.items_select_all}>
+                    <div
+                      className={styles.cardLink}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/item/${item.id}`)}
+                    >
+                      <div className={styles.itemImageWrapper}>
+                        {item.displayType &&
+                          item.displayType !== "FAVORITE" && (
+                            <span className={styles.ownStar}>
+                              {item.displayType === "STAR" ? "⭐️" : "💫"}
+                            </span>
                           )}
 
-                          <img
-                            src={getImageUrl(
-                              item.itemImagePath,
-                              IMAGE_TYPE.ITEM
-                            )}
-                            alt={item.name}
-                            className={styles.itemImage}
-                            onError={onImageError}
-                          />
-                        </div>
+                        {isAuthenticated && (
+                          <button
+                            className={styles.favoriteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(item, isFavorited);
+                            }}
+                          >
+                            {isFavorited ? "❤️" : "🤍"}
+                          </button>
+                        )}
 
-                        <div className={styles.item_info}>
-                          <p className={styles.item_name}>{item.name}</p>
-                          <p className={styles.item_price}>
-                            ¥
-                            {typeof item.price === "number"
-                              ? item.price.toLocaleString()
-                              : "-"}
-                          </p>
-                        </div>
+                        <img
+                          src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
+                          alt={item.name}
+                          className={styles.itemImage}
+                          onError={onImageError}
+                        />
+                      </div>
+
+                      <div className={styles.item_info}>
+                        <p className={styles.item_name}>{item.name}</p>
+                        <p className={styles.item_price}>
+                          ¥
+                          {typeof item.price === "number"
+                            ? item.price.toLocaleString()
+                            : "-"}
+                        </p>
                       </div>
                     </div>
-                  );
-                })
-              ) : (
-                <div className={styles.no_items}>
-                  {currentTab === "mylist" && !isAuthenticated
-                    ? "マイリストを見るにはログインが必要です。"
-                    : "該当する商品が見つかりませんでした。"}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    // </HeaderMainFrame>
+                  </div>
+                );
+              })
+            ) : (
+              <div className={styles.no_items}>
+                {currentTab === "mylist" && !isAuthenticated
+                  ? "マイリストを見るにはログインが必要です。"
+                  : "該当する商品が見つかりませんでした。"}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

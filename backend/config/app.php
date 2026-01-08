@@ -54,7 +54,7 @@ return [
 
 
     // 'url' => env('APP_URL', 'http://localhost'),
-    'url' => env('APP_URL', 'https://laravel.test'),
+    'url' => env('APP_URL'),
 
     'asset_url' => env('ASSET_URL', null),
 
@@ -63,7 +63,7 @@ return [
     | Frontend URL (for redirects) ★ 追加
     |--------------------------------------------------------------------------
     */
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    'frontend_url' => env('FRONTEND_URL'),
 
     /*
     |--------------------------------------------------------------------------
