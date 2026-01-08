@@ -146,7 +146,7 @@ export default function Home() {
                       className={styles.cardLink}
                       role="button"
                       tabIndex={0}
-                      onClick={() => router.push(`/item/${item.id}`)}
+                      onClick={() => router.push(`/api/item/${item.id}`)}
                     >
                       <div className={styles.itemImageWrapper}>
                         {item.displayType && (
