@@ -18,29 +18,34 @@ class CreateUsersTable extends Migration
                 ->comment('Firebase UID（Firebaseログイン時に必須）');
 
             /* ============================================================
-               🏪 マルチテナント（店舗紐づけ可能）
+               🏪 マルチテナント
             ============================================================ */
             $table->foreignId('shop_id')
                 ->nullable()
                 ->comment('所属店舗。null の場合はフリマ利用者');
 
             /* ============================================================
-               👤 基本プロフィール
+               👤 認証・識別情報
             ============================================================ */
             $table->string('name', 255);
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
 
-            $table->timestamp('first_login_at')->nullable();
+            $table->timestamp('first_login_at')->nullable()
+                ->comment('初回ログイン完了時刻（オンボーディング制御用）');
 
+            // 🔥 プロフィール完了フラグ（最終形）
+            $table->boolean('profile_completed')
+                ->default(false)
+                ->comment('プロフィール（配送先等）完了フラグ');
 
-
-
-            // Laravel パスワード（Firebaseログイン時は使わないが必要）
+            /* ============================================================
+               🔐 Laravel Auth
+            ============================================================ */
             $table->string('password')->nullable();
 
             /* ============================================================
-               🏠 住所情報
+               ⚠️ 旧：住所系（将来 Profile テーブルへ完全移行予定）
             ============================================================ */
             $table->string('post_number')->nullable();
             $table->string('address')->nullable();
@@ -51,12 +56,6 @@ class CreateUsersTable extends Migration
                🖼 プロフィール画像
             ============================================================ */
             $table->string('user_image')->nullable();
-
-            /* ============================================================
-               ⚠️ 旧 role カラム（削除推奨）
-               → role_user テーブルで管理するので不要
-            ============================================================ */
-            // $table->string('role')->nullable(); // ❌ 今後不要 → 残すなら nullable にすべき
 
             /* ============================================================
                🔐 Laravel 標準

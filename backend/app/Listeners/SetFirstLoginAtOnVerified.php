@@ -4,7 +4,7 @@ namespace App\Listeners;
 
 use Illuminate\Auth\Events\Verified;
 
-class SetFirstLoginAt
+class SetFirstLoginAtOnVerified
 {
     public function handle(Verified $event): void
     {

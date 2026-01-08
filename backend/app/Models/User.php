@@ -21,46 +21,60 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasFactory;
     use Notifiable;
 
-    /**
-     * マスアサインメント時に設定可能な属性。
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
+
+        // 🔥 状態フラグ
+        'profile_completed',
+        'first_login_at',
+        'email_verified_at',
+
+        // Firebase / Tenant
+        'firebase_uid',
+        'shop_id',
+
+        // ⚠️ 旧住所系（将来削除予定）
         'post_number',
         'address',
         'building',
-        'user_image',
         'address_country',
-        'firebase_uid',
-        'shop_id',
-        'first_login_at',
-        'email_verified_at', // ★★★ これを必ず追加
+        'user_image',
     ];
 
-    /**
-     * 配列に含めない属性。
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * ネイティブタイプにキャストする必要がある属性。
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'shop_id' => 'integer',
+        'email_verified_at'   => 'datetime',
+        'first_login_at'      => 'datetime',
+        'profile_completed'   => 'boolean',
+        'password'            => 'hashed',
+        'shop_id'             => 'integer',
     ];
+
+    /* ============================================================
+       🔐 Profile Completion 判定（Domain）
+    ============================================================ */
+
+    public function markProfileCompleted(): void
+    {
+        if (! $this->profile_completed) {
+            $this->profile_completed = true;
+            $this->save();
+        }
+    }
+
+    public function resetProfileCompleted(): void
+    {
+        if ($this->profile_completed) {
+            $this->profile_completed = false;
+            $this->save();
+        }
+    }
 
     // --- リレーションシップの定義 (既存のまま) ---
 

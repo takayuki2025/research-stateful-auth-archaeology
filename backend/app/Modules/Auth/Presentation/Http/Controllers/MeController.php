@@ -10,6 +10,13 @@ final class MeController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        return response()->json($request->user());
+        $user = $request->user(); // ★これが必須
+
+        return response()->json([
+            'id' => $user->id,
+            'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at,
+            'profile_completed' => $user->profile_completed, // ★必須
+        ]);
     }
 }

@@ -20,7 +20,6 @@ class FirebaseUsersSeeder extends Seeder
 
     public function run(): void
     {
-        // ★ テストユーザー一覧（以前と同じ）
         $testUsers = [
             [
                 'name' => 'テスト用のユーザ１',
@@ -74,7 +73,6 @@ class FirebaseUsersSeeder extends Seeder
             ],
         ];
 
-        // ★ 既存ユーザー削除
         $emailsToCleanup = array_column($testUsers, 'email');
         User::whereIn('email', $emailsToCleanup)->delete();
 
@@ -83,11 +81,11 @@ class FirebaseUsersSeeder extends Seeder
             $password = $userData['password'];
 
             try {
-                // Firebase の削除 → 作成
                 try {
                     $record = $this->firebaseAuth->getUserByEmail($email);
                     $this->firebaseAuth->deleteUser($record->uid);
                 } catch (\Exception $e) {
+                    // noop
                 }
 
                 $firebaseUser = $this->firebaseAuth->createUser([
@@ -97,17 +95,22 @@ class FirebaseUsersSeeder extends Seeder
                     'displayName' => $userData['name'],
                 ]);
 
-                // ★ Laravel DB へ保存（ロール付与なし）
                 User::updateOrCreate(
                     ['firebase_uid' => $firebaseUser->uid],
                     [
                         'name' => $userData['name'],
                         'email' => $email,
                         'password' => Hash::make(Str::random(16)),
+
+                        // 住所（テストデータ）
                         'post_number' => $userData['post_number'],
                         'address' => $userData['address'],
                         'building' => $userData['building'],
                         'address_country' => $userData['address_country'],
+
+                        // 🔥 状態フラグ（完成済み）
+                        'profile_completed' => true,
+
                         'shop_id' => $userData['shop_id'],
                         'email_verified_at' => now(),
                         'first_login_at' => now(),
@@ -115,7 +118,6 @@ class FirebaseUsersSeeder extends Seeder
                 );
 
                 Log::info("User synced: $email");
-
             } catch (\Exception $e) {
                 Log::error("Failed to sync user ($email): " . $e->getMessage());
                 throw $e;

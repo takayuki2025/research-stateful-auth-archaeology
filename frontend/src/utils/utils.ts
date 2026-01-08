@@ -8,50 +8,65 @@ export enum IMAGE_TYPE {
 }
 
 // ======================================
-// Backend Base URL
+// getOrigin（SSR / CSR 両対応）
 // ======================================
-const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
+function getOrigin(): string {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost";
+}
 
 // ======================================
-// Fallback Images（実在パス）
+// Fallback Images（相対 or origin）
 // ======================================
-const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+function getFallback(type: IMAGE_TYPE): string {
+  const origin = getOrigin();
 
-const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+  if (type === IMAGE_TYPE.USER) {
+    return `${origin}/pictures_user/default-profile2.jpg`;
+  }
+
+  return `${origin}/storage/pictures/no-image.png`;
+}
 
 // ======================================
-// getImageUrl（Laravel 実態対応版）
+// getImageUrl（最終版）
 // ======================================
 export function getImageUrl(
   path?: string | null,
-  type: IMAGE_TYPE = IMAGE_TYPE.OTHER,
+  type: IMAGE_TYPE = IMAGE_TYPE.OTHER
 ): string {
   if (!path) {
-    return type === IMAGE_TYPE.USER ? DEFAULT_USER_IMAGE : DEFAULT_ITEM_IMAGE;
+    return getFallback(type);
   }
 
+  // absolute URL はそのまま
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
+  const origin = getOrigin();
+
+  // Laravel storage absolute
   if (path.startsWith("/storage/")) {
-    return `${BACKEND_BASE_URL}${path}`;
+    return `${origin}${path}`;
   }
 
+  // storage 相対
   if (
     path.startsWith("pictures_user/") ||
     path.startsWith("item_images/") ||
     path.startsWith("pictures/")
   ) {
-    return `${BACKEND_BASE_URL}/storage/${path}`;
+    return `${origin}/storage/${path}`;
   }
 
-  return `${BACKEND_BASE_URL}/${path}`;
+  return `${origin}/${path}`;
 }
 
 // ======================================
-// onImageError（型安全）
+// onImageError
 // ======================================
 export const onImageError: React.ReactEventHandler<HTMLImageElement> = (e) => {
   const img = e.currentTarget;

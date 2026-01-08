@@ -20,24 +20,10 @@ export function useUserProfileSWR() {
   const swrKey = isReady && isAuthenticated ? "/mypage/profile" : null;
 
   const { data, error, isLoading } = useSWR<UserProfile>(swrKey, async () => {
-    const data = await fetcher.get<any>("/mypage/profile");
+    const res = await fetcher.get<any>("/mypage/profile");
+    const a = res.address ?? null;
 
-    /**
-     * backend response:
-     * {
-     *   address: {
-     *     id,
-     *     post_number,
-     *     address,
-     *     building
-     *   }
-     * }
-     */
-    const a = data.address ?? null;
-
-    if (!a) {
-      return { address: null };
-    }
+    if (!a) return { address: null };
 
     return {
       address: {

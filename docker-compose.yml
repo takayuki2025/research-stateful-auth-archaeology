@@ -1,8 +1,8 @@
-# version: "3.8"
+version: "3.8"
 
 services:
   # ============================================================
-  # 1) Nginx (Reverse Proxy — HTTPSを担当)
+  # 1) Nginx（Reverse Proxy）
   # ============================================================
   nginx:
     build: ./docker/nginx
@@ -10,9 +10,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./backend:/var/www/backend
-      # - ./backend/public:/var/www/backend/public
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       php:
@@ -20,31 +20,30 @@ services:
       frontend_dev:
         condition: service_started
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.2
+      - simulation1_network
 
   # ============================================================
-  # 2) PHP-FPM + Supervisor
+  # 2) PHP-FPM（Laravel）
   # ============================================================
   php:
     build: ./docker/php
     working_dir: /var/www/backend
     env_file:
-    - ./backend/.env
+      - ./backend/.env
     volumes:
-    - ./backend:/var/www/backend
+      - ./backend:/var/www/backend
     command: php-fpm
     depends_on:
-    - mysql
-    networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.3
+      - mysql
     healthcheck:
+      # ★ 実際に 9000 が LISTEN しているか確認
       test: ["CMD", "php-fpm", "-t"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - simulation1_network
 
   # ============================================================
   # 3) MySQL
@@ -56,12 +55,11 @@ services:
       MYSQL_DATABASE: laravel_db
       MYSQL_USER: laravel_user
       MYSQL_PASSWORD: laravel_pass
-      TZ: Asia/Tokyo # 🔥 追加: 明示的にタイムゾーンを設定
+      TZ: Asia/Tokyo
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.4
+      - simulation1_network
 
   # ============================================================
   # 4) phpMyAdmin
@@ -71,7 +69,7 @@ services:
     platform: linux/amd64
     environment:
       PMA_ARBITRARY: 1
-      PMA_HOST: 172.22.0.4
+      PMA_HOST: mysql
       PMA_USER: laravel_user
       PMA_PASSWORD: laravel_pass
     depends_on:
@@ -79,8 +77,7 @@ services:
     ports:
       - "8080:80"
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.5
+      - simulation1_network
 
   # ============================================================
   # 5) MailHog
@@ -93,39 +90,34 @@ services:
       - "8025:8025"
       - "1025:1025"
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.6
+      - simulation1_network
 
   # ============================================================
-  # 6) Next.js（HTTPSは使わない → Nginx が終端する）
+  # 6) Next.js（dev）
   # ============================================================
   frontend_dev:
     build:
       context: ./frontend
-    container_name: frontend_dev
     working_dir: /app
     volumes:
       - ./frontend:/app
       - /app/.next
     environment:
-      - NEXT_TELEMETRY_DISABLED=1
+      NEXT_TELEMETRY_DISABLED: "1"
     command: npm run dev -- --port 3000 --hostname 0.0.0.0
-
-  # 👇 ★これが最重要
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
       interval: 5s
       timeout: 3s
       retries: 10
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.7
+      - simulation1_network
+
   # ============================================================
-  # 7) Python
+  # 7) Python（AtlasKernel）
   # ============================================================
   python_atlaskernel:
     build: ./python_batch/atlaskernel
-    container_name: python_atlaskernel
     ports:
       - "8000:8000"
     working_dir: /app
@@ -138,18 +130,14 @@ services:
       DB_USER: laravel_user
       DB_PASS: laravel_pass
     networks:
-      simulation1_network:
-        ipv4_address: 172.22.0.8
+      - simulation1_network
 
 # ============================================================
-# Networks
+# Network
 # ============================================================
 networks:
   simulation1_network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.0.0/24
 
 # ============================================================
 # Volumes

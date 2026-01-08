@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/ui/auth/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, isLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,51 +20,14 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // ① CSRF Cookie
-      await fetch("/sanctum/csrf-cookie", { credentials: "include" });
+      /**
+       * 🔐 認証のみを行う
+       * - 状態同期は AuthProvider
+       * - 遷移判断は useAuthGuard
+       */
+      await login({ email, password });
 
-      // ② Login
-      const loginRes = await fetch("/api/login", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!loginRes.ok) {
-        throw new Error("login failed");
-      }
-
-      // ③ 最新ユーザー取得（重要：この user が真実）
-      const meRes = await fetch("/api/me", {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!meRes.ok) {
-        throw new Error("me failed");
-      }
-
-      const user = await meRes.json();
-
-      // ===== Profile Gate =====
-
-      // A. メール未認証
-      if (!user.email_verified_at) {
-        router.replace("/email/verify?from=login");
-        return;
-      }
-
-      // B. 初回ログイン or プロフィール未作成
-      if (!user.profile_completed) {
-        router.replace("/mypage/profile");
-        return;
-      }
-
-      // C. 通常ログイン
+      // ✅ ここでは必ずトップへ
       router.replace("/");
     } catch {
       setApiError("ログインに失敗しました");
@@ -92,6 +57,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
@@ -103,12 +69,13 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isLoading}
           className="w-full py-3 bg-red-600 text-white rounded"
         >
           {isSubmitting ? "ログイン中..." : "ログインする"}

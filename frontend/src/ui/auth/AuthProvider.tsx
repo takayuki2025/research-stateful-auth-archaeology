@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const me = await authClient.me();
       setUser(me);
     } catch {
-      setUser(null); // 未ログインは正常
+      setUser(null);
     }
   }, [authClient]);
 

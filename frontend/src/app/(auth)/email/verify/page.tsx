@@ -1,28 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
-import { AxiosError } from "axios";
 
 export default function VerifyEmailPage() {
-  const router = useRouter();
   const { user, apiClient, isLoading, isReady } = useAuth();
-
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
-
-  const canResend = !!user;
-
-  /**
-   * 認証済みならこのページに居させない
-   */
-  useEffect(() => {
-    if (!isReady || isLoading) return;
-    if (user?.email_verified_at) {
-      router.replace("/");
-    }
-  }, [isReady, isLoading, user, router]);
 
   const handleResend = async () => {
     if (!apiClient) return;
@@ -33,9 +17,8 @@ export default function VerifyEmailPage() {
     try {
       await apiClient.post("/email/verification-notification");
       setStatusMessage("認証メールを再送しました。");
-    } catch (e) {
-      const err = e as AxiosError<any>;
-      setStatusMessage(err.response?.data?.message ?? "再送に失敗しました。");
+    } catch {
+      setStatusMessage("再送に失敗しました。");
     } finally {
       setIsResending(false);
     }
@@ -66,28 +49,13 @@ export default function VerifyEmailPage() {
           </div>
         )}
 
-        <div className="mt-8 space-y-3">
-          <button
-            onClick={handleResend}
-            disabled={isResending || !canResend}
-            className="w-full bg-indigo-600 text-white py-3 rounded font-bold disabled:opacity-50"
-          >
-            認証メールを再送
-          </button>
-
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full border py-3 rounded font-semibold"
-          >
-            ログインページへ
-          </button>
-
-          {!user && (
-            <div className="mt-4 p-3 bg-yellow-50 text-yellow-700 text-sm rounded text-center">
-              認証メールを再送するには、一度ログインしてください。
-            </div>
-          )}
-        </div>
+        <button
+          onClick={handleResend}
+          disabled={isResending || !user}
+          className="mt-6 w-full bg-indigo-600 text-white py-3 rounded font-bold"
+        >
+          認証メールを再送
+        </button>
       </div>
     </div>
   );

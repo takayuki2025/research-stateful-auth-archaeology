@@ -2,6 +2,7 @@ export type AuthUser = {
   id: number;
   email: string;
   email_verified_at?: string | null;
+  profile_completed: boolean;
 };
 
 export type LoginResult = {

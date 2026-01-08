@@ -1,8 +1,10 @@
 import useSWR from "swr";
-import { PublicItem } from "@/types/publicItem";
 import { useAuth } from "@/ui/auth/useAuth";
+import type { PublicItemSummary } from "@/types/publicItemSummary";
 
-type Response = { items: PublicItem[] };
+type Response = {
+  items: PublicItemSummary[];
+};
 
 export const useItemListSWR = () => {
   const { apiClient, user, isReady } = useAuth();
@@ -15,14 +17,14 @@ export const useItemListSWR = () => {
     }
 
     const url = user
-      ? `/items/public?viewer_user_id=${encodeURIComponent(user.id)}`
-      : `/items/public`;
+      ? `/api/items/public?viewer_user_id=${user.id}`
+      : `/api/items/public`;
 
     const res = await apiClient.get<Response>(url);
     return res.data;
   };
 
-  const { data, error, isLoading, mutate } = useSWR<Response>(swrKey, fetcher);
+  const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher);
 
   return {
     items: data?.items ?? [],

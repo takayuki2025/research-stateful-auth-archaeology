@@ -76,6 +76,7 @@ class LocalUsersSeeder extends Seeder
                 'building' => $user['building'],
                 'address_country' => $user['address_country'],
                 'shop_id' => $user['shop_id'],
+                'profile_completed' => true,
                 'firebase_uid' => null,              // ← ローカルの決定打
                 'email_verified_at' => now(),        // ← 確認済み扱い
                 'first_login_at' => now(),

@@ -27,9 +27,21 @@ const nextConfig = {
   },
 
   /**
-   * ✅ Turbopack 用の watch 制御
-   * FD 枯渇対策の本命
+   * 🔥 Laravel API / Sanctum への転送（必須）
    */
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:8000/api/:path*",
+      },
+      {
+        source: "/sanctum/:path*",
+        destination: "http://localhost:8000/sanctum/:path*",
+      },
+    ];
+  },
+
   turbopack: {
     watchOptions: {
       ignored: [

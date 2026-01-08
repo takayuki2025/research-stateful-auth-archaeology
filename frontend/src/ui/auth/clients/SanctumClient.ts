@@ -14,7 +14,7 @@ const json = async (res: Response) => {
 /**
  * Sanctum 用 AuthClient 実装
  * - SPA + Cookie + Session 前提
- * - Occ_Auth_v1 の「Sanctum 分岐」
+ * - Occ_Auth_v1 Sanctum 分岐の正解実装
  */
 export const SanctumClient: AuthClient = {
   /* =========================
@@ -22,12 +22,11 @@ export const SanctumClient: AuthClient = {
   ========================= */
 
   async login(email: string, password: string) {
-    // CSRF Cookie
     await fetch("/sanctum/csrf-cookie", {
       credentials: "include",
     });
 
-    const res = await fetch("/login", {
+    const loginRes = await fetch("/api/login", {
       method: "POST",
       credentials: "include",
       headers: {
@@ -37,17 +36,31 @@ export const SanctumClient: AuthClient = {
       body: JSON.stringify({ email, password }),
     });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
+    if (!loginRes.ok) {
+      const data = await loginRes.json().catch(() => ({}));
       throw new Error(data?.message ?? "Login failed");
     }
 
-    // { user }
-    return res.json();
+    const meRes = await fetch("/api/me", {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+
+    if (!meRes.ok) {
+      throw new Error("Failed to fetch user");
+    }
+
+    const user = await meRes.json();
+
+    // ✅ Occ_Auth_v1 Sanctum では常に false
+    return {
+      user,
+      isFirstLogin: false,
+    };
   },
 
   async logout() {
-    await fetch("/logout", {
+    await fetch("/api/logout", {
       method: "POST",
       credentials: "include",
       headers: {
@@ -65,13 +78,15 @@ export const SanctumClient: AuthClient = {
       },
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      throw new Error("Unauthenticated");
+    }
+
     return res.json();
   },
 
   /**
    * Sanctum モードでは register は使わない
-   * （Firebase / Auth0 分岐用に interface 上は保持）
    */
   async register() {
     throw new Error("Register is not supported in Sanctum mode");

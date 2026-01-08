@@ -1,80 +1,58 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { mutate } from "swr";
+
+import { useAuthGuard } from "@/ui/auth/useAuthGuard";
+import { useAuth } from "@/ui/auth/useAuth";
 
 import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
-import { useAuth } from "@/ui/auth/useAuth";
-import type { PublicItem } from "@/types/publicItem";
+import type { PublicItemSummary } from "@/types/publicItemSummary";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
 import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
 export default function Home() {
+  useAuthGuard();
+
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const {
-    user,
-    isAuthenticated,
-    isLoading: isAuthLoading,
-    authClient,
-  } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, authClient } = useAuth();
 
   /* =========================
-     🔐 Profile Gate（最小・安定）
-  ========================= */
-  useEffect(() => {
-    if (isAuthLoading) return;
-
-    // トップは未ログインでも表示OK
-    if (!isAuthenticated || !user) return;
-
-    if (!user.email_verified_at) {
-      router.replace("/email/verify");
-      return;
-    }
-
-    if (!user.profile_completed) {
-      router.replace("/mypage/profile");
-    }
-  }, [isAuthLoading, isAuthenticated, user, router]);
-
-  /* =========================
-     🔖 Tab / Search
+     Tab / Search
   ========================= */
   const currentTab = useMemo<"all" | "mylist">(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
     [searchParams]
   );
 
-  const currentSearchQuery = useMemo(
+  const searchQuery = useMemo(
     () => searchParams.get("all_item_search") ?? "",
     [searchParams]
   );
 
-  const isSearch = currentSearchQuery.trim().length > 0;
+  const isSearch = searchQuery.trim().length > 0;
 
   /* =========================
-     📦 Data Hooks
+     Hooks（無条件）
   ========================= */
   const listResult = useItemListSWR();
-  const searchResult = useItemSearchSWR(currentSearchQuery);
+  const searchResult = useItemSearchSWR(searchQuery);
   const favoriteResult = useFavoriteItemsSWR();
 
   const isItemsLoading =
-    currentTab === "mylist"
-      ? favoriteResult.isLoading
-      : isSearch
-        ? searchResult.isLoading
-        : listResult.isLoading;
+    listResult.isLoading || searchResult.isLoading || favoriteResult.isLoading;
 
-  const items: PublicItem[] = useMemo(() => {
+  /* =========================
+     Normalize items
+  ========================= */
+  const items: PublicItemSummary[] = useMemo(() => {
     const raw =
       currentTab === "mylist"
         ? favoriteResult.items
@@ -82,28 +60,31 @@ export default function Home() {
           ? searchResult.items
           : listResult.items;
 
-    return raw.map((item: any) => ({
+    return raw.map((item) => ({
       id: item.id,
       name: item.name,
-      price: isSearch ? item.price?.amount : item.price,
-      itemImagePath: item.itemImagePath ?? item.item_image ?? null,
+      price: item.price ?? null,
+      itemImagePath: item.itemImagePath ?? null,
       displayType: item.displayType ?? null,
-      isFavorited: item.isFavorited ?? false,
+      isFavorited: Boolean(item.isFavorited),
     }));
   }, [
     currentTab,
     isSearch,
-    favoriteResult.items,
-    searchResult.items,
     listResult.items,
+    searchResult.items,
+    favoriteResult.items,
   ]);
 
   const isPageLoading = isAuthLoading || isItemsLoading;
 
   /* =========================
-     ❤️ Favorite toggle（ローカル定義）
+     Favorite toggle
   ========================= */
-  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
+  const toggleFavorite = async (
+    item: PublicItemSummary,
+    isFavorited: boolean
+  ) => {
     if (!authClient) return;
 
     try {
@@ -114,12 +95,12 @@ export default function Home() {
       }
       mutate();
     } catch (e) {
-      console.error("favorite error", e);
+      console.error(e);
     }
   };
 
   /* =========================
-     🎨 Render
+     Render
   ========================= */
   return (
     <div className={styles.main_contents}>
@@ -132,26 +113,10 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
-          {/* 🏪 テスト用ショップリンク */}
-          <div className={styles.shopButtons}>
-            {["a", "b", "c", "d"].map((code) => (
-              <button
-                key={code}
-                onClick={() => router.push(`/shops/shop-${code}`)}
-                className={styles.shopButton}
-              >
-                テストリンク ショップ{code.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
           {/* Tabs */}
           <div className={styles.main_select}>
             <Link
-              href={{
-                pathname: "/",
-                query: { tab: "all", all_item_search: currentSearchQuery },
-              }}
+              href={{ pathname: "/", query: { all_item_search: searchQuery } }}
               className={`${styles.recs} ${
                 currentTab === "all" ? styles.active : ""
               }`}
@@ -184,12 +149,11 @@ export default function Home() {
                       onClick={() => router.push(`/item/${item.id}`)}
                     >
                       <div className={styles.itemImageWrapper}>
-                        {item.displayType &&
-                          item.displayType !== "FAVORITE" && (
-                            <span className={styles.ownStar}>
-                              {item.displayType === "STAR" ? "⭐️" : "💫"}
-                            </span>
-                          )}
+                        {item.displayType && (
+                          <span className={styles.ownStar}>
+                            {item.displayType === "STAR" ? "⭐️" : "💫"}
+                          </span>
+                        )}
 
                         {isAuthenticated && (
                           <button

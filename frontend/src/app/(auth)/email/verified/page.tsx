@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function EmailVerifiedPage() {
+  const router = useRouter();
+
   useEffect(() => {
-    // Cookie 状態に依存しない「確実な遷移」
-    setTimeout(() => {
-      window.location.replace("/login?verified=1");
-    }, 300);
-  }, []);
+    const timer = setTimeout(() => {
+      router.replace("/login");
+    }, 2000); // ← 2秒（好みで 1000〜3000）
+
+    return () => clearTimeout(timer);
+  }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div>
-        <h1>メール認証が完了しました</h1>
-        <p>ログイン画面へ移動します…</p>
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center space-y-4">
+        <h1 className="text-xl font-semibold">メール認証が完了しました</h1>
+        <p className="text-gray-600">ログイン画面へ移動します…</p>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ use App\Modules\Order\Domain\Event\OrderPaid;
 use App\Modules\Order\Infrastructure\EventListener\OnOrderPaidRecordOrderHistory;
 use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaid;
 use App\Modules\Shop\Infrastructure\Listener\EnsureShopAddressOnOrderPaid;
+use App\Listeners\SetFirstLoginAtOnVerified;
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -31,8 +32,8 @@ final class EventServiceProvider extends ServiceProvider
             \App\Listeners\RedirectAfterEmailVerified::class,
         ],
 
-        \Illuminate\Auth\Events\Verified::class => [
-        \App\Listeners\SetFirstLoginAtOnVerified::class,
+        Verified::class => [
+        SetFirstLoginAtOnVerified::class,
     ],
         /*
         |--------------------------------------------------------------------------
