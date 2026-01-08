@@ -6,13 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { mutate } from "swr";
 
 import { useAuthGuard } from "@/ui/auth/useAuthGuard";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
-import type { PublicItemSummary } from "@/types/publicItemSummary";
+import type { PublicItemCard } from "@/ui/viewModels/PublicItemCard";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
 import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
@@ -22,7 +22,7 @@ export default function Home() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: isAuthLoading, authClient } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
 
   /* =========================
      Tab / Search
@@ -40,7 +40,7 @@ export default function Home() {
   const isSearch = searchQuery.trim().length > 0;
 
   /* =========================
-     Hooks（無条件）
+     Hooks（常に呼ぶ）
   ========================= */
   const listResult = useItemListSWR();
   const searchResult = useItemSearchSWR(searchQuery);
@@ -50,9 +50,9 @@ export default function Home() {
     listResult.isLoading || searchResult.isLoading || favoriteResult.isLoading;
 
   /* =========================
-     Normalize items
+     Normalize → ViewModel
   ========================= */
-  const items: PublicItemSummary[] = useMemo(() => {
+  const items: PublicItemCard[] = useMemo(() => {
     const raw =
       currentTab === "mylist"
         ? favoriteResult.items
@@ -81,19 +81,16 @@ export default function Home() {
   /* =========================
      Favorite toggle
   ========================= */
-  const toggleFavorite = async (
-    item: PublicItemSummary,
-    isFavorited: boolean
-  ) => {
-    if (!authClient) return;
+  const toggleFavorite = async (item: PublicItemCard, isFavorited: boolean) => {
+    if (!apiClient) return;
 
     try {
       if (isFavorited) {
-        await authClient.delete(`/favorites/${item.id}`);
+        await apiClient.delete(`/favorites/${item.id}`);
       } else {
-        await authClient.post(`/favorites/${item.id}`);
+        await apiClient.post(`/favorites/${item.id}`);
       }
-      mutate();
+      mutate(); // SWR 全体再検証
     } catch (e) {
       console.error(e);
     }
@@ -138,7 +135,7 @@ export default function Home() {
           <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => {
-                const isFavorited = item.isFavorited === true;
+                const isFavorited = item.isFavorited;
 
                 return (
                   <div key={item.id} className={styles.items_select_all}>
@@ -146,7 +143,7 @@ export default function Home() {
                       className={styles.cardLink}
                       role="button"
                       tabIndex={0}
-                      onClick={() => router.push(`/api/item/${item.id}`)}
+                      onClick={() => router.push(`/item/${item.id}`)}
                     >
                       <div className={styles.itemImageWrapper}>
                         {item.displayType && (

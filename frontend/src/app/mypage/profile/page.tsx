@@ -9,10 +9,13 @@ import React, {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
 import styles from "./W-ProfilePage.module.css";
 
+/* =========================
+   Types
+========================= */
 interface ProfileUser {
   id: number;
   display_name: string | null;
@@ -36,13 +39,16 @@ type ProfileErrors = {
   user_image?: string[];
 };
 
+/* =========================
+   Component
+========================= */
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const {
     user: authUser,
-    authClient,
+    apiClient,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
@@ -94,6 +100,8 @@ export default function ProfilePage() {
 
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
+      if (!apiClient) return;
+
       if (!isRetry) {
         setIsFetching(true);
         setSuccessMessage("");
@@ -101,7 +109,7 @@ export default function ProfilePage() {
       }
 
       try {
-        const data = await authClient.get("/mypage/profile");
+        const data = await apiClient.get("/mypage/profile");
         initializeProfileFromResponse(data);
         setIsLoading(false);
         setIsRecovering(false);
@@ -109,37 +117,71 @@ export default function ProfilePage() {
         if (err?.message === "Unauthenticated") {
           await logout();
           router.replace("/login");
-          return;
         }
         setIsLoading(false);
       } finally {
         if (!isRetry) setIsFetching(false);
       }
     },
-    [authClient, initializeProfileFromResponse, logout, router]
+    [apiClient, initializeProfileFromResponse, logout, router]
   );
 
-  // メール認証完了後の再同期
-  useEffect(() => {
-    if (!isVerificationRedirect) return;
-    if (verificationHandledRef.current) return;
+  // プロフィール画像アップロード
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !apiClient) return;
 
-    verificationHandledRef.current = true;
+    setImageError("");
+    setIsLoading(true);
 
-    const run = async () => {
-      try {
-        setIsRecovering(true);
-        const me = await authClient.me();
-        if (!me) {
-          await logout();
-          router.replace("/login");
-        }
-      } finally {
-        setIsRecovering(false);
+    const formData = new FormData();
+    formData.append("user_image", file);
+
+    try {
+      const data = await apiClient.post("/mypage/profile/image", formData);
+
+      initializeProfileFromResponse(data);
+      setSuccessMessage("画像を更新しました！");
+    } catch (err: any) {
+      setImageError(
+        err?.errors?.user_image?.[0] ?? "画像アップロードに失敗しました。"
+      );
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
-    };
-    run();
-  }, [isVerificationRedirect, authClient, logout, router]);
+    }
+  };
+
+  // プロフィール更新
+  const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!apiClient) return;
+
+    setProfileErrors({});
+    setIsLoading(true);
+    setSuccessMessage("");
+
+    try {
+      const data = await apiClient.post("/mypage/profile", form);
+      initializeProfileFromResponse(data);
+
+      setSuccessMessage(
+        profileUser
+          ? "プロフィールを更新しました！"
+          : "プロフィールを作成しました！"
+      );
+    } catch (err: any) {
+      if (err?.errors) {
+        setProfileErrors(err.errors);
+      } else {
+        setSuccessMessage("更新時にエラーが発生しました。");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 初期ロード
   useEffect(() => {
@@ -163,78 +205,16 @@ export default function ProfilePage() {
     router,
   ]);
 
-  // プロフィール画像アップロード
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImageError("");
-    setIsLoading(true);
-
-    const formData = new FormData();
-    formData.append("user_image", file);
-
-    try {
-      const res = await fetch("/mypage/profile/image", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (!res.ok) throw await res.json();
-
-      const data = await res.json();
-      initializeProfileFromResponse(data);
-      setSuccessMessage("画像を更新しました！");
-    } catch (err: any) {
-      setImageError(
-        err?.errors?.user_image?.[0] ?? "画像アップロードに失敗しました。"
-      );
-    } finally {
-      setIsLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  // プロフィール更新
-  const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    setProfileErrors({});
-    setIsLoading(true);
-
-    try {
-      const res = await authClient.post("/mypage/profile", form);
-      initializeProfileFromResponse(res);
-      setSuccessMessage(
-        profileUser
-          ? "プロフィールを更新しました！"
-          : "プロフィールを作成しました！"
-      );
-    } catch (err: any) {
-      if (err?.errors) {
-        setProfileErrors(err.errors);
-      } else {
-        setSuccessMessage("更新時にエラーが発生しました。");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   /* =========================
-     Render
+     Render Guards
   ========================= */
-
   if (isAuthLoading || isLoading || isRecovering) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
         <h2 className={styles.title}>プロフィール設定</h2>
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
-          <p className="text-gray-500 mt-3">
-            {isRecovering ? "セッションを再同期しています..." : "読み込み中..."}
-          </p>
+          <p className="text-gray-500 mt-3">読み込み中...</p>
         </div>
       </div>
     );
@@ -315,7 +295,7 @@ export default function ProfilePage() {
               }
             />
             <div className={styles.profile__error}>
-              {profileErrors.name ? profileErrors.name[0] : ""}
+              {profileErrors.display_name ? profileErrors.display_name[0] : ""}
             </div>
           </div>
 

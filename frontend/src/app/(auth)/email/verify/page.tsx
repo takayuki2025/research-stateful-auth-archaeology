@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 export default function VerifyEmailPage() {
-  const { user, apiClient, isLoading, isReady } = useAuth();
+  const { user, apiClient, isLoading, } = useAuth();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
 
@@ -24,7 +24,7 @@ export default function VerifyEmailPage() {
     }
   };
 
-  if (isLoading || !isReady) {
+  if (isLoading) {
     return <div className="mt-20 text-center">読み込み中...</div>;
   }
 

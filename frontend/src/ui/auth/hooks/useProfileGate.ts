@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 export function useProfileGate(options?: {
   profileUrl?: string;
@@ -12,49 +12,49 @@ export function useProfileGate(options?: {
   const redirectTo = options?.redirectTo ?? "/mypage/profile";
 
   const router = useRouter();
-  const { isAuthenticated, isReady, isLoading, authClient } = useAuth();
+  const { isAuthenticated, isLoading, apiClient } = useAuth();
 
-  const [profileChecked, setProfileChecked] = useState(false);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
 
+  // 🔹 プロフィール有無の取得（ログイン済み時のみ）
   useEffect(() => {
-    if (!isReady || isLoading) return;
-    if (!isAuthenticated) {
-      setProfileChecked(true);
-      setHasProfile(null);
-      return;
-    }
+    if (isLoading || !isAuthenticated) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        const data = await authClient.get<any>(profileUrl);
-        if (cancelled) return;
-        setHasProfile(!!data?.has_profile);
-        setProfileChecked(true);
+        const data = await apiClient.get<any>(profileUrl);
+        if (!cancelled) {
+          setHasProfile(!!data?.has_profile);
+        }
       } catch {
-        if (cancelled) return;
-        setHasProfile(false);
-        setProfileChecked(true);
+        if (!cancelled) {
+          setHasProfile(false);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [isReady, isLoading, isAuthenticated, authClient, profileUrl]);
+  }, [isLoading, isAuthenticated, apiClient, profileUrl]);
 
+  // 🔹 未作成ならリダイレクト
   useEffect(() => {
-    if (isAuthenticated && profileChecked && hasProfile === false) {
+    if (isAuthenticated && hasProfile === false) {
       router.replace(redirectTo);
     }
-  }, [isAuthenticated, profileChecked, hasProfile, redirectTo, router]);
+  }, [isAuthenticated, hasProfile, redirectTo, router]);
 
-  const isGateLoading = useMemo(
-    () => isAuthenticated && (!profileChecked || hasProfile === null),
-    [isAuthenticated, profileChecked, hasProfile]
-  );
+  // 🔹 Gate のローディング状態
+  const isGateLoading = useMemo(() => {
+    if (!isAuthenticated) return false;
+    return hasProfile === null;
+  }, [isAuthenticated, hasProfile]);
 
-  return { isGateLoading, profileChecked, hasProfile };
+  return {
+    isGateLoading,
+    hasProfile,
+  };
 }

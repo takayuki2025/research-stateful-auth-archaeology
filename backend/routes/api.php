@@ -88,10 +88,13 @@ use App\Modules\Search\Presentation\Http\Controllers\{
 Route::get('/items/public', PublicCatalogController::class);
 Route::get('/search/items', PublicItemSearchController::class);
 Route::get('/search/shop-items', ShopItemSearchController::class);
-Route::get('/item/{id}', ItemDetailController::class);
+// Route::get('/item/{id}', ItemDetailController::class);
 Route::get('/items/{itemId}', ItemDetailController::class)
     ->whereNumber('itemId');
 
+Route::middleware('auth.sanctum.optional')->group(function () {
+    Route::get('/items/{itemId}', ItemDetailController::class)->whereNumber('itemId');
+});
 
 
 

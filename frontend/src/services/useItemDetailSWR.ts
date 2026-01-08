@@ -1,9 +1,9 @@
+"use client";
+
 import { useEffect } from "react";
 import useSWR from "swr";
-import { useAuth } from "@/ui/auth/useAuth";
-/**
- * API Response 型
- */
+import { useAuth } from "@/ui/auth/AuthProvider";
+
 export type ItemDetailResponse = {
   item: {
     id: number;
@@ -39,37 +39,54 @@ export type ItemDetailResponse = {
 };
 
 export const useItemDetailSWR = (itemId: number | null) => {
-  const { apiClient, isReady, isAuthenticated } = useAuth();
+  const { apiClient, isLoading, isAuthenticated } = useAuth();
+
+  console.log("[ItemDetailSWR] itemId =", itemId);
+  console.log("[ItemDetailSWR] isLoading =", isLoading);
+  console.log("[ItemDetailSWR] isAuthenticated =", isAuthenticated);
+  console.log("[ItemDetailSWR] apiClient =", apiClient);
 
   const shouldFetch =
-    typeof itemId === "number" && Number.isFinite(itemId) && isReady;
+    typeof itemId === "number" &&
+    Number.isFinite(itemId) &&
+    !isLoading && // ✅ 修正点（超重要）
+    apiClient !== null;
+
+  console.log("[ItemDetailSWR] shouldFetch =", shouldFetch);
 
   const swrKey = shouldFetch
     ? ["item-detail", itemId, isAuthenticated ? "auth" : "guest"]
     : null;
 
+  console.log("[ItemDetailSWR] swrKey =", swrKey);
+
   const fetcher = async (): Promise<ItemDetailResponse> => {
-    const res = await apiClient.get(`/items/${itemId}`);
-    return res.data;
+    console.log("[ItemDetailSWR] FETCH START", `/items/${itemId}`);
+    const res = await apiClient!.get<ItemDetailResponse>(`/items/${itemId}`);
+    console.log("[ItemDetailSWR] FETCH RESPONSE", res);
+    return res;
   };
 
-  const { data, error, isLoading, mutate } = useSWR<ItemDetailResponse>(
-    swrKey,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateIfStale: false,
-      shouldRetryOnError: false,
-    }
-  );
+  const { data, error, mutate } = useSWR<ItemDetailResponse>(swrKey, fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+    shouldRetryOnError: false,
+  });
 
-  // guest → auth 切替時の再取得
+  console.log("[ItemDetailSWR] data =", data);
+  console.log("[ItemDetailSWR] error =", error);
+
+  // auth 切替時は key が変わるので自動再取得される
   useEffect(() => {
-    if (isAuthenticated && isReady) {
-      mutate();
-    }
-  }, [isAuthenticated, isReady, mutate]);
+    console.log(
+      "[ItemDetailSWR] auth change",
+      "isAuthenticated =",
+      isAuthenticated,
+      "isLoading =",
+      isLoading
+    );
+  }, [isAuthenticated, isLoading]);
 
   return {
     item: data?.item ?? null,

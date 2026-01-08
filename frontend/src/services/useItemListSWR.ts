@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import type { PublicItemSummary } from "@/types/publicItemSummary";
 
 type Response = {
@@ -7,24 +7,22 @@ type Response = {
 };
 
 export const useItemListSWR = () => {
-  const { apiClient, user, isReady } = useAuth();
+  const { apiClient, user, isLoading } = useAuth();
 
-  const swrKey = isReady ? ["public-items", user?.id ?? "guest"] : null;
+  const shouldFetch = !isLoading && apiClient !== null;
+
+  const swrKey = shouldFetch ? ["public-items", user?.id ?? "guest"] : null;
 
   const fetcher = async (): Promise<Response> => {
-    if (!apiClient) {
-      throw new Error("apiClient not ready");
-    }
-
     const url = user
-      ? `/api/items/public?viewer_user_id=${user.id}`
-      : `/api/items/public`;
+      ? `/items/public?viewer_user_id=${user.id}`
+      : `/items/public`;
 
-    const res = await apiClient.get<Response>(url);
-    return res.data;
+    // ★ res はすでに Response
+    return apiClient!.get<Response>(url);
   };
 
-  const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher);
+  const { data, error, mutate } = useSWR<Response>(swrKey, fetcher);
 
   return {
     items: data?.items ?? [],

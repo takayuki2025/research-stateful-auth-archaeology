@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useState, type FormEvent } from "react";
 
 export default function HeaderMain() {

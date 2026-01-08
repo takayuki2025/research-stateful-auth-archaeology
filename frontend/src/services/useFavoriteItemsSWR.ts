@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useAuthedFetcher } from "@/ui/auth/useAuthedFetcher";
 import type { PublicItemSummary } from "@/types/publicItemSummary";
 
@@ -10,12 +10,12 @@ type Response = {
 export const FAVORITE_ITEMS_SWR_KEY = "/items/favorite";
 
 export const useFavoriteItemsSWR = () => {
-  const { isAuthenticated, isReady } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const fetcher = useAuthedFetcher();
 
-  const swrKey = isReady && isAuthenticated ? FAVORITE_ITEMS_SWR_KEY : null;
+  const swrKey = !isLoading && isAuthenticated ? FAVORITE_ITEMS_SWR_KEY : null;
 
-  const { data, error, isLoading, mutate } = useSWR<Response>(
+  const { data, error, mutate } = useSWR<Response>(
     swrKey,
     () => fetcher.get(FAVORITE_ITEMS_SWR_KEY),
     {

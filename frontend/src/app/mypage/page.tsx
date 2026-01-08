@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { AxiosResponse } from "axios";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import styles from "./W-Mypage.module.css";
 
@@ -54,17 +53,35 @@ export default function Mypage() {
   }, [searchParams]);
 
   // =============================
+  // APIレスポンス吸収（axios / 非axios 両対応）
+  // =============================
+  const normalizeProfileResponse = (res: any): ProfileUser | null => {
+    // 1) apiClientが「dataそのもの」を返す場合: { user: {...}, has_profile: true }
+    if (res?.user) return res.user as ProfileUser;
+
+    // 2) axios互換: { data: { user: {...} } }
+    if (res?.data?.user) return res.data.user as ProfileUser;
+
+    // 3) user直返し
+    if (res?.display_name !== undefined) return res as ProfileUser;
+
+    return null;
+  };
+
+  // =============================
   // プロフィール取得（Gate しない）
   // =============================
   const fetchProfile = useCallback(async () => {
     if (!apiClient) return;
 
     try {
-      const res: AxiosResponse<any> = await apiClient.get("/mypage/profile");
-      const data = res.data?.user ?? null;
+      const res = await apiClient.get("/mypage/profile");
+      const data = normalizeProfileResponse(res);
       setUser(data);
     } catch (e: any) {
-      if (e.response?.status === 401) {
+      // apiClientが throw する形式に合わせて広めに拾う
+      const status = e?.response?.status ?? e?.status ?? null;
+      if (status === 401 || e?.message === "Unauthenticated") {
         await logout();
         router.replace("/login");
       }
@@ -82,8 +99,11 @@ export default function Mypage() {
     setIsLoading(true);
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
-      const res: AxiosResponse<any> = await apiClient.get(endpoint);
-      setItems((res.data?.items ?? []) as MypageItem[]);
+      const res = await apiClient.get(endpoint);
+
+      // axios / 非axios 両対応
+      const list = (res?.items ?? res?.data?.items ?? []) as MypageItem[];
+      setItems(list);
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +139,7 @@ export default function Mypage() {
   // ★ ここが超重要：null でも描画する
   const safeUser: ProfileUser = user ?? {
     id: 0,
-    display_name: "",
+    display_name: "（ユーザー名未設定）",
     user_image: null,
   };
 

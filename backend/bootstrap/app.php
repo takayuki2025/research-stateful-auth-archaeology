@@ -87,7 +87,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Sanctum
             'sanctum.auth'      => \Laravel\Sanctum\Http\Middleware\Authenticate::class,
-
+            'auth.sanctum.optional' => \App\Http\Middleware\OptionalSanctumAuth::class,
             // Tenant
             'tenant'            => \App\Http\Middleware\ResolveTenant::class,
 

@@ -2,18 +2,19 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 export function useRequireAuth(redirectTo = "/login") {
   const router = useRouter();
-  const { isReady, isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (!isReady || isLoading) return;
+    if (isLoading) return;
+
     if (!isAuthenticated) {
       router.replace(redirectTo);
     }
-  }, [isReady, isLoading, isAuthenticated, redirectTo, router]);
+  }, [isLoading, isAuthenticated, redirectTo, router]);
 
-  return { isReady, isLoading, isAuthenticated };
+  return { isLoading, isAuthenticated };
 }

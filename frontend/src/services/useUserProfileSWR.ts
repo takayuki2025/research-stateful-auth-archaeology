@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useAuthedFetcher } from "@/ui/auth/useAuthedFetcher";
 
 export type UserAddress = {
@@ -14,12 +14,17 @@ export type UserProfile = {
 };
 
 export function useUserProfileSWR() {
-  const { isAuthenticated, isReady } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const fetcher = useAuthedFetcher();
 
-  const swrKey = isReady && isAuthenticated ? "/mypage/profile" : null;
+  // ✅ isReady は不要。isLoading で完全に代替できる
+  const swrKey = !isLoading && isAuthenticated ? "/mypage/profile" : null;
 
-  const { data, error, isLoading } = useSWR<UserProfile>(swrKey, async () => {
+  const {
+    data,
+    error,
+    isLoading: swrLoading,
+  } = useSWR<UserProfile>(swrKey, async () => {
     const res = await fetcher.get<any>("/mypage/profile");
     const a = res.address ?? null;
 
@@ -37,7 +42,7 @@ export function useUserProfileSWR() {
 
   return {
     profile: data ?? null,
-    isLoading,
+    isLoading: isLoading || swrLoading,
     isError: !!error,
   };
 }

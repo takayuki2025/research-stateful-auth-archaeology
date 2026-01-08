@@ -2,17 +2,17 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 /**
  * 🔐 Occ_Auth_v1 Auth Guard（最終形）
  */
 export function useAuthGuard() {
-  const { user, isAuthenticated, isLoading, isReady } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isReady || isLoading) return;
+    if (!isLoading || isLoading) return;
 
     // 未ログインはガードしない
     if (!isAuthenticated || !user) return;
@@ -30,5 +30,5 @@ export function useAuthGuard() {
     }
 
     // ③ 通過
-  }, [isReady, isLoading, isAuthenticated, user, router]);
+  }, [isLoading, isAuthenticated, user, router]);
 }

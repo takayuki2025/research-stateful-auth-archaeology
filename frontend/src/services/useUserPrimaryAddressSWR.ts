@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useAuthedFetcher } from "@/ui/auth/useAuthedFetcher";
 
 export type UserPrimaryAddress = {
@@ -13,16 +13,21 @@ export type UserPrimaryAddress = {
 };
 
 export function useUserPrimaryAddressSWR() {
-  const { isAuthenticated, isReady } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const fetcher = useAuthedFetcher();
 
-  const swrKey = isReady && isAuthenticated ? "/me/addresses/primary" : null;
+  // ✅ isReady 廃止。Auth 初期化完了＋認証済みでのみ取得
+  const swrKey = !isLoading && isAuthenticated ? "/me/addresses/primary" : null;
 
-  const { data, error, isLoading } = useSWR<UserPrimaryAddress | null>(
+  const {
+    data,
+    error,
+    isLoading: swrLoading,
+  } = useSWR<UserPrimaryAddress | null>(
     swrKey,
     async () => {
       const res = await fetcher.get<any>("/me/addresses/primary");
-      const a = res?.data ?? null;
+      const a = res ?? null;
 
       if (!a) return null;
 
@@ -43,7 +48,7 @@ export function useUserPrimaryAddressSWR() {
 
   return {
     address: data ?? null,
-    isLoading,
+    isLoading: isLoading || swrLoading,
     isError: !!error,
   };
 }

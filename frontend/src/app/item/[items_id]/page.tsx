@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";

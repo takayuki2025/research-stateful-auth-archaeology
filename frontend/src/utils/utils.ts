@@ -1,5 +1,5 @@
 // ======================================
-// IMAGE TYPE（fallback 用）
+// IMAGE TYPE
 // ======================================
 export enum IMAGE_TYPE {
   USER = "user",
@@ -8,20 +8,20 @@ export enum IMAGE_TYPE {
 }
 
 // ======================================
-// getOrigin（SSR / CSR 両対応）
+// Backend Origin（単一責任）
 // ======================================
-function getOrigin(): string {
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost";
+function getBackendOrigin(): string {
+  return (
+    process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "") ||
+    "http://localhost"
+  );
 }
 
 // ======================================
-// Fallback Images（相対 or origin）
+// Fallback Images
 // ======================================
 function getFallback(type: IMAGE_TYPE): string {
-  const origin = getOrigin();
+  const origin = getBackendOrigin();
 
   if (type === IMAGE_TYPE.USER) {
     return `${origin}/pictures_user/default-profile2.jpg`;
@@ -31,26 +31,26 @@ function getFallback(type: IMAGE_TYPE): string {
 }
 
 // ======================================
-// getImageUrl（最終版）
+// getImageUrl（安定版）
 // ======================================
 export function getImageUrl(
   path?: string | null,
   type: IMAGE_TYPE = IMAGE_TYPE.OTHER
 ): string {
-  const origin = getOrigin();
+  const origin = getBackendOrigin();
 
   if (!path) {
     return getFallback(type);
   }
 
-  // absolute URL
-  if (path.startsWith("http://") || path.startsWith("https://")) {
+  // absolute URL（S3 等）
+  if (/^https?:\/\//i.test(path)) {
     return path;
   }
 
-  // USER 画像は public 直下
+  // USER 画像（public 直下）
   if (type === IMAGE_TYPE.USER) {
-    return `${origin}/${path}`;
+    return `${origin}/${path.replace(/^\/+/, "")}`;
   }
 
   // Laravel storage absolute
@@ -63,7 +63,8 @@ export function getImageUrl(
     return `${origin}/storage/${path}`;
   }
 
-  return `${origin}/${path}`;
+  // その他（念のため）
+  return `${origin}/${path.replace(/^\/+/, "")}`;
 }
 
 // ======================================

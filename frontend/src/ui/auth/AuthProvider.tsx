@@ -2,146 +2,64 @@
 
 import React, {
   createContext,
-  useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import { SanctumClient } from "./clients/SanctumClient";
-import type { AuthContextType, AxiosLikeClient } from "./AuthContext";
-import type {
-  AuthClient,
-  AuthUser,
-  LoginResult,
-  RegisterResult,
-} from "./AuthClient";
+import type { AuthContext, AuthUser } from "@/ui/auth/contracts";
+import { SanctumAuthAdapter } from "@/ui/auth/sanctum/SanctumAuthAdapter";
 
-export const AuthContext = createContext<AuthContextType | null>(null);
-
-function createAxiosLikeClient(authClient: AuthClient): AxiosLikeClient {
-  return {
-    async get(url) {
-      const data = await authClient.get(url);
-      return { data };
-    },
-    async post(url, body) {
-      const data = await authClient.post(url, body);
-      return { data };
-    },
-    async patch(url, body) {
-      const data = await authClient.patch(url, body);
-      return { data };
-    },
-    async delete(url) {
-      const data = await authClient.delete(url);
-      return { data };
-    },
-  };
-}
+const AuthCtx = createContext<AuthContext | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const authClient: AuthClient = SanctumClient;
+  const adapter = useMemo(() => new SanctumAuthAdapter(), []);
 
-  const apiClient = useMemo(
-    () => createAxiosLikeClient(authClient),
-    [authClient]
-  );
-
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isReady, setIsReady] = useState(false);
-
-  const reloadUser = useCallback(async () => {
-    try {
-      const me = await authClient.me();
-      setUser(me);
-    } catch {
-      setUser(null);
-    }
-  }, [authClient]);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
+      setIsLoading(true);
       try {
-        await reloadUser();
+        const u = await adapter.init();
+        if (mounted) setUser(u);
       } finally {
-        setIsLoading(false);
-        setIsReady(true);
+        if (mounted) setIsLoading(false);
       }
     })();
-  }, [reloadUser]);
+    return () => {
+      mounted = false;
+    };
+  }, [adapter]);
 
-  const login = useCallback(
-    async (args: { email: string; password: string }): Promise<LoginResult> => {
-      setIsLoading(true);
-      try {
-        const result = await authClient.login(args.email, args.password);
-        setUser(result.user);
-        return result;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [authClient]
-  );
-
-  const register = useCallback(
-    async (args: {
-      name: string;
-      email: string;
-      password: string;
-    }): Promise<RegisterResult> => {
-      setIsLoading(true);
-      try {
-        return await authClient.register(args.name, args.email, args.password);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [authClient]
-  );
-
-  const logout = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await authClient.logout();
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authClient]);
-
-  const reloginWithFirebaseToken = useCallback(async () => {
-    throw new Error("Not supported in Sanctum mode");
-  }, []);
-
-  const value: AuthContextType = useMemo(
+  const value: AuthContext = useMemo(
     () => ({
-      user,
+      isLoading,
       isAuthenticated: !!user,
-      isLoading,
-      isReady,
-      authClient,
-      apiClient,
-      login,
-      register,
-      logout,
-      reloadUser,
-      reloginWithFirebaseToken,
-    }),
-    [
       user,
-      isLoading,
-      isReady,
-      authClient,
-      apiClient,
-      login,
-      register,
-      logout,
-      reloadUser,
-      reloginWithFirebaseToken,
-    ]
+      apiClient: adapter.getApiClient(),
+
+      login: async ({ email, password }) => {
+        await adapter.login({ email, password });
+        const u = await adapter.init();
+        setUser(u);
+      },
+
+      logout: async () => {
+        await adapter.logout();
+        setUser(null);
+      },
+    }),
+    [adapter, isLoading, user]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+export function useAuth(): AuthContext {
+  const ctx = useContext(AuthCtx);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 }
