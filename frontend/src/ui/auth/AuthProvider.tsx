@@ -52,8 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   const reloadUser = useCallback(async () => {
-    const me = await authClient.me();
-    setUser(me);
+    try {
+      const me = await authClient.me();
+      setUser(me);
+    } catch {
+      setUser(null); // 未ログインは正常
+    }
   }, [authClient]);
 
   useEffect(() => {

@@ -122,16 +122,16 @@ export default function Home() {
   ========================= */
   if (isGateLoading) {
     return (
-      <HeaderMainFrame>
+      // <HeaderMainFrame>
         <div className={styles.main_contents}>
           <p>確認中...</p>
         </div>
-      </HeaderMainFrame>
+      // </HeaderMainFrame>
     );
   }
 
   return (
-    <HeaderMainFrame>
+    // <HeaderMainFrame>
       <div className={styles.main_contents}>
         {isPageLoading && (
           <div className={styles.loadingBox}>
@@ -248,6 +248,6 @@ export default function Home() {
           </>
         )}
       </div>
-    </HeaderMainFrame>
+    // </HeaderMainFrame>
   );
 }

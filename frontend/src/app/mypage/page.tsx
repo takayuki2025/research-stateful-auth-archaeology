@@ -13,7 +13,7 @@ import type { PublicItem } from "@/types/publicItem";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
-import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
+import styles from "./W-Mypage.module.css";
 
 export default function Home() {
   const router = useRouter();

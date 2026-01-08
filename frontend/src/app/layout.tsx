@@ -1,6 +1,6 @@
+import "@/app/globals.css";
+import HeaderMain from "@/components/layout/HeaderMain";
 import { AppProviders } from "./providers";
-
-import "./globals.css";
 
 export default function RootLayout({
   children,
@@ -10,7 +10,10 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <HeaderMain />
+          <main className="pt-[70px]">{children}</main>
+        </AppProviders>
       </body>
     </html>
   );

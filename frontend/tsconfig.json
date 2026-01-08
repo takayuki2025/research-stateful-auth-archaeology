@@ -17,19 +17,7 @@
     // ✔ Next.js が app router の場合でも src を alias の root にする
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-
-      "@/services/*": ["src/services/*"],
-      "@/domain/*": ["src/domain/*"],
-      "@/application/*": ["src/application/*"],
-      "@/infrastructure/*": ["src/infrastructure/*"],
-      "@/ui/*": ["src/ui/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/types/*": ["src/types/*"],
-      "@/components/*": ["components/*"],
-
-      // root 直下の hooks は別扱い
-      "@/hooks/*": ["hooks/*"]
+      "@/*": ["./src/*"],
     },
 
     "strict": true,

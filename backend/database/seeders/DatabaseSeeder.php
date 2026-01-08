@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
         if (app()->environment('local')) {
             $this->call(LocalUsersSeeder::class);
         } else {
-            $this->call(UsersTableSeeder::class); // Firebase前提
+            $this->call(FirebaseUsersSeeder::class); // Firebase前提
         }
 
         $this->call([

@@ -130,54 +130,46 @@ return Application::configure(basePath: dirname(__DIR__))
     */
     ->withExceptions(function (Exceptions $exceptions) {
 
-        $exceptions->render(function (\Throwable $e, Request $request) {
+    $exceptions->render(function (\Throwable $e, Request $request) {
 
-            /**
-             * ✅ 重要：SPA + API 前提
-             * - api/* は常に JSON
-             * - expectsJson() だけに依存すると Accept ヘッダ不備で web 扱いになる
-             */
-            $isApi = $request->is('api/*');
-            $wantsJson = $request->expectsJson() || $isApi;
+        $isApi = $request->is('api/*');
+        $wantsJson = $request->expectsJson() || $isApi;
 
-            if (!$wantsJson) {
-                return null; // web は Laravel 標準の HTML を許可
-            }
+        // ✅ web リクエストは Laravel 標準に完全委譲
+        if (!$wantsJson) {
+            throw $e;
+        }
 
-            if ($e instanceof AuthenticationException) {
-                return response()->json([
-                    'error_type' => 'AuthenticationException',
-                    'message' => 'Unauthenticated',
-                ], 401);
-            }
-
-            if ($e instanceof \DomainException) {
-                return response()->json([
-                    'error_type' => 'DomainException',
-                    'message' => $e->getMessage(),
-                ], 422);
-            }
-
-            if ($e instanceof BindingResolutionException) {
-                return response()->json([
-                    'error_type' => 'BindingResolutionException',
-                    'message' => 'Service binding error: ' . $e->getMessage(),
-                    'line' => $e->getLine(),
-                    'file' => basename($e->getFile()),
-                ], 500);
-            }
-
-            $statusCode = $e instanceof HttpExceptionInterface
-                ? $e->getStatusCode()
-                : 500;
-
+        if ($e instanceof AuthenticationException) {
             return response()->json([
-                'error_type' => get_class($e),
+                'error_type' => 'AuthenticationException',
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
+
+        if ($e instanceof \DomainException) {
+            return response()->json([
+                'error_type' => 'DomainException',
                 'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => basename($e->getFile()),
-            ], $statusCode);
-        });
-    })
+            ], 422);
+        }
+
+        if ($e instanceof BindingResolutionException) {
+            return response()->json([
+                'error_type' => 'BindingResolutionException',
+                'message' => 'Service binding error: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        $statusCode = $e instanceof HttpExceptionInterface
+            ? $e->getStatusCode()
+            : 500;
+
+        return response()->json([
+            'error_type' => get_class($e),
+            'message' => $e->getMessage(),
+        ], $statusCode);
+    });
+})
 
     ->create();

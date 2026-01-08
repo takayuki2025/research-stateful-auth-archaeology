@@ -1,5 +1,6 @@
 <?php
 
+namespace App\Http\Controllers;
 
 use App\Jobs\AnalyzeEntityWithAtlasKernel;
 use Illuminate\Support\Facades\Http;

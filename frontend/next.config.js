@@ -2,9 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // PPR / RSC キャッシュ
-  // cacheComponents: false,
-
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:
@@ -18,7 +15,6 @@ const nextConfig = {
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   },
 
-  // Origin 統一型では、画像の取得先として backend を許可
   images: {
     remotePatterns: [
       {
@@ -30,28 +26,20 @@ const nextConfig = {
     ],
   },
 
-  // 🔥🔥 これが Origin 統一の最重要ポイント（API プロキシ）
-  // async rewrites() {
-  //   return [
-  //     {
-  //       source: "/api/:path*",
-  //       destination: "https://localhost:9000/api/:path*",
-  //     },
-  //     {
-  //       source: "/sanctum/:path*",
-  //       destination: "https://localhost:9000/sanctum/:path*",
-  //     },
-  //   ];
-  // },
-
-  // 🔥 mkcert を使用している場合に必須
-  // Next.js dev server 自身も HTTPS として動けるようにする
-  // serverRuntimeConfig: {},
-  // experimental: {
-  //   serverActions: {
-  //     allowedOrigins: ["localhost:3000"],
-  //   },
-  // },
+  /**
+   * ✅ Turbopack 用の watch 制御
+   * FD 枯渇対策の本命
+   */
+  turbopack: {
+    watchOptions: {
+      ignored: [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/.next/**",
+        "**/logs/**",
+      ],
+    },
+  },
 };
 
 export default nextConfig;
