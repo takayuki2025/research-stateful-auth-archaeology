@@ -9,4 +9,6 @@ return [
 
     // ログに出すか
     'log_payload' => true,
+
+    'endpoint' => env('ATLAS_KERNEL_ENDPOINT', 'http://python_atlaskernel:8000/analyze'),
 ];

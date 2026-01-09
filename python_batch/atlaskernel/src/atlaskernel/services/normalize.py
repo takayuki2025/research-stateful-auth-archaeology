@@ -5,9 +5,15 @@ from typing import Dict, List
 # 汎用 normalize（brand 等）
 # =========================
 BRAND_ALIASES = {
+    # Rolex
     "rolax": "rolex",
     "ロレックス": "rolex",
     "ro lex": "rolex",
+
+    # Apple
+    "アップル": "apple",
+    "あっぷる": "apple",
+    "apple": "apple",
 }
 
 def normalize(text: str) -> str:
@@ -15,11 +21,13 @@ def normalize(text: str) -> str:
         return ""
 
     t = text.lower().strip()
+
+    # 日本語・英数・空白を残す
     t = re.sub(r"[^\w\s\u3040-\u30FF\u4E00-\u9FFF]", " ", t)
     t = re.sub(r"\s+", " ", t)
 
+    # ★ ここでブランド正規化
     return BRAND_ALIASES.get(t, t)
-
 
 # =========================
 # document_term 専用
