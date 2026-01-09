@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Auth\Application\Service;
+namespace App\Modules\Auth\Application\Context;
 
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 

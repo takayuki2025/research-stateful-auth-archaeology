@@ -25,7 +25,7 @@ final class AuthUserDto
         bool $hasProfile,
     ): self {
         return new self(
-            id: $principal->userId,
+            id: $principal->userId(),
             email: $principal->email ?? '',
             emailVerified: $principal->emailVerified,
             displayName: $profile?->displayName(), // ★ null safe

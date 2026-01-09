@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 
 final class AuthContextServiceProvider extends ServiceProvider
 {

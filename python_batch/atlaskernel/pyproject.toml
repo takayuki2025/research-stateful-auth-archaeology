@@ -3,6 +3,7 @@ name = "atlaskernel"
 version = "0.1.0"
 description = "AtlasKernel - Entity Analysis Engine (MVP)"
 requires-python = ">=3.11"
+
 dependencies = [
   "pydantic>=2.6",
   "rapidfuzz>=3.6",
@@ -10,8 +11,12 @@ dependencies = [
   "PyYAML>=6.0",
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.30.0",
-  "mysql-connector-python (>=9.5.0,<10.0.0)"
+  "mysql-connector-python>=9.5.0,<10.0.0",
 ]
 
-[project.scripts]
-atlaskernel = "atlaskernel.cli:main"
+[tool.poetry]
+name = "atlaskernel"
+version = "0.1.0"
+packages = [
+  { include = "atlaskernel", from = "src" }
+]

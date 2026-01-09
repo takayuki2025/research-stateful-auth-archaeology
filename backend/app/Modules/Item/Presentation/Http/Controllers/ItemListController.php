@@ -23,7 +23,7 @@ final class ItemListController extends Controller
 
         // Domain の UseCase を必ず通す
         $items = $useCase->execute(
-            userId: $principal->userId,
+            userId: $principal->userId(),
             shopId: $principal->shopId
         );
 

@@ -7,7 +7,7 @@ use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Command\CreateItemDraftUseCase;
 use App\Modules\Item\Application\Dto\Item\CreateItemDraftInput;
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 
 final class CreateItemDraftController extends Controller
 {

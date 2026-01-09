@@ -59,7 +59,7 @@ final class CreateItemDraftUseCase
          * ========================================= */
         if ($sellerId->type() === SellerType::INDIVIDUAL) {
             $this->assignSellerRoleService
-                ->assignIndividualIfNotExists($principal->userId);
+                ->assignIndividualIfNotExists($principal->userId());
         }
 
         /* =========================================

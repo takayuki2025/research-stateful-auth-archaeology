@@ -17,7 +17,7 @@ final class SellerAuthorizationService
             // 個人出品
             SellerType::INDIVIDUAL =>
                 $sellerId->id() !== null
-                && $principal->userId === $sellerId->id(),
+                && $principal->userId() === $sellerId->id(),
 
             // 店舗出品
             SellerType::SHOP =>

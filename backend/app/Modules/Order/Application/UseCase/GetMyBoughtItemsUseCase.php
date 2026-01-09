@@ -2,7 +2,7 @@
 
 namespace App\Modules\Order\Application\UseCase;
 
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 use App\Modules\Order\Domain\Repository\OrderHistoryQueryRepository;
 
 final class GetMyBoughtItemsUseCase
@@ -17,9 +17,9 @@ final class GetMyBoughtItemsUseCase
      * @return array<array<string,mixed>>
      */
     public function handle(): array
-    {
-        $userId = $this->auth->principal()->userId;
+{
+    $userId = $this->auth->principal()->userId();
 
-        return $this->histories->findByBuyer($userId);
-    }
+    return $this->histories->findByBuyer($userId);
+}
 }

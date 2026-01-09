@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
 
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 
 
 final class OptionalJwtAuth

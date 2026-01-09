@@ -5,7 +5,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Command\DeleteItemDraftUseCase;
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 
 final class DeleteItemDraftController extends Controller
 {

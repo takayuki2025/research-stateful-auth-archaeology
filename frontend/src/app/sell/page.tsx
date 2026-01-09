@@ -133,23 +133,13 @@ export default function ItemSellPage() {
       return;
     }
 
-    if (itemOrigin === "SHOP_MANAGED" && !selectedShopId) {
-      setError("出品するショップを選択してください");
-      return;
-    }
-
     setIsSubmitting(true);
     setError("");
 
     try {
-      /* =========================
-         1. Draft 作成
-      ========================= */
+      // 1. Draft 作成
       const draftRes = await apiClient.post("/items/drafts", {
-        seller_id:
-          itemOrigin === "USER_PERSONAL"
-            ? `individual:${user.id}`
-            : "shop:managed",
+        seller_id: `individual:${user.id}`,
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
@@ -158,28 +148,22 @@ export default function ItemSellPage() {
         category: form.categories.length ? form.categories : null,
       });
 
-      const draftId: string = draftRes.data.draft_id;
+      const draftId: string = draftRes.draft_id; // ★修正点
 
-      /* =========================
-         2. Image Upload
-      ========================= */
+      // 2. Image Upload
       const imageData = new FormData();
       imageData.append("image", imageFile);
 
-      await apiClient.post(`/items/drafts/${draftId}/image`, imageData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await apiClient.post(`/items/drafts/${draftId}/image`, imageData);
 
-      /* =========================
-         3. Publish
-         ★ shop_id だけ送るのが正解
-      ========================= */
+      // 3. Publish
       await apiClient.post(`/items/drafts/${draftId}/publish`, {
-        shop_id: itemOrigin === "SHOP_MANAGED" ? selectedShopId : null,
+        shop_id: null,
       });
 
       router.push("/");
-    } catch {
+    } catch (e) {
+      console.error(e);
       setError("商品の出品に失敗しました");
     } finally {
       setIsSubmitting(false);

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Modules\Item\Application\UseCase\Item\Query\CatalogItemListUseCase;
 use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 
 final class PublicCatalogController extends Controller
 {
@@ -23,7 +23,7 @@ final class PublicCatalogController extends Controller
             limit: 20,
             page: (int) $request->query('page', 1),
             keyword: null,
-            viewerUserId: $principal?->userId,
+            viewerUserId: $principal?->userId(),
             viewerShopIds: $principal?->shopIds ?? [],
         );
 

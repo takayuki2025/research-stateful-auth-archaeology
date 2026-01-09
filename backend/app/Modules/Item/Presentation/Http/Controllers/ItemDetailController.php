@@ -5,7 +5,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
 use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 use Illuminate\Http\Request;
 
 final class ItemDetailController extends Controller
@@ -17,7 +17,7 @@ final class ItemDetailController extends Controller
     ) {
         $principal = $authContext->principalOrNull(); // ★ ここが正解
 
-        $viewerUserId = $principal?->userId;
+        $viewerUserId = $principal?->userId();
 
         $output = $useCase->execute($id, $viewerUserId);
 

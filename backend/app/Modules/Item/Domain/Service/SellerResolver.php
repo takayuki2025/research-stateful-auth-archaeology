@@ -50,7 +50,7 @@ final class SellerResolver
         int $userId,
         AuthPrincipal $principal,
     ): SellerId {
-        if ($principal->userId !== $userId) {
+        if ($principal->userId() !== $userId) {
             throw new \DomainException('Cannot sell as another user.');
         }
 
@@ -70,7 +70,7 @@ final class SellerResolver
         }
 
         $hasRole = DB::table('role_user')
-            ->where('user_id', $principal->userId)
+            ->where('user_id', $principal->userId())
             ->where('shop_id', $shopId)
             ->exists();
 

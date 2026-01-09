@@ -115,7 +115,7 @@ final class PublishItemUseCase
                     : null,
                 createdByUserId: $sellerId->type() === SellerType::SHOP
                     ? null
-                    : $principal->userId,
+                    : $principal->userId(),
                 name: $draft->name()->value(),
                 price: $price,
                 explain: $draft->explain(),

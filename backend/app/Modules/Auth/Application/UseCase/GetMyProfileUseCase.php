@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth\Application\UseCase;
 
-use App\Modules\Auth\Application\Service\AuthContext;
+use App\Modules\Auth\Application\Context\AuthContext;
 use App\Modules\Auth\Application\Dto\AuthUserDto;
 use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
 use App\Modules\User\Domain\Entity\Profile;
