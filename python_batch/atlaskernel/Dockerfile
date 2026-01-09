@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app/src
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -9,18 +10,13 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-# 依存定義
-COPY pyproject.toml poetry.lock* ./
+# ★ poetry.lock を使わない
+COPY pyproject.toml ./
 
 RUN pip install poetry \
  && poetry config virtualenvs.create false \
- && poetry install --no-interaction --no-root
+ && poetry install --no-interaction --no-root --no-ansi
 
-# アプリ本体
 COPY . .
 
-# パッケージとしてインストール（atlaskernel コマンドも有効）
 RUN pip install -e .
-
-# FastAPI 起動
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

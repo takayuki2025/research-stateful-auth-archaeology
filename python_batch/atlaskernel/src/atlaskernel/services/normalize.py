@@ -1,6 +1,6 @@
 import re
 from typing import Dict, List
-
+import unicodedata
 # =========================
 # 汎用 normalize（brand 等）
 # =========================
@@ -72,4 +72,12 @@ def normalize_document_term(text: str, context: Dict[str, str] | None = None) ->
     # 空白圧縮
     t = re.sub(r"\s+", " ", t).strip()
 
+    return t
+
+def normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    t = unicodedata.normalize("NFKC", text)
+    t = t.lower().strip()
+    t = re.sub(r"\s+", " ", t)
     return t

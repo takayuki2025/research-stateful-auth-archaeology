@@ -1,16 +1,15 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-
-@dataclass(frozen=True)
+@dataclass
 class PolicyContext:
     entity_type: str
-    source: str                        # e.g. "ec_item"
+    source: str
     locale: Optional[str] = None
 
-    # multimodal（将来拡張）
+    # ここを統一：ContextBuilder は text=... を使う
+    text: Optional[Dict[str, Any]] = None
+
+    # multimodal
     image_features: Optional[Dict[str, Any]] = None
     audio_features: Optional[Dict[str, Any]] = None
-
-    # text/context（ECでも即使う）
-    text: Optional[Dict[str, Any]] = None

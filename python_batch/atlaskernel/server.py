@@ -1,30 +1,20 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from atlaskernel.application.analyze_entity import analyze
-from atlaskernel.domain.request import AnalysisRequest
+from .base_rule import PolicyRule
+from ..decisions import Decision
+from ..policy_result import PolicyResult
+from ..action import PolicyAction
 
-app = FastAPI(title="AtlasKernel API")
+class SimilarityLowRule(PolicyRule):
+    def __init__(self, low_threshold: float = 0.4):
+        self.low_threshold = low_threshold
 
-class AnalyzeRequestDto(BaseModel):
-    entity_type: str
-    raw_value: str
-    known_assets_ref: str | None = None
-
-
-@app.post("/analyze")
-def analyze_entity(req: AnalyzeRequestDto):
-    results = analyze(
-        AnalysisRequest(
-            entity_type=req.entity_type,
-            raw_value=req.raw_value,
-            known_assets_ref=req.known_assets_ref,
-        )
-    )
-
-    return {
-        "engine": {
-            "name": "AtlasKernel",
-            "version": "0.1.0",
-        },
-        "results": [r.model_dump(exclude_none=True) for r in results],
-    }
+    def evaluate(self, policy_input, context):
+        if policy_input.top_score < self.low_threshold:
+            return PolicyResult(
+                decision=Decision.NEEDS_REVIEW,
+                action=PolicyAction.REVIEW,
+                canonical_value=None,
+                confidence=policy_input.top_score,
+                rule_id="similarity_low",
+                trace={"low_threshold": self.low_threshold, "top_score": policy_input.top_score},
+            )
+        return None
