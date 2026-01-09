@@ -7,7 +7,8 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+
 
 import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
@@ -44,17 +45,20 @@ type ProfileErrors = {
 ========================= */
 export default function ProfilePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const {
     user: authUser,
     apiClient,
+    authReady,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
+    refresh,
   } = useAuth();
 
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
+  const [hasFetchedProfile, setHasFetchedProfile] = useState(false);
+
   const [form, setForm] = useState<ProfileForm>({
     display_name: "",
     post_number: "",
@@ -92,7 +96,7 @@ export default function ProfilePage() {
   }, []);
 
   /* =========================
-     Fetch Profile
+     Fetch Profile（1回だけ）
   ========================= */
   const fetchUserProfile = useCallback(async () => {
     if (!apiClient) return;
@@ -104,12 +108,9 @@ export default function ProfilePage() {
     try {
       const res = await apiClient.get("/mypage/profile");
 
-      // ★ ここが重要：初回ユーザーは user === null
-      if (res?.user) {
-        initializeProfile(res.user);
-      } else {
-        initializeProfile(null);
-      }
+      // API仕様: { user: Profile | null, has_profile: boolean }
+      initializeProfile(res?.user ?? null);
+      setHasFetchedProfile(true);
     } catch (err: any) {
       if (err?.message === "Unauthenticated") {
         await logout();
@@ -153,6 +154,9 @@ export default function ProfilePage() {
   /* =========================
      Profile Submit
   ========================= */
+
+  // const { refresh } = useAuth();
+
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!apiClient) return;
@@ -166,12 +170,20 @@ export default function ProfilePage() {
         ? await apiClient.patch("/mypage/profile", form)
         : await apiClient.post("/mypage/profile", form);
 
+      // ① Profile state 更新
       initializeProfile(res.user);
+
+      // ② Auth 再同期（profile_completed を反映）
+      await refresh();
+
       setSuccessMessage(
         profileUser
           ? "プロフィールを更新しました！"
           : "プロフィールを作成しました！"
       );
+
+      // ③ 即トップへ（リロード不要）
+      router.replace("/");
     } catch (err: any) {
       if (err?.errors) {
         setProfileErrors(err.errors);
@@ -182,9 +194,8 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   };
-
   /* =========================
-     Initial Load
+     Initial Load（★1回だけ）
   ========================= */
   useEffect(() => {
     if (isAuthLoading) return;
@@ -194,14 +205,30 @@ export default function ProfilePage() {
       return;
     }
 
-    if (!isFetching) {
+    if (!hasFetchedProfile && !isFetching) {
       fetchUserProfile();
     }
-  }, [isAuthLoading, isAuthenticated, isFetching, fetchUserProfile, router]);
+  }, [
+    isAuthLoading,
+    isAuthenticated,
+    hasFetchedProfile,
+    isFetching,
+    fetchUserProfile,
+    router,
+  ]);
 
   /* =========================
-     Render Guards
-  ========================= */
+   Render Guards
+========================= */
+  if (!authReady) {
+    return null; // ← ★ Auth 初期化待ち（追加）
+  }
+
+  if (!isAuthenticated) {
+    router.replace("/login");
+    return null;
+  }
+
   if (isAuthLoading || isLoading) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
@@ -270,7 +297,7 @@ export default function ProfilePage() {
         <form onSubmit={handleProfileUpdate}>
           {/* ユーザー名 */}
           <div className={styles["form-group"]}>
-            <label htmlFor="name" className={styles.label_form_1}>
+            <label htmlFor="display_name" className={styles.label_form_1}>
               ユーザー名
             </label>
             <input

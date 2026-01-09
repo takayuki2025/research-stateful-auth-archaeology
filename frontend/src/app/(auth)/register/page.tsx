@@ -7,9 +7,10 @@ import { useAuth } from "@/ui/auth/AuthProvider";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { isLoading } = useAuth();
+  const { isLoading, user } = useAuth();
+  // const { user } = useAuth();
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(user?.display_name ?? "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");

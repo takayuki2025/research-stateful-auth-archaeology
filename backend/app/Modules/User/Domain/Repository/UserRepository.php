@@ -13,4 +13,9 @@ interface UserRepository
     public function findByAuthUid(string $uid): ?User;
 
     public function createFromPrincipal(AuthPrincipal $principal): User;
+
+    public function markProfileCompleted(int $userId): void;
+
+    public function updateDisplayName(int $userId, string $displayName): void;
+
 }

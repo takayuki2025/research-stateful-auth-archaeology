@@ -14,7 +14,6 @@ final class RegisterController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        \Log::info('[🔥RegisterController] invoked', $request->all());
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -35,13 +34,8 @@ final class RegisterController extends Controller
         // 🔥 メール認証送信
         event(new Registered($user));
 
-        \Log::info('[🔥RegisterController] user registered & logged in', [
-            'user_id' => $user->id,
-        ]);
-
         return response()->json([
             'message' => 'registered',
-            'user' => $user,
         ], 201);
     }
 }

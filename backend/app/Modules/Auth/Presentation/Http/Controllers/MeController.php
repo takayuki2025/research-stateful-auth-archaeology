@@ -15,6 +15,7 @@ final class MeController extends Controller
         return response()->json([
             'id' => $user->id,
             'email' => $user->email,
+            'display_name' => $user->name,
             'email_verified_at' => $user->email_verified_at,
             'profile_completed' => $user->profile_completed, // ★必須
         ]);

@@ -9,7 +9,8 @@ use App\Modules\User\Domain\Exception\ProfileAlreadyExistsException;
 use App\Modules\User\Domain\Port\ShopAddressSyncPort;
 use App\Modules\User\Domain\Repository\ProfileRepository;
 use App\Modules\User\Domain\Repository\UserAddressRepository;
-
+use App\Modules\User\Domain\Repository\UserRepository;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class CreateProfileUseCase
@@ -18,48 +19,42 @@ final class CreateProfileUseCase
         private ProfileRepository $profiles,
         private UserAddressRepository $addresses,
         private ShopAddressSyncPort $shopSync,
+        private UserRepository $users, // ★追加
     ) {
     }
 
     public function handle(int $userId, CreateProfileInput $input): ProfileDto
     {
-        
-Log::warning('[PROFILE][CREATE][ENTER]', [
-    'user_id' => $userId,
-    'input' => [
-        'displayName' => $input->displayName,
-        'postNumber'  => $input->postNumber,
-        'address'     => $input->address,
-        'building'    => $input->building,
-    ],
-    'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
-]);
+        return DB::transaction(function () use ($userId, $input) {
 
-        $existing = $this->profiles->findByUserId($userId);
-        if ($existing) {
-            throw new ProfileAlreadyExistsException();
-        }
+            $existing = $this->profiles->findByUserId($userId);
+            if ($existing) {
+                throw new ProfileAlreadyExistsException();
+            }
 
-        // Profile::createEmpty(userId, displayName) が既にある前提で組み立てる
-        $profile = Profile::createEmpty($userId, $input->displayName);
+            $profile = Profile::createEmpty($userId, $input->displayName)
+                ->withBasic(
+                    displayName: $input->displayName,
+                    postNumber: $input->postNumber,
+                    address: $input->address,
+                    building: $input->building,
+                );
 
-        $profile = $profile->withBasic(
-            displayName: $input->displayName,
-            postNumber: $input->postNumber,
-            address: $input->address,
-            building: $input->building,
-        );
+            $saved = $this->profiles->save($profile);
 
-        $saved = $this->profiles->save($profile);
+            // ★ ここで User を更新
+            if ($saved->postNumber() && $saved->address()) {
+                $this->users->markProfileCompleted($userId);
+            }
 
-        // primary address 自動生成（既存仕様踏襲）
-        $primary = $this->addresses->findPrimaryByUser($userId);
-        if (! $primary && $saved->postNumber() && $saved->address()) {
-            $this->addresses->createPrimaryFromProfile($userId, $saved);
-        }
+            $primary = $this->addresses->findPrimaryByUser($userId);
+            if (! $primary && $saved->postNumber() && $saved->address()) {
+                $this->addresses->createPrimaryFromProfile($userId, $saved);
+            }
 
-        $this->shopSync->syncFromUserProfile($userId);
+            $this->shopSync->syncFromUserProfile($userId);
 
-        return ProfileDto::fromEntity($saved);
+            return ProfileDto::fromEntity($saved);
+        });
     }
 }

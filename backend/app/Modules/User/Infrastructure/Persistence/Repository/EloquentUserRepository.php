@@ -5,6 +5,7 @@ namespace App\Modules\User\Infrastructure\Persistence\Repository;
 use App\Models\User;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\User\Domain\Repository\UserRepository;
+use Illuminate\Support\Facades\DB;
 
 final class EloquentUserRepository implements UserRepository
 {
@@ -26,4 +27,24 @@ final class EloquentUserRepository implements UserRepository
             'name'     => $principal->name() ?? 'Guest',
         ]);
     }
+
+    public function markProfileCompleted(int $userId): void
+    {
+        DB::table('users')
+            ->where('id', $userId)
+            ->update([
+                'profile_completed' => true,
+                'updated_at' => now(),
+            ]);
+    }
+
+    public function updateDisplayName(int $userId, string $displayName): void
+{
+    DB::table('users')
+        ->where('id', $userId)
+        ->update([
+            'name' => $displayName,
+            'updated_at' => now(),
+        ]);
+}
 }

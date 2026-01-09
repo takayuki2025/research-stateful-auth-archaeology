@@ -16,7 +16,7 @@ final class UpdateProfileUseCase
         private ProfileRepository $profiles,
         private UserAddressRepository $addresses,
         private ShopAddressSyncPort $shopSync,
-        private UserRepository $users, // ★追加
+        private UserRepository $users,
     ) {
     }
 
@@ -40,7 +40,7 @@ final class UpdateProfileUseCase
 
         $saved = $this->profiles->save($next);
 
-        // primary address 自動生成（既存仕様）
+        // primary address
         $primary = $this->addresses->findPrimaryByUser($userId);
         if (! $primary && $saved->postNumber() && $saved->address()) {
             $this->addresses->createPrimaryFromProfile($userId, $saved);
@@ -48,12 +48,13 @@ final class UpdateProfileUseCase
 
         $this->shopSync->syncFromUserProfile($userId);
 
-        /* ============================================================
-           🔥 ここが今回の核心（追加）
-        ============================================================ */
+        // ★ User 更新は Repository 経由で行う
         if ($saved->postNumber() && $saved->address()) {
-            $user = $this->users->find($userId);
-            $user->markProfileCompleted();
+            $this->users->markProfileCompleted($userId);
+        }
+
+        if ($saved->displayName()) {
+            $this->users->updateDisplayName($userId, $saved->displayName());
         }
 
         return ProfileDto::fromEntity($saved);

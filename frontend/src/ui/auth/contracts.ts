@@ -16,6 +16,7 @@ export type AuthUser = {
   email?: string;
   email_verified_at?: string | null;
   profile_completed?: boolean;
+  display_name?: string | null;
 };
 
 /* =========================
@@ -30,6 +31,7 @@ export type AuthContext = {
 
   login(payload: { email: string; password: string }): Promise<void>;
   logout(): Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 /* =========================

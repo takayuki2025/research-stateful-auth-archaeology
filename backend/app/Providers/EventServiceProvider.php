@@ -47,6 +47,11 @@ final class EventServiceProvider extends ServiceProvider
             // CreateShipmentOnOrderPaid::class,
             EnsureShopAddressOnOrderPaid::class,
         ],
+
+        // 新規登録後プロフィールテーブルの名前だけ登録
+        Registered::class => [
+        \App\Listeners\CreateInitialProfile::class,
+    ],
     ];
 
     public function boot(): void

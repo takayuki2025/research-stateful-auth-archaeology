@@ -76,4 +76,10 @@ final class Profile
             && $this->address === $other->address
             && $this->building === $other->building;
     }
+
+    public function updateDisplayName(string $name): void
+{
+    $this->display_name = $name;
+    $this->save();
+}
 }
