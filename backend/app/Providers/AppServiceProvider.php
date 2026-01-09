@@ -23,7 +23,7 @@ use App\Modules\User\Application\Service\UserProvisioningService;
 use App\Modules\User\Domain\Repository\ProfileRepository;//⚫️
 use App\Modules\User\Domain\Repository\MypageRepository; // ⚫️MypageRepositoryは共通で残す
 // Infrastructure Persistence
-use App\Infrastructure\Persistence\EloquentUserRepository; // 既存のUserRepository
+// use App\Infrastructure\Persistence\EloquentUserRepository; // 既存のUserRepository
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentProfileRepository;//⚫️
 use App\Infrastructure\Persistence\EloquentOrderHistoryRepository;
 use App\Infrastructure\Persistence\EloquentCommentRepository;
@@ -71,6 +71,9 @@ use App\Modules\User\Infrastructure\External\NullShopAddressSyncAdapter;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
+use App\Modules\User\Domain\Repository\UserRepository;
+use App\Modules\User\Infrastructure\Persistence\Repository\EloquentUserRepository;
+
 class AppServiceProvider extends ServiceProvider
 {
     public function register()
@@ -190,6 +193,10 @@ class AppServiceProvider extends ServiceProvider
             );
         }
 
+            $this->app->bind(
+        UserRepository::class,
+        EloquentUserRepository::class
+        );
 
     }
 

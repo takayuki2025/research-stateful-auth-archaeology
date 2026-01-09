@@ -8,6 +8,11 @@ use App\Modules\User\Domain\Repository\UserRepository;
 
 final class EloquentUserRepository implements UserRepository
 {
+    public function findById(int $userId): ?User
+    {
+    return User::find($userId);
+    }
+
     public function findByAuthUid(string $uid): ?User
     {
         return User::where('auth_uid', $uid)->first();

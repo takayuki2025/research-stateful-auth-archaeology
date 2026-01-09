@@ -15,14 +15,16 @@ final class UpdateProfileImageUseCase
     ) {
     }
 
-    public function handle(int $userId, string $path): ProfileDto
+    public function handle(int $userId, string $storagePath): ProfileDto
     {
         $current = $this->profiles->findByUserId($userId);
         if (! $current) {
             throw new ProfileNotFoundException();
         }
 
-        $saved = $this->profiles->save($current->withImage($path));
+        $saved = $this->profiles->save(
+            $current->withImage($storagePath)
+        );
 
         $this->shopSync->syncFromUserProfile($userId);
 

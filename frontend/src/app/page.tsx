@@ -22,7 +22,12 @@ export default function Home() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
+  const {
+    isAuthenticated,
+    authReady,
+    isLoading: isAuthLoading,
+    apiClient,
+  } = useAuth();
 
   /* =========================
      Tab / Search
@@ -55,7 +60,10 @@ export default function Home() {
   const items: PublicItemCard[] = useMemo(() => {
     const raw =
       currentTab === "mylist"
-        ? favoriteResult.items
+        ? favoriteResult.items.map((item) => ({
+            ...item,
+            displayType: null, // ★ マイリストでは装飾しない
+          }))
         : isSearch
           ? searchResult.items
           : listResult.items;
@@ -76,7 +84,7 @@ export default function Home() {
     favoriteResult.items,
   ]);
 
-  const isPageLoading = isAuthLoading || isItemsLoading;
+  const isPageLoading = !authReady || isItemsLoading;
 
   /* =========================
      Favorite toggle
@@ -187,7 +195,7 @@ export default function Home() {
               })
             ) : (
               <div className={styles.no_items}>
-                {currentTab === "mylist" && !isAuthenticated
+                {currentTab === "mylist" && authReady && !isAuthenticated
                   ? "マイリストを見るにはログインが必要です。"
                   : "該当する商品が見つかりませんでした。"}
               </div>

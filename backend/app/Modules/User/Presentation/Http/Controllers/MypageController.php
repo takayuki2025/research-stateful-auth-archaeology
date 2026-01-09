@@ -24,14 +24,10 @@ final class MypageController extends Controller
 
         $profileDto = $useCase->handle($userId);
 
-        // $hasProfile =
-        //     $profileDto !== null
-        //     && trim((string) ($profileDto->displayName ?? '')) !== '';
+
 
         // 🔑 暫定 Gate 条件：住所が null かどうかとりあえずアドレスで設定
-            $hasProfile =
-                $profileDto !== null
-                && $profileDto->address !== null;
+            $hasProfile = $profileDto !== null;
 
         return response()->json([
             'user' => $profileDto?->toArray(),
@@ -95,25 +91,30 @@ final class MypageController extends Controller
         }
     }
 
-    public function updateProfileImage(Request $request, UpdateProfileImageUseCase $useCase)
-    {
-        $userId = (int) $request->user()->id;
-
-        $path = $request->file('user_image')->store('pictures_user', 'public');
-
-        try {
-            $profileDto = $useCase->handle($userId, $path);
-
-            return response()->json([
-                'user' => $profileDto->toArray(),
-                'has_profile' => true,
-            ]);
-        } catch (ProfileNotFoundException) {
-            return response()->json([
-                'message' => 'Profile not found.',
-            ], 404);
-        }
+    public function updateProfileImage(
+    Request $request,
+    UpdateProfileImageUseCase $useCase
+) {
+    if (! $request->hasFile('user_image')) {
+        return response()->json([
+            'message' => 'No image uploaded.',
+        ], 422);
     }
+
+    $path = $request
+        ->file('user_image')
+        ->store('pictures_user', 'public');
+
+    $profileDto = $useCase->handle(
+        (int) $request->user()->id,
+        $path
+    );
+
+    return response()->json([
+        'user' => $profileDto->toArray(),
+        'has_profile' => true,
+    ]);
+}
 
     public function sellItems(
     Request $request,

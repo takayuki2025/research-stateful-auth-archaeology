@@ -23,6 +23,7 @@ export type AuthUser = {
 ========================= */
 export type AuthContext = {
   isLoading: boolean;
+  authReady: boolean;
   isAuthenticated: boolean;
   user: AuthUser | null;
   apiClient: ApiClient;

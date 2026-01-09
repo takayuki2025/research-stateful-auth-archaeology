@@ -54,11 +54,6 @@ export default function ProfilePage() {
     logout,
   } = useAuth();
 
-  const isVerificationRedirect = useMemo(
-    () => searchParams.get("verified") === "true",
-    [searchParams]
-  );
-
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
   const [form, setForm] = useState<ProfileForm>({
     display_name: "",
@@ -73,60 +68,62 @@ export default function ProfilePage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
 
-  const verificationHandledRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  /* =========================
+     Image URL
+  ========================= */
   const profileImageUrl = useMemo(() => {
-    return getImageUrl(
-      profileUser?.user_image ?? null,
-      IMAGE_TYPE.USER,
-      Date.now()
-    );
+    return getImageUrl(profileUser?.user_image ?? null, IMAGE_TYPE.USER);
   }, [profileUser?.user_image]);
 
-  const initializeProfileFromResponse = useCallback((src: any) => {
-    const data: ProfileUser = src?.user ?? src;
-
-    setProfileUser(data);
+  /* =========================
+     Helpers
+  ========================= */
+  const initializeProfile = useCallback((user: ProfileUser | null) => {
+    setProfileUser(user);
     setForm({
-      display_name: data.display_name ?? "",
-      post_number: data.post_number ?? "",
-      address: data.address ?? "",
-      building: data.building ?? "",
+      display_name: user?.display_name ?? "",
+      post_number: user?.post_number ?? "",
+      address: user?.address ?? "",
+      building: user?.building ?? "",
     });
   }, []);
 
-  const fetchUserProfile = useCallback(
-    async (isRetry = false) => {
-      if (!apiClient) return;
+  /* =========================
+     Fetch Profile
+  ========================= */
+  const fetchUserProfile = useCallback(async () => {
+    if (!apiClient) return;
 
-      if (!isRetry) {
-        setIsFetching(true);
-        setSuccessMessage("");
-        setProfileErrors({});
+    setIsFetching(true);
+    setProfileErrors({});
+    setSuccessMessage("");
+
+    try {
+      const res = await apiClient.get("/mypage/profile");
+
+      // ★ ここが重要：初回ユーザーは user === null
+      if (res?.user) {
+        initializeProfile(res.user);
+      } else {
+        initializeProfile(null);
       }
-
-      try {
-        const data = await apiClient.get("/mypage/profile");
-        initializeProfileFromResponse(data);
-        setIsLoading(false);
-        setIsRecovering(false);
-      } catch (err: any) {
-        if (err?.message === "Unauthenticated") {
-          await logout();
-          router.replace("/login");
-        }
-        setIsLoading(false);
-      } finally {
-        if (!isRetry) setIsFetching(false);
+    } catch (err: any) {
+      if (err?.message === "Unauthenticated") {
+        await logout();
+        router.replace("/login");
       }
-    },
-    [apiClient, initializeProfileFromResponse, logout, router]
-  );
+    } finally {
+      setIsLoading(false);
+      setIsFetching(false);
+    }
+  }, [apiClient, initializeProfile, logout, router]);
 
-  // プロフィール画像アップロード
+  /* =========================
+     Image Upload
+  ========================= */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !apiClient) return;
@@ -138,9 +135,8 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      const data = await apiClient.post("/mypage/profile/image", formData);
-
-      initializeProfileFromResponse(data);
+      const res = await apiClient.post("/mypage/profile/image", formData);
+      initializeProfile(res.user);
       setSuccessMessage("画像を更新しました！");
     } catch (err: any) {
       setImageError(
@@ -154,7 +150,9 @@ export default function ProfilePage() {
     }
   };
 
-  // プロフィール更新
+  /* =========================
+     Profile Submit
+  ========================= */
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!apiClient) return;
@@ -164,9 +162,11 @@ export default function ProfilePage() {
     setSuccessMessage("");
 
     try {
-      const data = await apiClient.post("/mypage/profile", form);
-      initializeProfileFromResponse(data);
+      const res = profileUser
+        ? await apiClient.patch("/mypage/profile", form)
+        : await apiClient.post("/mypage/profile", form);
 
+      initializeProfile(res.user);
       setSuccessMessage(
         profileUser
           ? "プロフィールを更新しました！"
@@ -183,32 +183,26 @@ export default function ProfilePage() {
     }
   };
 
-  // 初期ロード
+  /* =========================
+     Initial Load
+  ========================= */
   useEffect(() => {
-    if (isAuthLoading || isRecovering) return;
+    if (isAuthLoading) return;
 
     if (!isAuthenticated) {
       router.replace("/login");
       return;
     }
 
-    if (!profileUser && !isFetching) {
+    if (!isFetching) {
       fetchUserProfile();
     }
-  }, [
-    isAuthLoading,
-    isRecovering,
-    isAuthenticated,
-    profileUser,
-    isFetching,
-    fetchUserProfile,
-    router,
-  ]);
+  }, [isAuthLoading, isAuthenticated, isFetching, fetchUserProfile, router]);
 
   /* =========================
      Render Guards
   ========================= */
-  if (isAuthLoading || isLoading || isRecovering) {
+  if (isAuthLoading || isLoading) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
         <h2 className={styles.title}>プロフィール設定</h2>
@@ -220,15 +214,11 @@ export default function ProfilePage() {
     );
   }
 
-  if (!isAuthenticated || !profileUser) {
-    return (
-      <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
-        <h2 className={styles.title}>プロフィール設定</h2>
-        <p>認証エラーが発生しました。ログインし直してください。</p>
-      </div>
-    );
-  }
+  if (!isAuthenticated) return null;
 
+  /* =========================
+     Render
+  ========================= */
   return (
     <div
       className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}
@@ -249,7 +239,6 @@ export default function ProfilePage() {
           <div className={styles.image_name}>
             <div className={styles.image_button_row}>
               <img
-                key={profileUser.user_image || "default"}
                 src={profileImageUrl}
                 alt="プロフィール画像"
                 className={styles.user_image_css}

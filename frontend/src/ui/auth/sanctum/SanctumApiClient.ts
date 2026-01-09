@@ -16,17 +16,27 @@ export function createSanctumApiClient(opts: RequestOptions = {}): ApiClient {
       ? url
       : `${basePrefix}${url.startsWith("/") ? "" : "/"}${url}`;
 
+    const isFormData = body instanceof FormData;
+
     const res = await fetch(fullUrl, {
       method,
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: isFormData
+        ? {
+            Accept: "application/json",
+          }
+        : {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+      body:
+        body === undefined
+          ? undefined
+          : isFormData
+            ? body
+            : JSON.stringify(body),
     });
 
-    // 204 のように body が無い可能性もあるので安全に処理
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       const err: any = new Error(
@@ -36,11 +46,12 @@ export function createSanctumApiClient(opts: RequestOptions = {}): ApiClient {
       throw err;
     }
 
-    if (res.status === 204) return undefined as unknown as T;
+    if (res.status === 204) {
+      return undefined as unknown as T;
+    }
 
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      // JSON 以外が返るのはルーティング誤り（NextのHTMLなど）の可能性が高い
       const text = await res.text().catch(() => "");
       throw new Error(`Non-JSON response: ${text.slice(0, 200)}`);
     }

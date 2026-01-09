@@ -7,15 +7,18 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { useRouter } from "next/navigation"; // ← 追加
 import type { AuthContext, AuthUser } from "@/ui/auth/contracts";
 import { SanctumAuthAdapter } from "@/ui/auth/sanctum/SanctumAuthAdapter";
 
 const AuthCtx = createContext<AuthContext | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter(); // ← 追加
   const adapter = useMemo(() => new SanctumAuthAdapter(), []);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
@@ -27,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) setUser(u);
       } finally {
         if (mounted) setIsLoading(false);
+                    setAuthReady(true);
       }
     })();
     return () => {
@@ -37,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContext = useMemo(
     () => ({
       isLoading,
+      authReady, // ★ここを追加
       isAuthenticated: !!user,
       user,
       apiClient: adapter.getApiClient(),
@@ -50,10 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         await adapter.logout();
         setUser(null);
+        router.replace("/login");
       },
     }),
-    [adapter, isLoading, user]
+    [adapter, isLoading, authReady, user, router] // ★authReady も依存に追加
   );
+
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

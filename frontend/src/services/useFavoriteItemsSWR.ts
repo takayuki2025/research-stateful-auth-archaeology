@@ -10,10 +10,10 @@ type Response = {
 export const FAVORITE_ITEMS_SWR_KEY = "/items/favorite";
 
 export const useFavoriteItemsSWR = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { authReady, isAuthenticated } = useAuth(); // ★authReady を使う
   const fetcher = useAuthedFetcher();
 
-  const swrKey = !isLoading && isAuthenticated ? FAVORITE_ITEMS_SWR_KEY : null;
+  const swrKey = authReady && isAuthenticated ? FAVORITE_ITEMS_SWR_KEY : null; // ★ここが本体
 
   const { data, error, mutate } = useSWR<Response>(
     swrKey,
@@ -27,7 +27,8 @@ export const useFavoriteItemsSWR = () => {
 
   return {
     items: data?.items ?? [],
-    isLoading,
+    // ★「Auth判定中」はローディング扱い
+    isLoading: !authReady,
     error,
     refetchFavorites: () => mutate(),
   };

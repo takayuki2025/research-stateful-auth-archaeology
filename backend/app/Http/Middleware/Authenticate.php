@@ -11,11 +11,11 @@ class Authenticate extends Middleware
      * Get the path the user should be redirected to when they are not authenticated.
      */
     protected function redirectTo(Request $request): ?string
-    {
-        // 💡 修正点:
-        // このプロジェクトはNuxtをフロントエンドとするAPIサーバーのため、
-        // 認証失敗時にはWebログインページへのリダイレクトは行いません。
-        // null を返すと、Laravelは自動的に 401 Unauthorized レスポンスを返します。
-        return null;
+{
+    if ($request->expectsJson()) {
+        return null; // API → 401
     }
+
+    return '/login'; // ← 文字列で返す（Next.js の画面）
+}
 }

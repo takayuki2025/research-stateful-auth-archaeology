@@ -1,17 +1,15 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
-
+use Illuminate\Http\Request;
 use App\Models\User;
-use App\Modules\Auth\Presentation\Http\Controllers\ResendEmailVerificationController;
-// use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
+
 /*
 |--------------------------------------------------------------------------
-| Web Routes (Browser only)
+| Web Routes (Browser only) web.php
 |--------------------------------------------------------------------------
 */
 
@@ -23,6 +21,7 @@ Route::get('/health', fn () => ['status' => 'ok']);
 | Email Verification (Web only)
 |--------------------------------------------------------------------------
 */
+use App\Modules\Auth\Presentation\Http\Controllers\ResendEmailVerificationController;
 
 // 認証メール再送（SPA から POST）
 Route::post(
@@ -30,8 +29,15 @@ Route::post(
     ResendEmailVerificationController::class
 )->middleware(['web']);
 
-// 認証リンククリック（メールから）
 
-// Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-//     ->middleware(['signed'])
-//     ->name('verification.verify');
+/*
+|--------------------------------------------------------------------------
+ログイン・ログアウト
+|--------------------------------------------------------------------------
+*/
+use App\Modules\Auth\Presentation\Http\Controllers\LoginController;
+use App\Modules\Auth\Presentation\Http\Controllers\LogoutController;
+
+Route::post('/login', LoginController::class);
+
+Route::post('/logout', LogoutController::class);

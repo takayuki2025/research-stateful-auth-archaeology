@@ -4,47 +4,31 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-use App\Modules\Auth\Presentation\Http\Controllers\MeController;
-use App\Modules\Auth\Presentation\Http\Controllers\LoginController;
-use App\Modules\Auth\Presentation\Http\Controllers\RegisterController;
-use App\Modules\Auth\Presentation\Http\Controllers\ConfirmFirstLoginController;
+
 
 /*
 |--------------------------------------------------------------------------
-| Auth API (SPA + Sanctum)
+| Auth API (SPA + Sanctum)　api.php
 |--------------------------------------------------------------------------
 */
 
-Route::post('/login', LoginController::class);
-
-Route::post('/register', RegisterController::class);
+use App\Modules\Auth\Presentation\Http\Controllers\MeController;
+use App\Modules\Auth\Presentation\Http\Controllers\ConfirmFirstLoginController;
+use App\Modules\Auth\Presentation\Http\Controllers\RegisterController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', MeController::class);
-
-    Route::post('/logout', function (Request $request) {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        return response()->noContent();
-    });
-
     Route::post('/auth/first-login', ConfirmFirstLoginController::class);
 });
+
+Route::post('/register', RegisterController::class);
+
 
 use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
 
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->middleware(['signed'])
     ->name('verification.verify');
-
-
-
-// use App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController;
-
-// Route::get('/items/public', PublicCatalogController::class);
-
-
 
 
 /*

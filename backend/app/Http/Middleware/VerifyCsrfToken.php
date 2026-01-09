@@ -16,5 +16,7 @@ class VerifyCsrfToken extends Middleware
         'api/firebase/auth',
         'api/*',
         'api/payments/webhook/stripe',
+        'login',
+        'logout',
     ];
 }

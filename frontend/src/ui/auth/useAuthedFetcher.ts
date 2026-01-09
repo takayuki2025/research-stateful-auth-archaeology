@@ -5,7 +5,7 @@ import { useAuth } from "@/ui/auth/AuthProvider";
 export function useAuthedFetcher() {
   const { apiClient, isLoading, isAuthenticated } = useAuth();
 
-  const notReady = !isLoading || !apiClient;
+  const notReady = isLoading || !apiClient;
 
   return {
     isLoading,

@@ -24,47 +24,40 @@ function getFallback(type: IMAGE_TYPE): string {
   const origin = getBackendOrigin();
 
   if (type === IMAGE_TYPE.USER) {
-    return `${origin}/pictures_user/default-profile2.jpg`;
+    // ★ 修正後
+    return `${origin}/storage/pictures_user/default-profile2.jpg`;
   }
 
   return `${origin}/storage/pictures/no-image.png`;
 }
 
 // ======================================
-// getImageUrl（安定版）
+// getImageUrl（最終安定版）
 // ======================================
 export function getImageUrl(
   path?: string | null,
-  type: IMAGE_TYPE = IMAGE_TYPE.OTHER
+  _type: IMAGE_TYPE = IMAGE_TYPE.OTHER
 ): string {
   const origin = getBackendOrigin();
 
   if (!path) {
-    return getFallback(type);
+    return getFallback(_type);
   }
 
-  // absolute URL（S3 等）
+  // absolute URL
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
 
-  // USER 画像（public 直下）
-  if (type === IMAGE_TYPE.USER) {
-    return `${origin}/${path.replace(/^\/+/, "")}`;
+  const normalized = path.replace(/^\/+/, "");
+
+  // ✅ すでに storage/ が含まれている場合は二重にしない
+  if (normalized.startsWith("storage/")) {
+    return `${origin}/${normalized}`;
   }
 
-  // Laravel storage absolute
-  if (path.startsWith("/storage/")) {
-    return `${origin}${path}`;
-  }
-
-  // storage 相対（ITEM 等）
-  if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
-    return `${origin}/storage/${path}`;
-  }
-
-  // その他（念のため）
-  return `${origin}/${path.replace(/^\/+/, "")}`;
+  // ✅ それ以外は storage 配下
+  return `${origin}/storage/${normalized}`;
 }
 
 // ======================================
