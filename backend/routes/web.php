@@ -8,7 +8,7 @@ use Illuminate\Foundation\Auth\EmailVerificationRequest;
 
 use App\Models\User;
 use App\Modules\Auth\Presentation\Http\Controllers\ResendEmailVerificationController;
-use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
+// use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes (Browser only)
@@ -32,6 +32,6 @@ Route::post(
 
 // 認証リンククリック（メールから）
 
-Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-    ->middleware(['signed'])
-    ->name('verification.verify');
+// Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
+//     ->middleware(['signed'])
+//     ->name('verification.verify');

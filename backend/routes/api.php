@@ -32,7 +32,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/first-login', ConfirmFirstLoginController::class);
 });
 
+use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
 
+Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
+    ->middleware(['signed'])
+    ->name('verification.verify');
 
 
 
