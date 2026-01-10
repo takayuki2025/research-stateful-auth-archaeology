@@ -4,11 +4,11 @@ namespace App\Modules\Item\Domain\Repository;
 
 interface ItemEntityTagRepository
 {
-    public function saveMany(
+    public function replaceTags(
         int $itemEntityId,
-        string $entityType,
-        array $entities
+        string $tagType,
+        array $tags
     ): void;
 
-    public function findByItemId(int $itemId): array;
+    public function findLatestByItemId(int $itemId): array;
 }

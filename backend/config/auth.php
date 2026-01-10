@@ -16,7 +16,7 @@ return [
         // SPA は session(cookie)で認証、API は sanctum guard で user を解決
         'sanctum' => [
             'driver' => 'sanctum',
-            'provider' => 'users',
+            'provider' => null,
         ],
     ],
 

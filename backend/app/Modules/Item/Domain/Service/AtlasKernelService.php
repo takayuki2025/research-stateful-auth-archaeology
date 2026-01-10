@@ -3,271 +3,80 @@
 namespace App\Modules\Item\Domain\Service;
 
 use DomainException;
-use Illuminate\Support\Facades\DB;
+use App\Modules\Item\Domain\Dto\AtlasAnalysisResult;
 
 final class AtlasKernelService
 {
     private string $assetPath;
-
-    /** AtlasKernel generated version */
-    private const GENERATED_VERSION = 'v1.6-stable';
+    private const GENERATED_VERSION = 'v3.0-review';
 
     public function __construct()
     {
         $this->assetPath = base_path('../python_batch/atlaskernel/src/atlaskernel/assets');
     }
 
-    /**
-     * AtlasKernel v1.6-stable
-     *
-     * - items の「事実」を SoT としつつ
-     * - item_entities / item_entity_tags を Operational Truth として生成する
-     *
-     * @param int $itemId
-     * @param string $rawText 解析対象（例: "Apple ほぼ新品 黒" + explain 等を合成して渡す想定）
-     * @param ?int $tenantId 現状未使用でもOK（将来 multi-tenant 用）
-     */
-    public function analyze(
+    public function requestAnalysis(
         int $itemId,
         string $rawText,
         ?int $tenantId = null
-    ): void {
+    ): AtlasAnalysisResult {
         if ($itemId <= 0) {
             throw new DomainException('Invalid itemId');
         }
 
-        DB::transaction(function () use ($itemId, $rawText, $tenantId) {
-            // --------------------------------------------------
-            // 0) 前提：items の存在確認（最低限）
-            // --------------------------------------------------
-            $itemRow = DB::table('items')->where('id', $itemId)->first();
-            if (! $itemRow) {
-                throw new DomainException('Item not found');
-            }
+        $rawText = trim((string)$rawText);
+        $text = $this->normalize($rawText);
 
-            // --------------------------------------------------
-            // 1) 正規化 & RawText 構築（空でも破綻しない）
-            // --------------------------------------------------
-            $rawText = (string) $rawText;
-            $rawText = trim($rawText);
+        // --- dict load ---
+        $brandDict  = $this->loadDict('brands_v1.txt');
+        $brandAlias = $this->loadAlias('brand_alias.txt');
+        $conditionDict = $this->loadDict('conditions_v1.txt');
+        $colorDict     = $this->loadDict('colors_v1.txt');
 
-            // rawText が薄い場合は explain/name/brand 等の「事実」も混ぜて解析精度を底上げ
-            // （ただし items の各列が null の場合もあるので安全に連結）
-            if ($rawText === '') {
-                $rawText = trim(implode(' ', array_filter([
-                    (string)($itemRow->name ?? ''),
-                    (string)($itemRow->explain ?? ''),
-                    (string)($itemRow->brand ?? ''),
-                    (string)($itemRow->condition ?? ''),
-                    (string)($itemRow->color ?? ''),
-                ])));
-            }
+        // --- extract ---
+        [$condition, $text, $confCondition] = $this->extractOne($text, $conditionDict);
+        [$color, $text, $confColor] = $this->extractOne($text, $colorDict);
+        [$brands, $text] = $this->extractMany($text, $brandDict);
 
-            $text = $this->normalize($rawText);
+        $brands = $this->applyAliasToList($brands, $brandAlias);
 
-            // --------------------------------------------------
-            // 2) Confidence 初期値（必ず保存する）
-            // --------------------------------------------------
-            $confidence = [
-                'brand'     => 0.0,
-                'condition' => 0.0,
-                'color'     => 0.0,
-                'category'  => 0.0,
+        // --- build tags ---
+        $tags = [];
+
+        foreach ($brands as $b) {
+            $tags['brand'][] = [
+                'display_name' => $b,
+                'entity_id'    => null,
+                'confidence'   => 0.9,
             ];
+        }
 
-            // --------------------------------------------------
-            // 3) 辞書ロード（存在しなくても落とさない）
-            // --------------------------------------------------
-            // brand
-            $brandDict  = $this->loadDict('brands_v1.txt');
-            $brandAlias = $this->loadAlias('brand_alias.txt');
+        if ($condition) {
+            $tags['condition'][] = [
+                'display_name' => $condition,
+                'entity_id'    => null,
+                'confidence'   => $confCondition,
+            ];
+        }
 
-            // condition / color
-            $conditionDict = $this->loadDict('conditions_v1.txt');
-            $colorDict     = $this->loadDict('colors_v1.txt');
+        if ($color) {
+            $tags['color'][] = [
+                'display_name' => $color,
+                'entity_id'    => null,
+                'confidence'   => $confColor,
+            ];
+        }
 
-            // category（items.category を SoT として mirror するので抽出は補助扱い）
-            $categoryDict  = $this->loadDict('categories_v1.txt');
-            $categoryAlias = $this->loadAlias('category_alias.txt');
-
-            // brand search dict = dict + alias keys
-            $brandSearchDict = array_values(array_unique(array_merge(
-                $brandDict,
-                array_keys($brandAlias)
-            )));
-
-            // condition/color も alias 追加したくなったら同様に merge できる構造
-            // --------------------------------------------------
-            // 4) カテゴリ（SoT: items.category）を確定（漏れ防止）
-            // --------------------------------------------------
-            $categories = $this->readCategoriesFromItemsRow($itemRow);
-
-            // category alias（canonical 化）
-            $categories = $this->applyAliasToList($categories, $categoryAlias);
-
-            // --------------------------------------------------
-            // 5) 前処理ログ
-            // --------------------------------------------------
-            logger()->info('[AtlasKernel] input', [
-                'item_id' => $itemId,
-                'raw'     => $rawText,
-                'norm'    => $text,
-                'categories' => $categories,
-                'tenant_id'  => $tenantId,
-            ]);
-
-            // --------------------------------------------------
-            // 6) 抽出（優先順：condition → color → brands）
-            // --------------------------------------------------
-            // condition
-            [$condition, $textAfterCondition, $confCondition] = $this->extractOne($text, $conditionDict);
-            $confidence['condition'] = $confCondition;
-            $text = $textAfterCondition;
-
-            // color
-            [$color, $textAfterColor, $confColor] = $this->extractOne($text, $colorDict);
-            $confidence['color'] = $confColor;
-            $text = $textAfterColor;
-
-            // brands（複数）
-            [$brands, $textAfterBrands] = $this->extractMany($text, $brandSearchDict);
-            $text = $textAfterBrands;
-            $confidence['brand'] = count($brands) > 0 ? 0.9 : 0.0;
-
-            // brand alias 正規化（canonical 化）
-            $brands = $this->applyAliasToList($brands, $brandAlias);
-
-            // primary brand = 先頭
-            $primaryBrand = $brands[0] ?? null;
-
-            // category confidence：items.category から mirror なので最大
-            $confidence['category'] = count($categories) > 0 ? 1.0 : 0.0;
-
-            logger()->info('[AtlasKernel] extracted', [
-                'item_id'    => $itemId,
-                'brands'     => $brands,
-                'condition'  => $condition,
-                'color'      => $color,
-                'categories' => $categories,
-                'confidence' => $confidence,
-            ]);
-
-            // --------------------------------------------------
-            // 7) entity resolve（未知は null でも良い / 必要なら作る）
-            // --------------------------------------------------
-            // 方針：
-            // - brand_entities は「未知ブランド」が多いので、必要なら entity を作成しても良い
-            // - condition/color/category は運用上「辞書に寄せる」想定が多いので、まずは null 許容
-            //
-            // ※ ここはプロジェクト方針に合わせて toggle できるようにしてある
-            $autoCreateBrandEntity = true;
-
-            $brandId = $this->resolveEntityId('brand_entities', $primaryBrand, $autoCreateBrandEntity);
-            $conditionId = $this->resolveEntityId('condition_entities', $condition, false);
-            $colorId = $this->resolveEntityId('color_entities', $color, false);
-
-            // --------------------------------------------------
-            // 8) item_entities（latest スナップショット）確定
-            // --------------------------------------------------
-            DB::table('item_entities')
-                ->where('item_id', $itemId)
-                ->where('is_latest', true)
-                ->update(['is_latest' => false, 'updated_at' => now()]);
-
-            DB::table('item_entities')->insert([
-                'item_id'             => $itemId,
-                'brand_entity_id'     => $brandId,
-                'condition_entity_id' => $conditionId,
-                'color_entity_id'     => $colorId,
-                'confidence'          => json_encode($confidence, JSON_UNESCAPED_UNICODE),
-                'is_latest'           => true,
-                'generated_version'   => self::GENERATED_VERSION,
-                'generated_at'        => now(),
-                'created_at'          => now(),
-                'updated_at'          => now(),
-            ]);
-
-            // --------------------------------------------------
-            // 9) item_entity_tags（完全に作り直す：漏れ防止）
-            // --------------------------------------------------
-            DB::table('item_entity_tags')->where('item_id', $itemId)->delete();
-
-            // 9-1) brands (複数)
-            foreach ($brands as $b) {
-                $entityId = $this->resolveEntityId('brand_entities', $b, $autoCreateBrandEntity);
-
-                $displayName = $this->resolveDisplayName('brand_entities', $entityId, $b);
-
-                DB::table('item_entity_tags')->insert([
-                    'item_id'      => $itemId,
-                    'tag_type'     => 'brand',
-                    'entity_id'    => $entityId,
-                    'display_name' => $displayName,
-                    'confidence'   => 0.9,
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-            }
-
-            // 9-2) condition
-            if ($condition !== null && $condition !== '') {
-                DB::table('item_entity_tags')->insert([
-                    'item_id'      => $itemId,
-                    'tag_type'     => 'condition',
-                    'entity_id'    => $conditionId,
-                    'display_name' => $condition,
-                    'confidence'   => $confidence['condition'],
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-            }
-
-            // 9-3) color
-            if ($color !== null && $color !== '') {
-                DB::table('item_entity_tags')->insert([
-                    'item_id'      => $itemId,
-                    'tag_type'     => 'color',
-                    'entity_id'    => $colorId,
-                    'display_name' => $color,
-                    'confidence'   => $confidence['color'],
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-            }
-
-            // 9-4) categories（SoT mirror）
-            $insertedCategories = 0;
-            foreach ($categories as $cat) {
-                $entityId = $this->resolveEntityId('category_entities', $cat, false);
-
-                DB::table('item_entity_tags')->insert([
-                    'item_id'      => $itemId,
-                    'tag_type'     => 'category',
-                    'entity_id'    => $entityId,
-                    'display_name' => $cat,
-                    'confidence'   => 1.0, // mirror は最大
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-
-                $insertedCategories++;
-            }
-
-            logger()->info('[AtlasKernel] category mirror inserted', [
-                'item_id' => $itemId,
-                'count'   => $insertedCategories,
-            ]);
-
-            // --------------------------------------------------
-            // 10) audit（必ず残す）
-            // --------------------------------------------------
-            DB::table('item_entity_audits')->insert([
-                'item_id'    => $itemId,
-                'confidence' => json_encode($confidence, JSON_UNESCAPED_UNICODE),
-                'raw_text'   => $rawText,
-                'created_at' => now(),
-            ]);
-        });
+        return new AtlasAnalysisResult(
+            tags: $tags,
+            confidence: [
+                'brand'     => count($brands) ? 0.9 : 0.0,
+                'condition' => $confCondition,
+                'color'     => $confColor,
+            ],
+            version: self::GENERATED_VERSION,
+            rawText: $rawText
+        );
     }
 
     /* ======================================================

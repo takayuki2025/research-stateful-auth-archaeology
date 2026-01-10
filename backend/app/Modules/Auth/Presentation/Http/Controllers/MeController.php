@@ -11,6 +11,10 @@ final class MeController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $user = $request->user(); // ★これが必須
+        logger()->info('me auth', [
+    'id' => auth()->id(),
+    'user' => auth()->user(),
+]);
 
         return response()->json([
             'id' => $user->id,

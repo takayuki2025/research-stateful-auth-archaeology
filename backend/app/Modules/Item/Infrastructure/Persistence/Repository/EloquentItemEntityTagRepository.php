@@ -7,41 +7,35 @@ use Illuminate\Support\Facades\DB;
 
 final class EloquentItemEntityTagRepository implements ItemEntityTagRepository
 {
-    public function saveMany(
-        int $itemEntityId,
-        string $entityType,
-        array $entities
-    ): void {
-        foreach ($entities as $entity) {
+    public function replaceTags(int $itemEntityId, string $tagType, array $tags): void
+    {
+        DB::table('item_entity_tags')
+            ->where('item_entity_id', $itemEntityId)
+            ->where('tag_type', $tagType)
+            ->delete();
+
+        foreach ($tags as $tag) {
             DB::table('item_entity_tags')->insert([
                 'item_entity_id' => $itemEntityId,
-                'entity_type'    => $entityType,
-                'entity_id'      => $entity['entity_id'] ?? null,
-                'confidence'     => $entity['confidence'] ?? 0,
-                'source'         => $entity['source'] ?? 'atlas_kernel',
-                'meta'           => isset($entity['meta'])
-                    ? json_encode($entity['meta'])
-                    : null,
+                'tag_type'       => $tagType,
+                'entity_id'      => $tag['entity_id'] ?? null,
+                'display_name'   => $tag['display_name'],
+                'confidence'     => $tag['confidence'] ?? 0.0,
                 'created_at'     => now(),
                 'updated_at'     => now(),
             ]);
         }
     }
 
-    public function findByItemId(int $itemId): array
+    public function findLatestByItemId(int $itemId): array
     {
         return DB::table('item_entity_tags as t')
             ->join('item_entities as e', 'e.id', '=', 't.item_entity_id')
             ->where('e.item_id', $itemId)
             ->where('e.is_latest', true)
-            ->select(
-                't.entity_type',
-                't.entity_id',
-                't.confidence',
-                't.meta'
-            )
+            ->select('t.tag_type', 't.entity_id', 't.display_name', 't.confidence')
             ->get()
-            ->groupBy('entity_type')
+            ->groupBy('tag_type')
             ->toArray();
     }
 }

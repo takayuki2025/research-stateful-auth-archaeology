@@ -277,3 +277,17 @@ use App\Modules\User\Presentation\Http\Controllers\UserAddressController;
 
 Route::middleware('auth:sanctum')
     ->get('/me/addresses/primary', [UserAddressController::class, 'primary']);
+
+
+
+    // アトラスカーネル解析結果。
+    use App\Modules\Review\Presentation\Http\Controllers\ReviewController;
+
+Route::prefix('review')->group(function () {
+    Route::get('/items', [ReviewController::class, 'list']);
+    Route::get('/items/{itemId}', [ReviewController::class, 'show']);
+
+    Route::post('/items/{itemId}/confirm', [ReviewController::class, 'confirm']);
+    Route::post('/items/{itemId}/edit-confirm', [ReviewController::class, 'editConfirm']);
+    Route::post('/items/{itemId}/reject', [ReviewController::class, 'reject']);
+});

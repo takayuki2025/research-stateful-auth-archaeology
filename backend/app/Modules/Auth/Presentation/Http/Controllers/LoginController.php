@@ -21,7 +21,10 @@ final class LoginController extends Controller
         }
 
         $request->session()->regenerate();
-
+logger()->info('auth check', [
+    'id' => auth()->id(),
+    'user' => auth()->user(),
+]);
         return response()->json([
             'user' => $request->user(),
         ]);

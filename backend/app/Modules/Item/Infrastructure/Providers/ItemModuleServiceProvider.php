@@ -13,6 +13,12 @@ use App\Modules\Item\Application\Port\FavoriteItemReadPort;
 use App\Modules\Item\Infrastructure\Persistence\Query\EloquentFavoriteItemReadAdapter;
 use App\Modules\Item\Domain\Port\BrandNormalizationPort;
 use App\Modules\Item\Infrastructure\External\AtlaskernelBrandNormalizer;
+use App\Modules\Item\Domain\Repository\ItemEntityRepository;
+use App\Modules\Item\Domain\Repository\ItemEntityTagRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityTagRepository;
+use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentAnalysisResultRepository;
 
 final class ItemModuleServiceProvider extends ServiceProvider
 {
@@ -25,5 +31,10 @@ final class ItemModuleServiceProvider extends ServiceProvider
         $this->app->bind(FavoriteItemReadPort::class, EloquentFavoriteItemReadAdapter::class);
 
         $this->app->bind(BrandNormalizationPort::class, AtlaskernelBrandNormalizer::class);
+
+        $this->app->bind(ItemEntityRepository::class, EloquentItemEntityRepository::class);
+        $this->app->bind(ItemEntityTagRepository::class, EloquentItemEntityTagRepository::class);
+
+        $this->app->bind(AnalysisResultRepository::class,EloquentAnalysisResultRepository::class);
     }
 }

@@ -239,11 +239,11 @@ final class ItemsTableSeeder extends Seeder
             /**
              * AtlasKernel（既存）
              */
-            $atlasKernel->analyze(
-                itemId: $item->id,
-                rawText: $item->brand ?? '',
-                tenantId: null
-            );
+            // $atlasKernel->analyze(
+            //     itemId: $item->id,
+            //     rawText: $item->brand ?? '',
+            //     tenantId: null
+            // );
         }
 
         Log::info('[ItemsSeeder] completed with AtlasKernel.');

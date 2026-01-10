@@ -66,7 +66,8 @@
     62 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemModuleServiceProvider',
     63 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemEventServiceProvider',
     64 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
-    65 => 'App\\Providers\\AppServiceProvider',
+    65 => 'App\\Modules\\Review\\Infrastructure\\ReviewServiceProvider',
+    66 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -121,7 +122,8 @@
     48 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemModuleServiceProvider',
     49 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemEventServiceProvider',
     50 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
-    51 => 'App\\Providers\\AppServiceProvider',
+    51 => 'App\\Modules\\Review\\Infrastructure\\ReviewServiceProvider',
+    52 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (
