@@ -35,6 +35,10 @@ final class EventServiceProvider extends ServiceProvider
         Verified::class => [
         SetFirstLoginAtOnVerified::class,
     ],
+
+    \App\Modules\Item\Application\Event\ItemImported::class => [
+        \App\Modules\Item\Application\Listener\DispatchAnalyzeItemForReview::class,
+    ],
         /*
         |--------------------------------------------------------------------------
         | Domain Events（唯一の定義）

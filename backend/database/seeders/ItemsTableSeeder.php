@@ -20,7 +20,7 @@ final class ItemsTableSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('items')->truncate();
         DB::table('item_entities')->truncate();
-        DB::table('item_entity_tags')->truncate();
+        // DB::table('item_entity_tags')->truncate();
         DB::table('item_entity_audits')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 

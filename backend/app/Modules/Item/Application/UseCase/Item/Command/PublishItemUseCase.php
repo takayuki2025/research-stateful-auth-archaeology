@@ -18,6 +18,7 @@ use App\Modules\Item\Domain\ValueObject\ItemOrigin as ItemOriginVO;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Modules\Item\Application\Event\ItemImported;
 use DomainException;
 
 final class PublishItemUseCase
@@ -150,12 +151,13 @@ final class PublishItemUseCase
             ])));
 
             Event::dispatch(
-                new ItemPublished(
-                    itemId: $itemId,
-                    rawText: $rawText,
-                    tenantId: $tenantId,
-                )
-            );
+                new ItemImported(
+                itemId: $itemId,
+                rawText: $rawText,
+                tenantId: $tenantId,
+                source: 'publish',
+    )
+);
 
             $draft->markPublished();
             $this->draftRepository->save($draft);

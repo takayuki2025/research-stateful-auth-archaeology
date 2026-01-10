@@ -3,6 +3,7 @@
 namespace App\Modules\Item\Domain\Service;
 
 use DomainException;
+use Illuminate\Support\Facades\DB;
 use App\Modules\Item\Domain\Dto\AtlasAnalysisResult;
 
 final class AtlasKernelService
@@ -12,7 +13,7 @@ final class AtlasKernelService
 
     public function __construct()
     {
-        $this->assetPath = base_path('../python_batch/atlaskernel/src/atlaskernel/assets');
+        $this->assetPath = config('atlaskernel.assets_path');
     }
 
     public function requestAnalysis(
@@ -67,16 +68,37 @@ final class AtlasKernelService
             ];
         }
 
-        return new AtlasAnalysisResult(
-            tags: $tags,
-            confidence: [
-                'brand'     => count($brands) ? 0.9 : 0.0,
-                'condition' => $confCondition,
-                'color'     => $confColor,
-            ],
-            version: self::GENERATED_VERSION,
-            rawText: $rawText
-        );
+        return new AtlasAnalysisResult([
+    'integration' => [
+        'brand_identity' => [
+            'canonical' => $brands[0] ?? null,
+            'aliases' => array_keys($brandAlias),
+            'confidence' => count($brands) ? 0.9 : 0.0,
+        ],
+    ],
+
+    'extraction' => [
+        'condition' => $condition ? [$condition] : [],
+        'color' => $color ? [$color] : [],
+    ],
+
+    'partitioning' => [
+        'facts' => [
+            'category' => [],
+        ],
+        'ai_inference' => [],
+    ],
+
+    'normalization' => [
+        'brand_entity_id' =>
+            $this->resolveEntityId('brand_entities', $brands[0] ?? null, true),
+    ],
+
+    'lineage' => [
+        'model' => 'AtlasKernel-v3',
+        'generated_at' => now()->toIso8601String(),
+    ],
+]);
     }
 
     /* ======================================================

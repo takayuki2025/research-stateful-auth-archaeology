@@ -12,10 +12,19 @@ return new class () extends Migration {
 
             $table->unsignedBigInteger('item_id');
 
-            $table->json('tags');
-            $table->json('confidence');
-            $table->string('generated_version');
-            $table->text('raw_text');
+            /**
+             * v3: AtlasKernel 正式結果（完全スナップショット）
+             */
+            $table->json('payload');
+
+            /**
+             * v2互換 / 検索・集計用の冗長カラム
+             * （将来 drop 可能）
+             */
+            $table->json('tags')->nullable();
+            $table->json('confidence')->nullable();
+            $table->string('generated_version')->nullable();
+            $table->text('raw_text')->nullable();
 
             // active / rejected / superseded
             $table->string('status')->default('active');

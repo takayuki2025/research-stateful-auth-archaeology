@@ -11,4 +11,9 @@ return [
     'log_payload' => true,
 
     'endpoint' => env('ATLAS_KERNEL_ENDPOINT', 'http://python_atlaskernel:8000/analyze'),
+
+    'assets_path' => env(
+        'ATLAS_KERNEL_ASSETS_PATH',
+        base_path('python_batch/atlaskernel/src/atlaskernel/assets')
+    ),
 ];
