@@ -1,7 +1,9 @@
 from atlaskernel.application.analyze_entity import analyze
 from atlaskernel.adapters.mysql_reader import read_requests_from_db
 from atlaskernel.adapters.mysql_writer import write_results_to_db
+from atlaskernel.api.routes.reviews import router as review_router
 
+app.include_router(review_router)
 
 def main():
     requests = read_requests_from_db()
