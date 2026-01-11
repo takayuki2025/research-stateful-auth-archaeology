@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Modules\Item\Domain\Service\AtlasKernelService;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
+use App\Modules\Item\Application\UseCase\AtlasKernel\ApplyProvisionalAnalysisUseCase;
 
 final class AnalyzeItemForReviewJob implements ShouldQueue
 {
@@ -23,25 +24,32 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
 
     public function handle(
         AtlasKernelService $atlasKernel,
-        AnalysisResultRepository $analysisRepo
+        AnalysisResultRepository $analysisRepo,
+        ApplyProvisionalAnalysisUseCase $applyUseCase
     ): void {
-        // Domain に完全委譲
+        // ① 解析
         $analysisResult = $atlasKernel->requestAnalysis(
             itemId: $this->itemId,
             rawText: $this->rawText,
             tenantId: $this->tenantId,
         );
 
-        // v3 payload をここで「包むだけ」
+        $payload = [
+            'source'   => $this->source,
+            'input'    => ['raw_text' => $this->rawText],
+            'analysis' => $analysisResult->toArray(),
+        ];
+
+        // ② analysis_results 保存
         $analysisRepo->save(
             itemId: $this->itemId,
-            payload: [
-                'source' => $this->source,
-                'input' => [
-                    'raw_text' => $this->rawText,
-                ],
-                'analysis' => $analysisResult->toArray(), // ★唯一の正解
-            ]
+            payload: $payload
+        );
+
+        // ③ ★AI一次結果を仮 entity として反映
+        $applyUseCase->handle(
+            $this->itemId,
+            $payload['analysis']
         );
     }
 }

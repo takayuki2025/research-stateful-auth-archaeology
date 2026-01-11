@@ -62,7 +62,7 @@ export default function Home() {
       currentTab === "mylist"
         ? favoriteResult.items.map((item) => ({
             ...item,
-            displayType: null, // ★ マイリストでは装飾しない
+            displayType: null,
           }))
         : isSearch
           ? searchResult.items
@@ -98,7 +98,7 @@ export default function Home() {
       } else {
         await apiClient.post(`/favorites/${item.id}`);
       }
-      mutate(); // SWR 全体再検証
+      mutate();
     } catch (e) {
       console.error(e);
     }
@@ -118,6 +118,19 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
+          {/* 🏪 ショップ別ホームリンク（追加） */}
+          <div className={styles.shopButtons}>
+            {["a", "b", "c", "d"].map((code) => (
+              <button
+                key={code}
+                className={styles.shopButton}
+                onClick={() => router.push(`/shops/shop-${code}`)}
+              >
+                ショップ {code.toUpperCase()} へ
+              </button>
+            ))}
+          </div>
+
           {/* Tabs */}
           <div className={styles.main_select}>
             <Link

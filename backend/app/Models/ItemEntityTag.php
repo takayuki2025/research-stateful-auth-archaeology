@@ -10,7 +10,7 @@ class ItemEntityTag extends Model
     protected $table = 'item_entity_tags';
 
     protected $fillable = [
-        'item_id',
+        'item_entity_id',
         'tag_type',
         'entity_id',
         'display_name',
@@ -20,6 +20,15 @@ class ItemEntityTag extends Model
     protected $casts = [
         'confidence' => 'float',
     ];
+
+    /** 親 entity */
+    public function itemEntity(): BelongsTo
+    {
+        return $this->belongsTo(
+            ItemEntity::class,
+            'item_entity_id'
+        );
+    }
 
     /** 商品 */
     public function item(): BelongsTo

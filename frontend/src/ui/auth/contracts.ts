@@ -15,8 +15,15 @@ export type AuthUser = {
   id: number;
   email?: string;
   email_verified_at?: string | null;
-  profile_completed?: boolean;
   display_name?: string | null;
+  profile_completed?: boolean;
+
+  /** ★ 追加：ショップ権限 */
+  shop_roles: {
+    shop_id: number;
+    shop_code: string;
+    role: "owner" | "manager" | "staff";
+  }[];
 };
 
 /* =========================

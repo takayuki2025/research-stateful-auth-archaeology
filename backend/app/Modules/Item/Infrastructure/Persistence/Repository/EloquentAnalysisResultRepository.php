@@ -57,4 +57,21 @@ final class EloquentAnalysisResultRepository implements AnalysisResultRepository
                 'updated_at' => now(),
             ]);
     }
+
+   public function markDecided(
+    int $itemId,
+    string $decidedBy,
+    int $decidedUserId
+): void {
+    DB::table('analysis_results')
+        ->where('item_id', $itemId)
+        ->where('status', 'active')
+        ->update([
+            'status'          => 'decided',
+            'decided_by'      => $decidedBy,
+            'decided_user_id' => $decidedUserId,
+            'decided_at'      => now(),
+            'updated_at'      => now(),
+        ]);
+}
 }

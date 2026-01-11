@@ -21,16 +21,26 @@ final class GenerateItemEntitiesJob implements ShouldQueue
     ) {}
 
     public function handle(
-        AtlasKernelService $atlasKernel,
-        AnalysisResultRepository $analysisRepo
-    ): void {
-        $result = $atlasKernel->requestAnalysis(
-            itemId: $this->itemId,
-            rawText: $this->rawText,
-            tenantId: $this->tenantId,
-        );
+    AtlasKernelService $atlasKernel,
+    AnalysisResultRepository $analysisRepo,
+    ApplyProvisionalAnalysisUseCase $applyProvisional
+): void {
+    $result = $atlasKernel->requestAnalysis(
+        itemId: $this->itemId,
+        rawText: $this->rawText,
+        tenantId: $this->tenantId,
+    );
 
-        // ★ DB保存は analysis_results のみ
-        $analysisRepo->save($this->itemId, $result);
-    }
+    // analysis_results 保存
+    $analysisRepo->save($this->itemId, [
+        'analysis' => $result->toArray(),
+        'status'   => 'provisional',
+    ]);
+
+    // ★ 仮 Entity 自動生成
+    $applyProvisional->handle(
+        $this->itemId,
+        $result->toArray()
+    );
+}
 }

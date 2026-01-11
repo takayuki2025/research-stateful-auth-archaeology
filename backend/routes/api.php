@@ -280,7 +280,7 @@ Route::middleware('auth:sanctum')
 
 
 
-    // アトラスカーネル解析結果。
+    //１４・ アトラスカーネル解析結果。
     use App\Modules\Review\Presentation\Http\Controllers\ReviewController;
 
 Route::prefix('review')->group(function () {
@@ -291,3 +291,27 @@ Route::prefix('review')->group(function () {
     Route::post('/items/{itemId}/edit-confirm', [ReviewController::class, 'editConfirm']);
     Route::post('/items/{itemId}/reject', [ReviewController::class, 'reject']);
 });
+
+// AI評価数値のUI化
+use App\Modules\Item\Presentation\Http\Controllers\GetItemAnalysisResultController;
+
+Route::get(
+    '/items/{itemId}/analysis',
+    GetItemAnalysisResultController::class
+);
+
+// 解析結果後の処理前
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\GetItemAnalysisForReviewController;
+
+Route::get(
+    '/items/{itemId}/analysis/review',
+    GetItemAnalysisForReviewController::class
+);
+
+// 再解析処理
+use App\Modules\Item\Presentation\Http\Controller\ItemAnalysisController;
+
+Route::post(
+    '/items/{itemId}/analysis/reanalyze',
+    [ItemAnalysisController::class, 'reanalyze']
+);

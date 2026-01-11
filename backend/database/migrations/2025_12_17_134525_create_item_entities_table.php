@@ -29,6 +29,7 @@ return new class () extends Migration {
 
             // ★ v1 から is_latest を持つ（AtlasKernel 前提）
             $table->boolean('is_latest')->default(true);
+            $table->string('source')->default('ai_provisional');
 
             // AtlasKernel meta
             $table->string('generated_version')->default('v1');
