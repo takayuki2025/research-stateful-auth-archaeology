@@ -131,6 +131,7 @@ services:
       DB_NAME: laravel_db
       DB_USER: laravel_user
       DB_PASS: laravel_pass
+      DATABASE_URL: mysql+mysqlconnector://laravel_user:laravel_pass@mysql:3306/laravel_db
     command: >
       uvicorn atlaskernel.server:app
       --host 0.0.0.0
