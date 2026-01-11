@@ -19,68 +19,49 @@ final class CreateOrderUseCase
     }
 
     public function handle(CreateOrderInput $input): CreateOrderOutput
-    {
-        return DB::transaction(function () use ($input) {
+{
+    return DB::transaction(function () use ($input) {
 
-            // =========================================
-            // ★ ① 既存の未確定 Order があれば再利用
-            // =========================================
-            $existing = $this->orders->findDraftByUserAndShop(
-                userId: $input->userId,
-                shopId: $input->shopId
-            );
+        // =========================================
+        // ① OrderItemSnapshot を構築
+        // =========================================
+        $snapshots = array_map(function (array $row) {
+            return OrderItemSnapshot::fromArray([
+                'item_id'        => $row['item_id'],
+                'name'           => $row['name'],
+                'price_amount'   => $row['price_amount'],
+                'price_currency' => $row['price_currency'],
+                'quantity'       => $row['quantity'] ?? 1,
+                'image_path'     => $row['image_path'] ?? null,
+            ]);
+        }, $input->items);
 
-            if ($existing) {
-                return CreateOrderOutput::from(
-                    orderId: $existing->id(),
-                    status: $existing->status(),
-                    totalAmount: $existing->totalAmount(),
-                    currency: $existing->currency()
-                );
+        // =========================================
+        // ② 金額計算
+        // =========================================
+        $currency = $snapshots[0]->priceCurrency;
+        $totalAmount = 0;
+
+        foreach ($snapshots as $s) {
+            if ($s->priceCurrency !== $currency) {
+                throw new \DomainException('Mixed currency not supported');
             }
+            $totalAmount += $s->priceAmount * $s->quantity;
+        }
 
-            // =========================================
-            // ★ ② OrderItemSnapshot を構築
-            // =========================================
-            $snapshots = array_map(function (array $row) {
-                return OrderItemSnapshot::fromArray([
-                    'item_id'        => $row['item_id'],
-                    'name'           => $row['name'],
-                    'price_amount'   => $row['price_amount'],
-                    'price_currency' => $row['price_currency'],
-                    'condition'      => $row['condition'] ?? null,
-                    'category'       => $row['category'] ?? [],
-                    'image_path'     => $row['image_path'] ?? null,
-                    'quantity'       => $row['quantity'] ?? 1,
-                ]);
-            }, $input->items);
+        // =========================================
+        // ③ Order 新規作成（毎回）
+        // =========================================
+        $order = Order::create(
+            shopId: $input->shopId,
+            userId: $input->userId,
+            totalAmount: $totalAmount,
+            currency: $currency,
+            items: $snapshots,
+            meta: $input->meta
+        );
 
-            // =========================================
-            // ★ ③ 金額計算（v1）
-            // =========================================
-            $currency = $snapshots[0]->priceCurrency;
-            $totalAmount = 0;
-
-            foreach ($snapshots as $s) {
-                if ($s->priceCurrency !== $currency) {
-                    throw new \DomainException('Mixed currency is not supported in v1');
-                }
-                $totalAmount += ($s->priceAmount * $s->quantity);
-            }
-
-            // =========================================
-            // ★ ④ Order 新規作成
-            // =========================================
-            $order = Order::create(
-                shopId: $input->shopId,
-                userId: $input->userId,
-                totalAmount: $totalAmount,
-                currency: $currency,
-                items: $snapshots,
-                meta: $input->meta
-            );
-
-            $saved = $this->orders->save($order);
+        $saved = $this->orders->save($order);
 
             // =========================================
             // ★ ⑤ 正規 order_items を作成
@@ -115,10 +96,10 @@ final class CreateOrderUseCase
             );
 
             return CreateOrderOutput::from(
-                orderId: $saved->id(),
-                status: $saved->status(),
-                totalAmount: $saved->totalAmount(),
-                currency: $saved->currency()
+            orderId: $saved->id(),
+            status: $saved->status(),
+            totalAmount: $saved->totalAmount(),
+            currency: $saved->currency()
             );
         });
     }

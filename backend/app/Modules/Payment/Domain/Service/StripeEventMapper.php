@@ -13,7 +13,6 @@ final class StripeEventMapper
         $payload = $input->payload;
         $object  = $payload['data']['object'] ?? [];
 
-        // payment_intent id を取得
         $providerPaymentId = $this->extractPaymentIntentId($input->eventType, $object);
 
         if (!is_string($providerPaymentId) || $providerPaymentId === '') {
@@ -22,13 +21,11 @@ final class StripeEventMapper
 
         $instructions = $this->extractKonbiniInstructions($object);
 
-
         return match ($input->eventType) {
 
-            // ----------------------------
-            // PaymentIntent 系（唯一の成功）
-            // ----------------------------
-            'payment_intent.succeeded' =>
+            // ✅ 成功（最重要）
+            'payment_intent.succeeded',
+            'charge.succeeded' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::SUCCEEDED,
                     $providerPaymentId,
@@ -56,16 +53,7 @@ final class StripeEventMapper
                     $instructions,
                 ),
 
-            // ----------------------------
-            // 補助イベント（必ず無視）
-            // ----------------------------
-            'charge.succeeded',
-            'checkout.session.completed' =>
-                DomainPaymentEvent::ignored($input->occurredAt),
-
-            // ----------------------------
-            // Refund（別系統なのでOK）
-            // ----------------------------
+            // Refund
             'charge.refunded' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::REFUND_SUCCEEDED,
@@ -83,7 +71,6 @@ final class StripeEventMapper
             default =>
                 DomainPaymentEvent::ignored($input->occurredAt),
         };
-
     }
 
     private function extractPaymentIntentId(string $eventType, array $object): ?string
@@ -92,7 +79,7 @@ final class StripeEventMapper
             return $object['id'] ?? null;
         }
 
-        if (in_array($eventType, ['charge.succeeded', 'charge.refunded', 'checkout.session.completed'], true)) {
+        if (str_starts_with($eventType, 'charge.')) {
             return $object['payment_intent'] ?? null;
         }
 

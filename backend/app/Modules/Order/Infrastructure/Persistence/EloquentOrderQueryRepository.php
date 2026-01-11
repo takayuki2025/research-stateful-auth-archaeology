@@ -10,13 +10,11 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
     public function findOrderListWithShipmentByShopId(int $shopId): array
     {
         $rows = DB::table('orders')
-            ->leftJoin('payments', function ($join) {
-                $join->on('payments.order_id', '=', 'orders.id')
-                     ->where('payments.status', 'succeeded');
-            })
+
+            // Shipment（存在しない場合あり）
             ->leftJoin('shipments', 'shipments.order_id', '=', 'orders.id')
 
-            // ★ delivered event
+            // 配達完了イベント（あれば1件）
             ->leftJoin('shipment_events as delivered_events', function ($join) {
                 $join->on('shipments.id', '=', 'delivered_events.shipment_id')
                      ->where('delivered_events.type', 'delivered');
@@ -28,7 +26,10 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
                 'orders.id as order_id',
                 'orders.status as order_status',
                 'orders.created_at as order_created_at',
-                DB::raw('payments.id IS NOT NULL as order_paid'),
+
+                // ★★ ここが最重要 ★★
+                // Order が paid なら「支払い済み」
+                DB::raw("orders.status = 'paid' as order_paid"),
 
                 'orders.total_amount',
                 'orders.currency',
@@ -37,16 +38,17 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
                 'shipments.status as shipment_status',
                 'shipments.eta',
 
-                // ★ Event 由来
+                // delivered_at（あれば）
                 DB::raw('MAX(delivered_events.occurred_at) as delivered_at'),
 
+                // Address snapshot
                 'orders.address_snapshot as destination_address',
             ])
+
             ->groupBy(
                 'orders.id',
                 'orders.status',
                 'orders.created_at',
-                'payments.id',
                 'orders.total_amount',
                 'orders.currency',
                 'shipments.id',
@@ -54,6 +56,7 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
                 'shipments.eta',
                 'orders.address_snapshot'
             )
+
             ->orderByDesc('orders.id')
             ->get();
 
@@ -61,6 +64,8 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
             'order_id' => (int) $row->order_id,
             'order_status' => (string) $row->order_status,
             'order_created_at' => $row->order_created_at,
+
+            // bool に正規化
             'order_paid' => (bool) $row->order_paid,
 
             'total_amount' => (int) $row->total_amount,
@@ -73,7 +78,6 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
             'shipment_status' => $row->shipment_status,
             'eta' => $row->eta,
 
-            // ★ これが今回の本命
             'delivered_at' => $row->delivered_at,
 
             'destination_address' => $row->destination_address

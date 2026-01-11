@@ -30,30 +30,31 @@ final class StripePaymentGateway implements PaymentGatewayPort
            CARD
         ========================= */
         if ($method === PaymentMethod::CARD) {
-            $pi = $this->stripe->paymentIntents->create([
-                'amount' => $amount,
-                'currency' => strtolower($currency),
-                'automatic_payment_methods' => ['enabled' => true],
-                'metadata' => [
-                    'order_id'   => (string)$context['order_id'],
-                    // 'payment_id' => (string)$context['payment_id'],
-                    'user_id'    => (string)$context['user_id'],
-                    'shop_id'    => (string)$context['shop_id'],
-                ],
-            ]);
+    $pi = $this->stripe->paymentIntents->create([
+        'amount'   => $amount,
+        'currency' => strtolower($currency),
 
-            return [
-                'provider_payment_id' => $pi->id,
-                'client_secret' => $pi->client_secret,
-                'requires_action' => $pi->status === 'requires_action',
-                'status' => $pi->status,
-            ];
-        }
+        // ★ automatic_payment_methods を使わない
+        'payment_method_types' => ['card'],
+
+        'metadata' => [
+            'order_id' => (string) $context['order_id'],
+            'user_id'  => (string) $context['user_id'],
+            'shop_id'  => (string) $context['shop_id'],
+        ],
+    ]);
+
+    return [
+        'provider_payment_id' => $pi->id,
+        'client_secret'       => $pi->client_secret,
+        'requires_action'     => $pi->status === 'requires_action',
+        'status'              => $pi->status,
+    ];
+}
 
         /* =========================
-           KONBINI（本番仕様）
+           KONBINI
         ========================= */
-
         if ($method === PaymentMethod::KONBINI) {
 
             $payerName  = $context['payer_name'] ?? '購入者';
@@ -62,8 +63,6 @@ final class StripePaymentGateway implements PaymentGatewayPort
             $pi = $this->stripe->paymentIntents->create([
                 'amount' => $amount,
                 'currency' => 'jpy',
-
-                // ★ 重要：confirm を true にする
                 'confirm' => true,
 
                 'payment_method_types' => ['konbini'],
@@ -74,11 +73,13 @@ final class StripePaymentGateway implements PaymentGatewayPort
                         'email' => $payerEmail,
                     ],
                 ],
+
+                // ★ 同じく metadata を必ず入れる
                 'metadata' => [
-                    'order_id'   => (string)$context['order_id'],
-                    // 'payment_id' => (string)$context['payment_id'],
-                    'user_id'    => (string)$context['user_id'],
-                    'shop_id'    => (string)$context['shop_id'],
+                    'order_id'   => (string) $context['order_id'],
+                    'payment_id' => (string) $context['payment_id'],
+                    'user_id'    => (string) $context['user_id'],
+                    'shop_id'    => (string) $context['shop_id'],
                 ],
             ]);
 
@@ -86,18 +87,17 @@ final class StripePaymentGateway implements PaymentGatewayPort
 
             return [
                 'provider_payment_id' => $pi->id,
-                'client_secret' => $pi->client_secret,
-                'requires_action' => true,
-                'status' => $pi->status,
+                'client_secret'       => $pi->client_secret,
+                'requires_action'     => true,
+                'status'              => $pi->status,
                 'instructions' => [
-                    'type' => 'konbini',
+                    'type'       => 'konbini',
                     'expires_at' => $details?->expires_at,
-                    'reference' => $details?->confirmation_number,
-                    'store' => $details?->stores,
+                    'reference'  => $details?->confirmation_number,
+                    'store'      => $details?->stores,
                 ],
             ];
         }
-
 
         throw new \InvalidArgumentException('Unsupported payment method');
     }
@@ -126,6 +126,7 @@ final class StripePaymentGateway implements PaymentGatewayPort
             'event_type' => $event->type,
             'provider_payment_id' => $pi->id,
             'status' => $pi->status,
+            'metadata' => (array) ($pi->metadata ?? []),
         ];
     }
 
@@ -133,17 +134,6 @@ final class StripePaymentGateway implements PaymentGatewayPort
         PaymentMethod $method,
         array $payload
     ): array {
-        /**
-         * payload は Application 層で構築済み
-         * [
-         *   amount,
-         *   currency,
-         *   shipping,
-         *   metadata,
-         * ]
-         */
-
-        // StripeClient にそのまま渡す
         $pi = $this->stripe->paymentIntents->create($payload);
 
         return [
@@ -154,8 +144,3 @@ final class StripePaymentGateway implements PaymentGatewayPort
         ];
     }
 }
-
-
-
-
-

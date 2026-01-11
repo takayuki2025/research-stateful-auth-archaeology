@@ -27,7 +27,7 @@ final class StartPaymentUseCase
         return DB::transaction(function () use ($input, $userId) {
 
             /* ============================================
-            ① Order 検証
+               ① Order 検証
             ============================================ */
             $order = $this->orders->findById($input->orderId);
             if (! $order) {
@@ -42,37 +42,14 @@ final class StartPaymentUseCase
                 throw new \DomainException('Order is not payable');
             }
 
-            $method = PaymentMethod::from($input->method);
-
-
-
             if ($order->shippingAddress() === null) {
                 throw new \DomainException('Shipping address must be confirmed before payment.');
             }
 
-            /* ============================================
-            ② Gateway 呼び出し（★先に PI を作る）
-            - provider_payment_id (= payment_intent.id) を必ず取得
-            ============================================ */
-            $res = $this->gateway->createIntent(
-                method: $method,
-                amount: $order->totalAmount(),
-                currency: $order->currency(),
-                context: [
-                    'order_id'   => $order->id(),
-                    'user_id'    => $order->userId(),
-                    'shop_id'    => $order->shopId(),
-                    'payer_name' => '購入者-' . $order->userId(),
-                ]
-            );
-
-            if (empty($res['provider_payment_id'])) {
-                // ここが空だと “絶対ルール” を満たせないので gateway 実装側の修正が必要
-                throw new \RuntimeException('provider_payment_id missing from gateway response');
-            }
+            $method = PaymentMethod::from($input->method);
 
             /* ============================================
-            ③ Payment 初期作成（★PI を持った状態で作る）
+               ② Payment を先に作成（id を確定）
             ============================================ */
             $payment = Payment::initiate(
                 orderId: $order->id(),
@@ -82,37 +59,49 @@ final class StartPaymentUseCase
                 method: $method,
                 amount: $order->totalAmount(),
                 currency: $order->currency(),
-                meta: [
-                    'order_status' => $order->status()->value,
+            );
+
+            $payment = $this->payments->save($payment);
+
+            /* ============================================
+               ③ Stripe PaymentIntent 作成
+            ============================================ */
+            $res = $this->gateway->createIntent(
+                method: $method,
+                amount: $order->totalAmount(),
+                currency: $order->currency(),
+                context: [
+                    'order_id'   => $order->id(),
+                    'payment_id' => $payment->id(), // ★最重要
+                    'user_id'    => $order->userId(),
+                    'shop_id'    => $order->shopId(),
+                    'payer_name' => '購入者-' . $order->userId(),
                 ]
             );
 
-            // ★ provider_payment_id を必ずセットしてから INSERT する
-            $payment = $payment->withProviderPayment($res['provider_payment_id']);
+            if (empty($res['provider_payment_id'])) {
+                throw new \RuntimeException('provider_payment_id missing from gateway response');
+            }
 
             /* ============================================
-            ④ requires_action 遷移
+               ④ Payment 更新
             ============================================ */
+            $payment = $payment->withProviderPayment($res['provider_payment_id']);
+
             if (($res['requires_action'] ?? false) === true) {
                 $payment = $payment->markRequiresAction([
                     'gateway_status' => $res['status'] ?? null,
                 ]);
             }
 
-            /* ============================================
-            ⑤ instructions 反映
-            ============================================ */
             if (! empty($res['instructions'])) {
                 $payment = $payment->withInstructions($res['instructions']);
             }
 
-            /* ============================================
-            ⑥ INSERT（provider_payment_id が必ず入る）
-            ============================================ */
             $payment = $this->payments->save($payment);
 
             /* ============================================
-            ⑦ レスポンス
+               ⑤ レスポンス
             ============================================ */
             return new StartPaymentOutput(
                 paymentId: $payment->id(),
