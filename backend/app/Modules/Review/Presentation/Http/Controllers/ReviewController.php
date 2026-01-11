@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Review\Presentation\Http;
+namespace App\Modules\Review\Presentation\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;

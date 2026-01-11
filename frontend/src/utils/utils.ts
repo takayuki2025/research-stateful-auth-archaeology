@@ -8,13 +8,13 @@ export enum IMAGE_TYPE {
 }
 
 // ======================================
-// Backend Origin（単一責任）
+// Backend Origin（環境依存を排除）
 // ======================================
 function getBackendOrigin(): string {
-  return (
-    process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "") ||
-    "http://localhost"
-  );
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
 }
 
 // ======================================
@@ -24,7 +24,6 @@ function getFallback(type: IMAGE_TYPE): string {
   const origin = getBackendOrigin();
 
   if (type === IMAGE_TYPE.USER) {
-    // ★ 修正後
     return `${origin}/storage/pictures_user/default-profile2.jpg`;
   }
 
@@ -36,12 +35,12 @@ function getFallback(type: IMAGE_TYPE): string {
 // ======================================
 export function getImageUrl(
   path?: string | null,
-  _type: IMAGE_TYPE = IMAGE_TYPE.OTHER
+  type: IMAGE_TYPE = IMAGE_TYPE.OTHER
 ): string {
   const origin = getBackendOrigin();
 
   if (!path) {
-    return getFallback(_type);
+    return getFallback(type);
   }
 
   // absolute URL
@@ -51,12 +50,10 @@ export function getImageUrl(
 
   const normalized = path.replace(/^\/+/, "");
 
-  // ✅ すでに storage/ が含まれている場合は二重にしない
   if (normalized.startsWith("storage/")) {
     return `${origin}/${normalized}`;
   }
 
-  // ✅ それ以外は storage 配下
   return `${origin}/storage/${normalized}`;
 }
 

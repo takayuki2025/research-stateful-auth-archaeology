@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Item\Presentation\Http\Controller;
+namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;

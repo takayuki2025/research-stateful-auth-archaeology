@@ -20,6 +20,10 @@ final class GetMyBoughtItemsUseCase
 {
     $userId = $this->auth->principal()->userId();
 
+    \Log::info('[GetMyBoughtItems]', [
+        'principal_user_id' => $userId,
+    ]);
+
     return $this->histories->findByBuyer($userId);
 }
 }

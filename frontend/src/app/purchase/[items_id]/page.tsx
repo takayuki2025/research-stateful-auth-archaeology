@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useUserPrimaryAddressSWR } from "@/services/useUserPrimaryAddressSWR";
 import { getImageUrl } from "@/utils/utils";
@@ -18,7 +18,7 @@ import {
 } from "@stripe/react-stripe-js";
 
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 );
 
 type PaymentMethod = "" | "card" | "konbini";
@@ -32,6 +32,17 @@ export default function PurchaseConfirmPageWrapper() {
   );
 }
 
+type CreateOrderResponse = {
+  order_id: number;
+  status: string;
+  total_amount: number;
+  currency: string;
+};
+
+type StartPaymentResponse = {
+  client_secret: string;
+};
+
 /* ================= Page ================= */
 function PurchaseConfirmPage() {
   const router = useRouter();
@@ -43,69 +54,102 @@ function PurchaseConfirmPage() {
 
   const itemId = useMemo(() => {
     const raw = (params as any).items_id;
-    return Number(raw);
+    const n = Number(raw);
+    return Number.isNaN(n) ? null : n;
   }, [params]);
 
-  const { item, isLoading: isItemLoading } = useItemDetailSWR(itemId);
-  const { address, isLoading: isAddressLoading } = useUserPrimaryAddressSWR();
+  const {
+    item,
+    isLoading: isItemLoading,
+    isError: isItemError,
+  } = useItemDetailSWR(itemId);
+
+  const {
+    address,
+    isLoading: isAddressLoading,
+    isError: isAddressError,
+  } = useUserPrimaryAddressSWR();
 
   const [payment, setPayment] = useState<PaymentMethod>("");
 
-  /* ================= Early return ================= */
+  /* =========================================================
+     🛑 Guard（認証システム共通仕様）
+  ========================================================= */
+
   if (isAuthLoading || isItemLoading || isAddressLoading) {
     return <div className={styles.loadingOverlay}>購入情報を読み込み中...</div>;
   }
 
-  if (!item) {
-    return <div className={styles.loadingOverlay}>商品が見つかりません</div>;
+  if (isItemError || isAddressError) {
+    return (
+      <div className={styles.loadingOverlay}>
+        情報の取得に失敗しました。時間をおいて再度お試しください。
+      </div>
+    );
   }
+
+  if (!item) {
+    return (
+      <div className={styles.loadingOverlay}>購入情報を準備しています...</div>
+    );
+  }
+
+  const resolvedItem = item;
 
   /* ================= canPurchase ================= */
   const canPurchase =
-    isAuthenticated && item.remain > 0 && payment !== "" && !!address?.id;
+    isAuthenticated &&
+    resolvedItem.remain > 0 &&
+    payment !== "" &&
+    !!address?.id;
 
   /* ================= submit ================= */
   const submitPurchase = async () => {
     if (!canPurchase || !apiClient || !address) return;
 
     try {
-      // ① Order 作成
-      const orderRes = await apiClient.post("/orders", {
-        shop_id: item.shop_id,
+      const orderRes = await apiClient.post<CreateOrderResponse>("/orders", {
+        shop_id: resolvedItem.shop_id,
         items: [
           {
-            item_id: item.id,
-            name: item.name,
-            price_amount: item.price,
+            item_id: resolvedItem.id,
+            name: resolvedItem.name,
+            price_amount: resolvedItem.price,
             price_currency: "JPY",
             quantity: 1,
-            image_path: item.item_image,
+            image_path: resolvedItem.item_image,
           },
         ],
       });
 
-      const orderId = orderRes.data.order_id;
+      const orderId = orderRes.order_id; // ✅ OK
 
-      // ② 配送先確定
       await apiClient.post(`/orders/${orderId}/address`, {
         address_id: address.id,
       });
 
       await apiClient.post(`/orders/${orderId}/confirm`);
 
-      // ④ 決済開始
-      const paymentRes = await apiClient.post("/payments/start", {
-        order_id: orderId,
-        method: payment,
-      });
+      const paymentRes = await apiClient.post<StartPaymentResponse>(
+        "/payments/start",
+        {
+          order_id: orderId,
+          method: payment,
+        }
+      );
 
       if (payment === "card") {
-        if (!stripe || !elements) return;
+        if (!stripe || !elements) {
+          alert(
+            "決済の準備が整っていません。少し待ってから再度お試しください。"
+          );
+          return;
+        }
 
         const card = elements.getElement(CardElement);
         if (!card) return;
 
-        const { client_secret } = paymentRes.data;
+        const { client_secret } = paymentRes; // ✅ OK
 
         const result = await stripe.confirmCardPayment(client_secret, {
           payment_method: { card },
@@ -123,7 +167,7 @@ function PurchaseConfirmPage() {
     } catch (e: any) {
       console.error(e);
       alert(
-        e?.response?.data?.message ?? e?.message ?? "購入処理に失敗しました",
+        e?.response?.data?.message ?? e?.message ?? "購入処理に失敗しました"
       );
     }
   };
@@ -135,20 +179,21 @@ function PurchaseConfirmPage() {
         <div className={styles.item_buy_lr}>
           {/* LEFT */}
           <div className={styles.item_buy_l}>
-            {/* 商品 */}
             <div className={styles.item_buy_content_section}>
               <div className={styles.item_buy_image}>
-                <img src={getImageUrl(item.item_image)} alt={item.name} />
+                <img
+                  src={getImageUrl(resolvedItem.item_image)}
+                  alt={resolvedItem.name}
+                />
               </div>
               <div>
-                <h3 className={styles.item_name}>{item.name}</h3>
+                <h3 className={styles.item_name}>{resolvedItem.name}</h3>
                 <p className={styles.item_price}>
-                  ¥{item.price.toLocaleString()}
+                  ¥{resolvedItem.price.toLocaleString()}
                 </p>
               </div>
             </div>
 
-            {/* 支払い方法 */}
             <div className={styles.item_buy_content_section}>
               <h4>支払い方法</h4>
               <select
@@ -161,44 +206,15 @@ function PurchaseConfirmPage() {
               </select>
             </div>
 
-            {/* Card */}
             {payment === "card" && stripe && elements && (
               <div className={styles.item_buy_content_section}>
                 <h4>カード情報</h4>
-
                 <div className={styles.stripeCardWrapper}>
-                  <div
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "6px",
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
-                    <CardElement
-                      options={{
-                        hidePostalCode: true,
-                        style: {
-                          base: {
-                            fontSize: "16px",
-                            color: "#111827",
-                            lineHeight: "24px",
-                            "::placeholder": {
-                              color: "#9ca3af",
-                            },
-                          },
-                          invalid: {
-                            color: "#dc2626",
-                          },
-                        },
-                      }}
-                    />
-                  </div>
+                  <CardElement />
                 </div>
               </div>
             )}
 
-            {/* 配送先 */}
             <div className={styles.item_buy_content_section}>
               <h4>配送先</h4>
               {address ? (
@@ -218,9 +234,8 @@ function PurchaseConfirmPage() {
           {/* RIGHT */}
           <div className={styles.item_buy_r}>
             <div className={styles.item_buy_summary_box}>
-              <p>商品代金: ¥{item.price.toLocaleString()}</p>
+              <p>商品代金: ¥{resolvedItem.price.toLocaleString()}</p>
               <p>支払い方法: {payment || "未選択"}</p>
-
               <button disabled={!canPurchase} onClick={submitPurchase}>
                 購入する
               </button>

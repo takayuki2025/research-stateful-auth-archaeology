@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { AxiosResponse } from "axios";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import styles from "./W-ThanksKonbini.module.css";
 
 /* =======================
@@ -48,31 +47,25 @@ export default function ThanksBuyKonbiniPage() {
   const MAX_RETRY = 30;
   const INTERVAL_MS = 1000;
 
-  /* =======================
-     Fetch with polling
-  ======================= */
+  const canFetch = !!apiClient && !!orderId;
 
   useEffect(() => {
-    if (!apiClient || !orderId) {
-      setError("注文情報が取得できませんでした。");
-      return;
-    }
+    if (!canFetch) return;
 
     let cancelled = false;
 
     const fetchOrder = async () => {
       try {
-        const res: AxiosResponse<OrderDetailResponse> = await apiClient.get(
-          `/me/orders/${orderId}`,
+        const res = await apiClient.get<OrderDetailResponse>(
+          `/me/orders/${orderId}`
         );
 
         if (cancelled) return;
 
-        setOrder(res.data);
+        setOrder(res);
 
-        const payment = res.data.payment;
+        const payment = res.payment;
 
-        // polling 継続条件
         if (
           payment &&
           payment.method === "konbini" &&
@@ -98,11 +91,24 @@ export default function ThanksBuyKonbiniPage() {
         clearTimeout(retryTimerRef.current);
       }
     };
-  }, [apiClient, orderId]);
+  }, [apiClient, orderId, canFetch]);
 
   /* =======================
-     Guards
+     Render Guards
   ======================= */
+
+  if (!canFetch) {
+    return (
+      <div className={styles.thankYouPage}>
+        <div className={styles.messageBox}>
+          <p className={styles.message}>注文情報が取得できませんでした。</p>
+          <Link href="/" className={styles.backHomeLink}>
+            ホームへ戻る
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -177,10 +183,6 @@ export default function ThanksBuyKonbiniPage() {
     ? Object.keys(instructions.store)
     : [];
 
-  /* =======================
-     UI
-  ======================= */
-
   return (
     <div className={styles.thankYouPage}>
       <div className={styles.messageBox}>
@@ -188,9 +190,6 @@ export default function ThanksBuyKonbiniPage() {
 
         <p className={styles.message}>
           支払期限までに指定のコンビニでお支払いください。
-        </p>
-        <p className={styles.message}>
-          お支払い完了後、自動的に注文が確定し発送準備に入ります。
         </p>
 
         <div className={styles.konbiniInfo}>
@@ -205,27 +204,20 @@ export default function ThanksBuyKonbiniPage() {
           </p>
 
           {availableStores.length > 0 && (
-            <>
-              <p>
-                <strong>利用可能なコンビニ：</strong>
-              </p>
-              <ul>
-                {availableStores.map((store) => (
-                  <li key={store}>{store}</li>
-                ))}
-              </ul>
-            </>
+            <ul>
+              {availableStores.map((store) => (
+                <li key={store}>{store}</li>
+              ))}
+            </ul>
           )}
         </div>
 
-        <div className={styles.actions}>
-          <Link
-            href={`/mypage/orders/${orderId}`}
-            className={styles.backHomeLink}
-          >
-            注文履歴へ
-          </Link>
-        </div>
+        <Link
+          href={`/mypage/orders/${orderId}`}
+          className={styles.backHomeLink}
+        >
+          注文履歴へ
+        </Link>
       </div>
     </div>
   );

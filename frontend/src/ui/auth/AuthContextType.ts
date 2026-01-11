@@ -1,9 +1,10 @@
 import type {
   AuthClient,
-  AuthUser,
   LoginResult,
   RegisterResult,
 } from "./AuthClient";
+
+import type { AuthUser } from "@/domain/auth/AuthUser";
 
 export type AxiosLikeResponse<T> = { data: T };
 

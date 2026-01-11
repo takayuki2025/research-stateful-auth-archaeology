@@ -9,7 +9,6 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 
-
 import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
 import styles from "./W-ProfilePage.module.css";
@@ -70,7 +69,9 @@ export default function ProfilePage() {
   const [imageError, setImageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true);
+  // 🔹 役割分離
+  const [pageLoading, setPageLoading] = useState(true);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -107,8 +108,6 @@ export default function ProfilePage() {
 
     try {
       const res = await apiClient.get("/mypage/profile");
-
-      // API仕様: { user: Profile | null, has_profile: boolean }
       initializeProfile(res?.user ?? null);
       setHasFetchedProfile(true);
     } catch (err: any) {
@@ -117,7 +116,7 @@ export default function ProfilePage() {
         router.replace("/login");
       }
     } finally {
-      setIsLoading(false);
+      setPageLoading(false);
       setIsFetching(false);
     }
   }, [apiClient, initializeProfile, logout, router]);
@@ -130,7 +129,7 @@ export default function ProfilePage() {
     if (!file || !apiClient) return;
 
     setImageError("");
-    setIsLoading(true);
+    setSubmitLoading(true);
 
     const formData = new FormData();
     formData.append("user_image", file);
@@ -144,7 +143,7 @@ export default function ProfilePage() {
         err?.errors?.user_image?.[0] ?? "画像アップロードに失敗しました。"
       );
     } finally {
-      setIsLoading(false);
+      setSubmitLoading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -154,15 +153,12 @@ export default function ProfilePage() {
   /* =========================
      Profile Submit
   ========================= */
-
-  // const { refresh } = useAuth();
-
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!apiClient) return;
 
     setProfileErrors({});
-    setIsLoading(true);
+    setSubmitLoading(true);
     setSuccessMessage("");
 
     try {
@@ -170,10 +166,7 @@ export default function ProfilePage() {
         ? await apiClient.patch("/mypage/profile", form)
         : await apiClient.post("/mypage/profile", form);
 
-      // ① Profile state 更新
       initializeProfile(res.user);
-
-      // ② Auth 再同期（profile_completed を反映）
       await refresh();
 
       setSuccessMessage(
@@ -182,7 +175,6 @@ export default function ProfilePage() {
           : "プロフィールを作成しました！"
       );
 
-      // ③ 即トップへ（リロード不要）
       router.replace("/");
     } catch (err: any) {
       if (err?.errors) {
@@ -191,14 +183,15 @@ export default function ProfilePage() {
         setSuccessMessage("更新時にエラーが発生しました。");
       }
     } finally {
-      setIsLoading(false);
+      setSubmitLoading(false);
     }
   };
+
   /* =========================
-     Initial Load（★1回だけ）
+     Initial Load（Auth共通仕様）
   ========================= */
   useEffect(() => {
-    if (isAuthLoading) return;
+    if (!authReady) return;
 
     if (!isAuthenticated) {
       router.replace("/login");
@@ -209,7 +202,7 @@ export default function ProfilePage() {
       fetchUserProfile();
     }
   }, [
-    isAuthLoading,
+    authReady,
     isAuthenticated,
     hasFetchedProfile,
     isFetching,
@@ -218,18 +211,9 @@ export default function ProfilePage() {
   ]);
 
   /* =========================
-   Render Guards
-========================= */
-  if (!authReady) {
-    return null; // ← ★ Auth 初期化待ち（追加）
-  }
-
-  if (!isAuthenticated) {
-    router.replace("/login");
-    return null;
-  }
-
-  if (isAuthLoading || isLoading) {
+     Render Guards（単一）
+  ========================= */
+  if (!authReady || isAuthLoading || pageLoading) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
         <h2 className={styles.title}>プロフィール設定</h2>
@@ -241,10 +225,8 @@ export default function ProfilePage() {
     );
   }
 
-  if (!isAuthenticated) return null;
-
   /* =========================
-     Render
+     Render（完全不変）
   ========================= */
   return (
     <div
@@ -274,7 +256,7 @@ export default function ProfilePage() {
                 type="button"
                 className={styles.upload_submit}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
+                disabled={submitLoading}
               >
                 画像を選択する
               </button>
@@ -383,7 +365,7 @@ export default function ProfilePage() {
               type="submit"
               className={styles.submit_form}
               value="更新する"
-              disabled={isLoading}
+              disabled={submitLoading}
             />
           </div>
         </form>

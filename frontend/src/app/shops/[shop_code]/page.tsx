@@ -17,13 +17,15 @@ export default function ShopHomePage() {
   const { shop_code } = useParams<{ shop_code: string }>();
   const searchParams = useSearchParams();
 
-  const { isAuthenticated, authReady, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, authReady, isLoading: isAuthLoading } = useAuth();
+
   const shopAccess = useShopAccess(shop_code);
 
   const currentSearchQuery = useMemo(
     () => searchParams.get("q") || "",
     [searchParams]
   );
+
   const isSearch = currentSearchQuery.trim().length > 0;
 
   const listResult = useItemListByShopSWR(shop_code);
@@ -34,7 +36,8 @@ export default function ShopHomePage() {
   const isItemsLoading = isSearch
     ? searchResult.isLoading
     : listResult.isLoading;
-  const isPageLoading = !authReady || authLoading || isItemsLoading;
+
+  const isPageLoading = !authReady || isAuthLoading || isItemsLoading;
 
   if (isPageLoading) {
     return <div className={styles.loadingBox}>読み込み中...</div>;

@@ -1,4 +1,5 @@
-import type { AuthAdapter, AuthUser } from "@/ui/auth/contracts";
+import type { AuthAdapter } from "@/ui/auth/contracts";
+import type { AuthUser } from "@/domain/auth/AuthUser";
 import { createSanctumApiClient } from "./SanctumApiClient";
 import { getXsrfToken } from "./xsrf";
 export class SanctumAuthAdapter implements AuthAdapter {

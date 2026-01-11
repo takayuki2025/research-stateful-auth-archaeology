@@ -1,3 +1,4 @@
+import type { AuthUser } from "@/domain/auth/AuthUser";
 /* =========================
    API Client Contract
 ========================= */
@@ -7,24 +8,6 @@ export interface ApiClient {
   patch<T>(url: string, body?: unknown): Promise<T>;
   delete<T>(url: string): Promise<T>;
 }
-
-/* =========================
-   Auth User
-========================= */
-export type AuthUser = {
-  id: number;
-  email?: string;
-  email_verified_at?: string | null;
-  display_name?: string | null;
-  profile_completed?: boolean;
-
-  /** ★ 追加：ショップ権限 */
-  shop_roles: {
-    shop_id: number;
-    shop_code: string;
-    role: "owner" | "manager" | "staff";
-  }[];
-};
 
 /* =========================
    Auth Context

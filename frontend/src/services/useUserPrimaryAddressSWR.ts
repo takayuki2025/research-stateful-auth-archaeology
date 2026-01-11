@@ -13,11 +13,12 @@ export type UserPrimaryAddress = {
 };
 
 export function useUserPrimaryAddressSWR() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const fetcher = useAuthedFetcher();
 
-  // ✅ isReady 廃止。Auth 初期化完了＋認証済みでのみ取得
-  const swrKey = !isLoading && isAuthenticated ? "/me/addresses/primary" : null;
+  // Auth 初期化完了＋認証済みのみ取得
+  const swrKey =
+    !authLoading && isAuthenticated ? "/me/addresses/primary" : null;
 
   const {
     data,
@@ -27,7 +28,7 @@ export function useUserPrimaryAddressSWR() {
     swrKey,
     async () => {
       const res = await fetcher.get<any>("/me/addresses/primary");
-      const a = res ?? null;
+      const a = res?.data ?? null;
 
       if (!a) return null;
 
@@ -47,8 +48,8 @@ export function useUserPrimaryAddressSWR() {
   );
 
   return {
-    address: data ?? null,
-    isLoading: isLoading || swrLoading,
+    address: data,
+    isLoading: authLoading || swrLoading,
     isError: !!error,
   };
 }

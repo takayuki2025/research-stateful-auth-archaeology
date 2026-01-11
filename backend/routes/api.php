@@ -309,7 +309,7 @@ Route::get(
 );
 
 // 再解析処理
-use App\Modules\Item\Presentation\Http\Controller\ItemAnalysisController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ItemAnalysisController;
 
 Route::post(
     '/items/{itemId}/analysis/reanalyze',

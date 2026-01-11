@@ -31,6 +31,26 @@ function shortenLabel(s: string, max = 14): string {
   return t.length <= max ? t : t.slice(0, max) + "…";
 }
 
+/* =========================
+   Loading UI
+========================= */
+function ItemDetailLoading() {
+  return (
+    <div className={styles.loadingWrapper}>
+      {/* 上段：スピナー＋メインメッセージ */}
+      <div className={styles.loadingMain}>
+        <div className={styles.spinner} />
+        <p className={styles.loadingText}>商品情報を読み込み中...</p>
+      </div>
+
+      {/* 下段：補足説明 */}
+      <p className={styles.loadingSubText}>
+        解析された商品情報を取得しています
+      </p>
+    </div>
+  );
+}
+
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -72,20 +92,41 @@ export default function ItemDetailPage() {
   const isAuthenticated = auth.isAuthenticated;
   const user = auth.user;
   const { refetchFavorites } = useFavoriteItemsSWR();
+
+  /* =========================================================
+     🛑 Guard（UX 改善の核心）
+  ========================================================= */
+
+  // ✅ 通信中 or item がまだ確定していない（正常系）
+  if (isLoading || (!isError && !item)) {
+    return <ItemDetailLoading />;
+  }
+
+  // ❌ 明確なエラーのみ
+  if (isError) {
+    return (
+      <div className={styles.errorBox}>
+        <p className={styles.errorTitle}>商品情報の取得に失敗しました</p>
+        <p>時間をおいて再度お試しください。</p>
+      </div>
+    );
+  }
+
+  if (!item) {
+    return <ItemDetailLoading />;
+  }
+
+
+  // ✅ ここから下は「必ず item が存在する」ので確定変数に寄せる
+  const resolvedItem = item;
+
   /* =========================
-     Guard
+     ここから下は item が必ず存在
   ========================= */
-  if (isLoading) {
-    return <p className={styles.loadingText}>商品情報を読み込み中...</p>;
-  }
 
-  if (isError || !item) {
-    return <p className={styles.notFoundText}>商品が見つかりませんでした。</p>;
-  }
-
-  const isOwner = isAuthenticated && user?.id === item.user_id;
+  const isOwner = false;
   const canInteract = isAuthenticated && !isOwner;
-  const isSoldOut = item.remain === 0;
+  const isSoldOut = resolvedItem.remain === 0;
 
   const displayedFavorited = isFavorited;
   const displayedCount = favoritesCount;
@@ -94,74 +135,62 @@ export default function ItemDetailPage() {
      ❤️ Favorite（唯一ここだけ mutate）
   ========================= */
   const submitFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
-  e.preventDefault();
-  e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
 
-  if (!isAuthenticated || !auth.apiClient) {
-    router.push("/login");
-    return;
-  }
-  if (isTogglingFavorite) return;
-
-  setIsTogglingFavorite(true);
-
-  let nextFavorited: boolean | null = null;
-
-  // ✅ optimistic update（ここが唯一の真実）
-  mutateItemDetail(
-    (current) => {
-      if (!current) return current;
-
-      nextFavorited = !current.is_favorited;
-
-      return {
-        ...current,
-        is_favorited: nextFavorited,
-        favorites_count: Math.max(
-          0,
-          current.favorites_count + (nextFavorited ? 1 : -1),
-        ),
-      };
-    },
-    { revalidate: false },
-  );
-
-  try {
-    if (nextFavorited) {
-      await auth.apiClient.post(`/reactions/items/${item.id}/favorite`);
-    } else {
-      await auth.apiClient.delete(`/reactions/items/${item.id}/favorite`);
+    if (!isAuthenticated || !auth.apiClient) {
+      router.push("/login");
+      return;
     }
+    if (isTogglingFavorite) return;
 
-    // ✅ server truth は「差分だけ」同期
+    setIsTogglingFavorite(true);
+
+    let nextFavorited: boolean | null = null;
+
+    // optimistic update
     mutateItemDetail(
-      (current) =>
-        current
-          ? {
-              ...current,
-              is_favorited: nextFavorited!,
-            }
-          : current,
-      { revalidate: false },
+      (current) => {
+        if (!current) return current;
+
+        nextFavorited = !current.is_favorited;
+
+        return {
+          ...current,
+          is_favorited: nextFavorited,
+          favorites_count: Math.max(
+            0,
+            current.favorites_count + (nextFavorited ? 1 : -1)
+          ),
+        };
+      },
+      { revalidate: false }
     );
 
-    // ✅ 一覧系だけ更新
-    refetchFavorites();
+    try {
+      if (nextFavorited) {
+        await auth.apiClient.post(
+          `/reactions/items/${resolvedItem.id}/favorite`
+        );
+      } else {
+        await auth.apiClient.delete(
+          `/reactions/items/${resolvedItem.id}/favorite`
+        );
+      }
 
-  } catch {
-    // rollback
-    mutateItemDetail();
-  } finally {
-    setIsTogglingFavorite(false);
-  }
-};
+      refetchFavorites();
+    } catch {
+      mutateItemDetail();
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  };
 
   /* =========================
      💬 Comment
   ========================= */
   const submitComment = async () => {
-    if (!item) return;
-
+    // ✅ resolvedItem を使うことで "item は null の可能性" を根絶
     if (!newComment.trim()) {
       setCommentErrors(["コメントを入力してください"]);
       return;
@@ -177,7 +206,7 @@ export default function ItemDetailPage() {
 
     try {
       await auth.apiClient.post("/comment", {
-        item_id: item.id,
+        item_id: resolvedItem.id,
         comment: newComment,
       });
 
@@ -190,24 +219,24 @@ export default function ItemDetailPage() {
     }
   };
 
-  const brandTokens: string[] = Array.isArray(item.brands) ? item.brands : [];
+  const brandTokens: string[] = Array.isArray(resolvedItem.brands)
+    ? resolvedItem.brands
+    : [];
 
-  // カテゴリ（tags から抽出）
-  const categoryTokens: string[] = Array.isArray(item.tags)
-    ? item.tags
+  const categoryTokens: string[] = Array.isArray(resolvedItem.tags)
+    ? resolvedItem.tags
         .filter((t: any) => t.type === "category")
         .map((t: any) => t.display_name)
     : [];
 
-  // 購入遷移
   const navigateToPurchase = () => {
-    router.push(`/purchase/${item.id}`);
+    router.push(`/purchase/${resolvedItem.id}`);
   };
 
-  // 状態・カラー
-  const rawCondition: string | null = item.condition ?? null;
-  const rawColor: string | null = item.color ?? null;
-  const displayColor: string | null = item.color ?? null;
+  const rawCondition: string | null = resolvedItem.condition ?? null;
+  const rawColor: string | null = resolvedItem.color ?? null;
+  const displayColor: string | null = resolvedItem.color ?? null;
+
   /* =========================
      JSX
   ========================= */
@@ -218,8 +247,8 @@ export default function ItemDetailPage() {
           {/* 商品画像エリア */}
           <div className={styles.imageArea}>
             <img
-              src={getImageUrl(item.item_image)}
-              onError={(e) => onImageError(e, item.name)}
+              src={getImageUrl(resolvedItem.item_image)}
+              onError={(e) => onImageError(e, resolvedItem.name)}
               alt="商品写真"
               className={styles.image}
             />
@@ -227,44 +256,15 @@ export default function ItemDetailPage() {
 
           {/* 商品情報エリア */}
           <div className={styles.infoArea}>
-            {/* 商品名 */}
-            <h2 className={styles.itemTitle}>{item.name}</h2>
+            <h2 className={styles.itemTitle}>{resolvedItem.name}</h2>
 
-            {/* ブランド（複数ボタン） */}
+            {/* ブランド */}
             <div className={styles.brandBlock}>
               <p className={styles.brandLabel}>ブランド名</p>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
+              <div className={styles.brandTokensRow}>
                 {brandTokens.length > 0 ? (
                   brandTokens.map((b, idx) => (
-                    <button
-                      key={`${b}-${idx}`}
-                      type="button"
-                      // ここは「将来UI向上ボタン」に育てられる（検索/同ブランド一覧/属性説明など）
-                      onClick={() => {
-                        // v1: 動作確認用（必要なら後で実装を入れる）
-                        // 例: router.push(`/search?brand=${encodeURIComponent(b)}`)
-                        console.log("[brand token clicked]", b);
-                      }}
-                      style={{
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        borderRadius: 10,
-                        padding: "6px 10px",
-                        fontSize: 13,
-                        lineHeight: 1,
-                        background: "white",
-                        cursor: "pointer",
-                        maxWidth: 220,
-                      }}
-                      title={b}
-                    >
+                    <button key={idx} className={styles.brandToken}>
                       {shortenLabel(b)}
                     </button>
                   ))
@@ -280,21 +280,20 @@ export default function ItemDetailPage() {
                 <h2 className={styles.priceSoldOut}>SOLD OUT</h2>
               ) : (
                 <h2 className={styles.price}>
-                  <span className={styles.priceYen}>¥</span>
-                  {item.price?.toLocaleString()}
+                  ¥{resolvedItem.price?.toLocaleString()}
                   <span className={styles.priceAfter}> (税込)</span>
                 </h2>
               )}
             </div>
 
-            {/* お気に入り + コメント */}
+            {/* お気に入り */}
             <div className={styles.reactionRow}>
               <div className={styles.favoriteBlock}>
                 {canInteract ? (
                   <button
                     type="button"
                     className={styles.favoriteBtn}
-                    onClick={(e) => submitFavorite(e)}
+                    onClick={submitFavorite}
                   >
                     <span
                       className={`${styles.favoriteIcon} ${
@@ -307,13 +306,7 @@ export default function ItemDetailPage() {
                 ) : (
                   <span className={styles.disabledHeart}>🤍</span>
                 )}
-
                 <p className={styles.favoriteCount}>{displayedCount}</p>
-              </div>
-
-              <div className={styles.commentIconBlock}>
-                <span className={styles.commentIcon}>💬</span>
-                <span className={styles.commentCount}>{comments.length}</span>
               </div>
             </div>
 
@@ -350,7 +343,7 @@ export default function ItemDetailPage() {
             {/* 商品説明 */}
             <div className={styles.section}>
               <h2 className={styles.sectionTitle}>商品説明</h2>
-              <p className={styles.explainText}>{item.explain}</p>
+              <p className={styles.explainText}>{resolvedItem.explain}</p>
             </div>
 
             {/* 商品情報 */}
@@ -412,7 +405,7 @@ export default function ItemDetailPage() {
                           <img
                             src={getImageUrl(
                               comment.user.user_image,
-                              IMAGE_TYPE.USER,
+                              IMAGE_TYPE.USER
                             )}
                             className={styles.commentUserImage}
                             onError={onImageError}

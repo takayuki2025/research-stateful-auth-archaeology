@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -42,7 +43,8 @@ const CATEGORY_LIST = [
 ========================= */
 export default function ItemSellPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, apiClient, user } = useAuth();
+
+  const { authReady, isAuthenticated, apiClient, user } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -58,25 +60,22 @@ export default function ItemSellPage() {
   });
 
   const [itemOrigin, setItemOrigin] = useState<ItemOrigin>("USER_PERSONAL");
-
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
-
   const [imageFile, setImageFile] = useState<File | null>(null);
-
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [error, setError] = useState("");
 
   /* =========================
-     Auth Guard
+     Auth Guard（共通仕様）
   ========================= */
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!authReady) return;
+
+    if (!isAuthenticated) {
       router.replace("/login");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [authReady, isAuthenticated, router]);
 
   /* =========================
      SHOP_MANAGED 初期化
@@ -86,13 +85,15 @@ export default function ItemSellPage() {
     if (!user) return;
 
     if (itemOrigin === "SHOP_MANAGED") {
-      setSelectedShopId(user.primary_shop?.shop_id ?? null);
+      const firstRole = user.shop_roles?.[0];
+      setSelectedShopId(firstRole?.shop_id ?? null);
     } else {
       setSelectedShopId(null);
     }
   }, [itemOrigin, user]);
 
-  if (isLoading || !user) return null;
+  // Auth 初期化待ち
+  if (!authReady || !user) return null;
 
   /* =========================
      Image Select
@@ -138,17 +139,24 @@ export default function ItemSellPage() {
 
     try {
       // 1. Draft 作成
-      const draftRes = await apiClient.post("/items/drafts", {
-        seller_id: `individual:${user.id}`,
-        name: form.name,
-        price_amount: Number(form.price),
-        price_currency: "JPY",
-        brand: form.attributes || null,
-        explain: form.explain || null,
-        category: form.categories.length ? form.categories : null,
-      });
+      type CreateItemDraftResponse = {
+        draft_id: string;
+      };
 
-      const draftId: string = draftRes.draft_id; // ★修正点
+      const draftRes = await apiClient.post<CreateItemDraftResponse>(
+        "/items/drafts",
+        {
+          seller_id: `individual:${user.id}`,
+          name: form.name,
+          price_amount: Number(form.price),
+          price_currency: "JPY",
+          brand: form.attributes || null,
+          explain: form.explain || null,
+          category: form.categories.length ? form.categories : null,
+        }
+      );
+
+      const draftId = draftRes.draft_id;
 
       // 2. Image Upload
       const imageData = new FormData();
@@ -158,7 +166,7 @@ export default function ItemSellPage() {
 
       // 3. Publish
       await apiClient.post(`/items/drafts/${draftId}/publish`, {
-        shop_id: null,
+        shop_id: selectedShopId,
       });
 
       router.push("/");
@@ -203,7 +211,7 @@ export default function ItemSellPage() {
         </div>
 
         {/* ショップ選択 */}
-        {itemOrigin === "SHOP_MANAGED" && (
+        {itemOrigin === "SHOP_MANAGED" && user.shop_roles?.length ? (
           <div className={styles.formGroup}>
             <label>出品するショップ</label>
             <select
@@ -219,7 +227,7 @@ export default function ItemSellPage() {
               ))}
             </select>
           </div>
-        )}
+        ) : null}
 
         {/* 画像 */}
         <div className={styles.imageBoxWide}>

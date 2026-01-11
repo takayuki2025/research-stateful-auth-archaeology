@@ -8,10 +8,9 @@ import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import styles from "./W-Mypage.module.css";
 
-/**
- * sell: 出品商品一覧
- * buy : 購入商品一覧
- */
+/* =========================
+   Types
+========================= */
 type PageMode = "sell" | "buy";
 
 type MypageItem = {
@@ -34,6 +33,7 @@ export default function Mypage() {
   const searchParams = useSearchParams();
 
   const {
+    authReady,
     isAuthenticated,
     isLoading: isAuthLoading,
     apiClient,
@@ -45,43 +45,26 @@ export default function Mypage() {
   const [isLoading, setIsLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  // =============================
-  // page 判定
-  // =============================
-  const page: PageMode = useMemo(() => {
-    return searchParams.get("page") === "buy" ? "buy" : "sell";
-  }, [searchParams]);
+  /* =========================
+     page 判定
+  ========================= */
+  const page: PageMode = useMemo(
+    () => (searchParams.get("page") === "buy" ? "buy" : "sell"),
+    [searchParams]
+  );
 
-  // =============================
-  // APIレスポンス吸収（axios / 非axios 両対応）
-  // =============================
-  const normalizeProfileResponse = (res: any): ProfileUser | null => {
-    // 1) apiClientが「dataそのもの」を返す場合: { user: {...}, has_profile: true }
-    if (res?.user) return res.user as ProfileUser;
-
-    // 2) axios互換: { data: { user: {...} } }
-    if (res?.data?.user) return res.data.user as ProfileUser;
-
-    // 3) user直返し
-    if (res?.display_name !== undefined) return res as ProfileUser;
-
-    return null;
-  };
-
-  // =============================
-  // プロフィール取得（Gate しない）
-  // =============================
+  /* =========================
+     Profile Fetch
+  ========================= */
   const fetchProfile = useCallback(async () => {
     if (!apiClient) return;
 
     try {
       const res = await apiClient.get("/mypage/profile");
-      const data = normalizeProfileResponse(res);
-      setUser(data);
+      const u = res?.user ?? res?.data?.user ?? null;
+      setUser(u);
     } catch (e: any) {
-      // apiClientが throw する形式に合わせて広めに拾う
-      const status = e?.response?.status ?? e?.status ?? null;
-      if (status === 401 || e?.message === "Unauthenticated") {
+      if (e?.message === "Unauthenticated" || e?.response?.status === 401) {
         await logout();
         router.replace("/login");
       }
@@ -90,9 +73,9 @@ export default function Mypage() {
     }
   }, [apiClient, logout, router]);
 
-  // =============================
-  // 出品 / 購入商品取得
-  // =============================
+  /* =========================
+     Items Fetch
+  ========================= */
   const fetchItems = useCallback(async () => {
     if (!apiClient) return;
 
@@ -100,20 +83,18 @@ export default function Mypage() {
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
       const res = await apiClient.get(endpoint);
-
-      // axios / 非axios 両対応
-      const list = (res?.items ?? res?.data?.items ?? []) as MypageItem[];
+      const list = res?.items ?? res?.data?.items ?? [];
       setItems(list);
     } finally {
       setIsLoading(false);
     }
   }, [apiClient, page]);
 
-  // =============================
-  // 初期ロード
-  // =============================
+  /* =========================
+     Lifecycle
+  ========================= */
   useEffect(() => {
-    if (isAuthLoading) return;
+    if (!authReady) return;
 
     if (!isAuthenticated) {
       router.replace("/login");
@@ -121,7 +102,7 @@ export default function Mypage() {
     }
 
     fetchProfile();
-  }, [isAuthLoading, isAuthenticated, fetchProfile, router]);
+  }, [authReady, isAuthenticated, fetchProfile, router]);
 
   useEffect(() => {
     if (profileLoaded) {
@@ -129,23 +110,22 @@ export default function Mypage() {
     }
   }, [profileLoaded, fetchItems]);
 
-  // =============================
-  // Loading
-  // =============================
-  if (isAuthLoading || !profileLoaded || isLoading) {
+  /* =========================
+     Guards
+  ========================= */
+  if (!authReady || isAuthLoading || !profileLoaded || isLoading) {
     return <div className="text-center p-10">読み込み中...</div>;
   }
 
-  // ★ ここが超重要：null でも描画する
   const safeUser: ProfileUser = user ?? {
     id: 0,
     display_name: "（ユーザー名未設定）",
     user_image: null,
   };
 
-  // =============================
-  // Render
-  // =============================
+  /* =========================
+     Render
+  ========================= */
   return (
     <div className={styles.profile_page}>
       <div className={styles.profile_header}>
@@ -158,7 +138,7 @@ export default function Mypage() {
           />
 
           <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
-            {safeUser.display_name ?? ""}
+            {safeUser.display_name}
           </h2>
 
           <button

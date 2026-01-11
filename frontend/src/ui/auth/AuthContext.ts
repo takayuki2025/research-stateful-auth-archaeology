@@ -1,9 +1,10 @@
 import type {
   AuthClient,
-  AuthUser,
   LoginResult,
   RegisterResult,
 } from "./AuthClient";
+
+import type { AuthUser } from "@/domain/auth/AuthUser";
 
 export type AxiosLikeClient = {
   get<T = any>(url: string): Promise<{ data: T }>;

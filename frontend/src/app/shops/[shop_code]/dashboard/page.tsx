@@ -1,24 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 export default function ShopDashboardPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const { user, isLoading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) return <div className="p-6">読み込み中...</div>;
+  const {
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    authReady,
+  } = useAuth();
+
+  if (!authReady || isAuthLoading) {
+    return <div className="p-6">読み込み中...</div>;
+  }
+
+  if (!isAuthenticated) {
+    router.replace("/login");
+    return null;
+  }
 
   const isShopStaff =
     user?.shop_roles?.some(
       (r) =>
         r.shop_code === shop_code &&
-        ["owner", "manager", "staff"].includes(r.role),
+        ["owner", "manager", "staff"].includes(r.role)
     ) ?? false;
 
-  if (!isShopStaff)
+  if (!isShopStaff) {
     return <div className="p-6">アクセス権限がありません。</div>;
+  }
 
   return (
     <div className="p-6 space-y-6">

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 /**
  * ============================
@@ -37,16 +37,32 @@ type OrderDetail = {
     shipment_id: number;
     status: string;
     eta: string | null;
-    delivered_at?: string | null; // ★ 追加（重要）
+    delivered_at?: string | null;
   } | null;
 };
 
 export default function OrderDetailPage() {
-  const { apiClient, isReady } = useAuth();
-  const { order_id } = useParams<{ order_id: string }>();
   const router = useRouter();
+  const params = useParams<{ order_id: string }>();
+
+  const { apiClient, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
+
+  const orderId = Number(params.order_id);
+
+  /**
+   * ============================
+   * Auth Guard
+   * ============================
+   */
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    if (!isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
 
   /**
    * ============================
@@ -54,19 +70,43 @@ export default function OrderDetailPage() {
    * ============================
    */
   useEffect(() => {
-    if (!isReady || !apiClient || !order_id) return;
+    if (
+      isAuthLoading ||
+      !isAuthenticated ||
+      !apiClient ||
+      Number.isNaN(orderId)
+    ) {
+      return;
+    }
 
     apiClient
-      .get(`/me/orders/${order_id}`)
-      .then((res) => setOrder(res.data))
-      .catch((e) => {
-        if (e.response?.status === 404 || e.response?.status === 403) {
+      .get(`/me/orders/${orderId}`)
+      .then((res: any) => {
+        // axios / 非axios 両対応
+        const data = res?.data ?? res;
+        setOrder(data as OrderDetail);
+      })
+      .catch((e: any) => {
+        const status = e?.response?.status ?? e?.status;
+
+        if (status === 401) {
+          router.replace("/login");
+        }
+
+        if (status === 403 || status === 404) {
           router.replace("/mypage?page=buy");
         }
       });
-  }, [isReady, apiClient, order_id, router]);
+  }, [isAuthLoading, isAuthenticated, apiClient, orderId, router]);
 
-  if (!order) return <div className="p-6">読み込み中...</div>;
+  /**
+   * ============================
+   * Loading
+   * ============================
+   */
+  if (isAuthLoading || !order) {
+    return <div className="p-6">読み込み中...</div>;
+  }
 
   const isDelivered = order.shipment?.status === "delivered";
 
@@ -111,7 +151,6 @@ export default function OrderDetailPage() {
 
             <div>到着予定：{order.shipment.eta ?? "未定"}</div>
 
-            {/* ★ delivered_at 表示（ここが欠けていた） */}
             {isDelivered && order.shipment.delivered_at && (
               <div className="text-sm text-gray-600">
                 配達完了日：

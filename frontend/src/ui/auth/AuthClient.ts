@@ -1,9 +1,4 @@
-export type AuthUser = {
-  id: number;
-  email: string;
-  email_verified_at?: string | null;
-  profile_completed: boolean;
-};
+import type { AuthUser } from "@/domain/auth/AuthUser";
 
 export type LoginResult = {
   user: AuthUser;

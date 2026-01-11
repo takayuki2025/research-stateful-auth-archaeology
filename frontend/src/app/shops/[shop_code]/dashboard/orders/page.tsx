@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 type OrderShipmentListItem = {
   order_id: number;
@@ -12,13 +12,10 @@ type OrderShipmentListItem = {
   order_created_at: string;
   total_amount: number;
   currency: string;
-
   buyer_user_id: number;
-
   shipment_status: string | null;
   eta: string | null;
   delivered_at?: string | null;
-
   destination_address: {
     postal_code?: string | null;
     prefecture?: string | null;
@@ -32,38 +29,75 @@ type OrderShipmentListItem = {
 
 export default function ShopOrderListPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const { apiClient, isReady } = useAuth();
+  const router = useRouter();
 
-  const [items, setItems] = useState<OrderShipmentListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    apiClient,
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    authReady,
+  } = useAuth();
 
+  const [items, setItems] = useState<OrderShipmentListItem[] | null>(null);
+
+  /* =========================
+     Auth Guard
+  ========================= */
   useEffect(() => {
-    if (!isReady || !apiClient || !shop_code) return;
+    if (!authReady || isAuthLoading) return;
 
-    setIsLoading(true);
-    apiClient
-      .get(`/shops/${shop_code}/dashboard/orders`)
-      .then((res) => {
-        setItems(res.data.orders ?? []);
-      })
-      .finally(() => setIsLoading(false));
-  }, [isReady, apiClient, shop_code]);
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
 
-  const count = useMemo(() => items.length, [items]);
+    const hasAccess =
+      user?.shop_roles?.some(
+        (r) =>
+          r.shop_code === shop_code &&
+          ["owner", "manager", "staff"].includes(r.role)
+      ) ?? false;
+
+    if (!hasAccess) {
+      router.replace(`/shops/${shop_code}`);
+    }
+  }, [authReady, isAuthLoading, isAuthenticated, user, shop_code, router]);
+
+  /* =========================
+     Fetch（副作用は結果のみ）
+  ========================= */
+  useEffect(() => {
+    if (!authReady || !apiClient) return;
+
+    apiClient.get(`/shops/${shop_code}/dashboard/orders`).then((res: any) => {
+      const list = res?.orders ?? res?.data?.orders ?? [];
+      setItems(list);
+    });
+  }, [authReady, apiClient, shop_code]);
+
+  /* =========================
+     Derived State
+  ========================= */
+  const isLoading = !authReady || isAuthLoading || items === null;
+
+  const count = useMemo(() => items?.length ?? 0, [items]);
 
   if (isLoading) {
     return <div className="p-6">読み込み中...</div>;
   }
 
+  /* =========================
+     Render（以下 UI 完全不変）
+  ========================= */
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">注文・配送管理</h1>
       <div className="text-sm text-gray-600">件数: {count}</div>
 
       <div className="space-y-4">
-        {items.map((it) => {
+        {items!.map((it) => {
           const addr = it.destination_address;
-
           const shipmentStatus = it.order_paid
             ? (it.shipment_status ?? "draft")
             : "not_created";
@@ -78,6 +112,7 @@ export default function ShopOrderListPage() {
 
           return (
             <div key={it.order_id} className="border rounded p-4 space-y-2">
+              {/* （以下 UI 変更なし） */}
               <div className="flex justify-between">
                 <div className="font-semibold text-lg">注文 #{it.order_id}</div>
 
@@ -85,19 +120,16 @@ export default function ShopOrderListPage() {
                   <div>{it.order_status}</div>
                   <div className="font-mono">{shipmentStatus}</div>
 
-                  {/* ✅ 補足ステータス表示 */}
                   {isDelivered && (
                     <div className="text-green-700 text-xs font-semibold">
                       配達完了
                     </div>
                   )}
-
                   {isDraft && (
                     <div className="text-amber-600 text-xs font-semibold">
                       購入手続き受付待ち
                     </div>
                   )}
-
                   {isNotCreated && (
                     <div className="text-blue-600 text-xs font-semibold">
                       支払い完了待ち

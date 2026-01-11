@@ -1,80 +1,30 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { useRouter } from "next/navigation";
-import type { AuthContext, AuthUser } from "@/ui/auth/contracts";
-import { SanctumAuthAdapter } from "@/ui/auth/sanctum/SanctumAuthAdapter";
-
-const AuthCtx = createContext<AuthContext | null>(null);
+import React from "react";
+import dynamic from "next/dynamic";
+export { useAuth } from "@/ui/auth/core/AuthContextCore";
+const SanctumProvider = dynamic(() => import("./modes/SanctumProvider"), {
+  ssr: false,
+});
+const FirebaseJwtProvider = dynamic(
+  () => import("./modes/FirebaseJwtProvider"),
+  { ssr: false }
+);
+// 将来:
+const IdaasProvider = dynamic(() => import("./modes/IdaasProvider"), {
+  ssr: false,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const adapter = useMemo(() => new SanctumAuthAdapter(), []);
+  const mode =
+    process.env.NEXT_PUBLIC_AUTH_MODE === "firebase_jwt"
+      ? "firebase_jwt"
+      : process.env.NEXT_PUBLIC_AUTH_MODE === "idaas"
+        ? "idaas"
+        : "sanctum";
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  // 初期同期
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setIsLoading(true);
-      try {
-        const u = await adapter.init();
-        if (mounted) setUser(u);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-          setAuthReady(true);
-        }
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [adapter]);
-
-  const refresh = async () => {
-    const u = await adapter.init();
-    setUser(u);
-  };
-
-  const value: AuthContext = useMemo(
-    () => ({
-      isLoading,
-      authReady,
-      isAuthenticated: !!user,
-      user,
-      apiClient: adapter.getApiClient(),
-
-      login: async ({ email, password }) => {
-        await adapter.login({ email, password });
-        await refresh();
-      },
-
-      logout: async () => {
-        await adapter.logout();
-        setUser(null);
-        router.replace("/login");
-      },
-
-      refresh, // ★ここ
-    }),
-    [adapter, isLoading, authReady, user, router]
-  );
-
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
-}
-
-export function useAuth(): AuthContext {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  if (mode === "firebase_jwt")
+    return <FirebaseJwtProvider>{children}</FirebaseJwtProvider>;
+  if (mode === "idaas") return <IdaasProvider>{children}</IdaasProvider>;
+  return <SanctumProvider>{children}</SanctumProvider>;
 }
