@@ -59,6 +59,7 @@ export default function AtlasDecisionHistoryPage() {
         Atlas Decision History #{request_id}
       </h1>
 
+      {/* 履歴 */}
       {decisions.length === 0 ? (
         <div className="text-gray-500">判断履歴はありません。</div>
       ) : (
@@ -106,10 +107,13 @@ export default function AtlasDecisionHistoryPage() {
               {
                 method: "POST",
                 credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ version: "v3_ai" }),
               }
             );
 
             if (res.ok) {
+              alert("Replay を受け付けました（非同期）");
               router.push(`/shops/${shop_code}/dashboard/atlas/requests`);
             } else {
               alert("Replay に失敗しました");

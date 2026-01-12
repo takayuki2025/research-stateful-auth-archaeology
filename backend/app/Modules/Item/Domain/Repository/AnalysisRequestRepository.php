@@ -4,6 +4,7 @@ namespace App\Modules\Item\Domain\Repository;
 
 use App\Modules\Item\Domain\ValueObject\AnalysisRequestRecord;
 use App\Modules\Item\Domain\Entity\AnalysisRequest;
+use Carbon\CarbonImmutable;
 
 interface AnalysisRequestRepository
 {
@@ -34,4 +35,21 @@ interface AnalysisRequestRepository
     public function listByShopCode(string $shopCode): array;
 
     public function findOrFail(int $id): AnalysisRequest;
+
+    public function getById(int $id): AnalysisRequest;
+
+    /**
+     * Replay 回数カウント
+     *
+     * @param int $originalRequestId 元の AnalysisRequest ID
+     * @param CarbonImmutable $from 開始日時
+     * @param CarbonImmutable $to 終了日時
+     */
+    public function countReplaysInPeriod(
+        int $originalRequestId,
+        CarbonImmutable $from,
+        CarbonImmutable $to,
+    ): int;
+
+    public function save(AnalysisRequest $request): int;
 }

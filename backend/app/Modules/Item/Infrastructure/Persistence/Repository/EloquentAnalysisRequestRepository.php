@@ -6,6 +6,7 @@ use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\ValueObject\AnalysisRequestRecord;
 use App\Modules\Item\Domain\Entity\AnalysisRequest;
 use App\Models\AnalysisRequest as AnalysisRequestModel;
+// use App\Models\AnalysisRequest as EloquentAnalysisRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -131,9 +132,7 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
 
     public function listByShopCode(string $shopCode): array
     {
-        /**
-         * review_decisions の最新（max(id)）を request 単位で拾う
-         */
+        // review_decisions の最新（max(id)）を request 単位で拾う
         $latestDecisionIdSub = DB::table('review_decisions')
             ->selectRaw('analysis_request_id, MAX(id) as max_id')
             ->groupBy('analysis_request_id');
@@ -145,33 +144,26 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
                 'analysis_requests.status',
                 'analysis_requests.analysis_version',
                 'analysis_requests.created_at',
-
-                // 追加（decision ledger）
                 'rd.decision_type as decision',
                 'rd.decided_at as decided_at'
             )
             ->join('items', 'analysis_requests.item_id', '=', 'items.id')
             ->join('shops', 'items.shop_id', '=', 'shops.id')
             ->where('shops.shop_code', $shopCode)
-
-            // LEFT JOIN: latest decision
             ->leftJoinSub($latestDecisionIdSub, 'ld', function ($join) {
                 $join->on('ld.analysis_request_id', '=', 'analysis_requests.id');
             })
             ->leftJoin('review_decisions as rd', 'rd.id', '=', 'ld.max_id')
-
             ->orderByDesc('analysis_requests.created_at')
             ->get()
             ->map(fn ($m) => [
-                'id'               => (int) $m->id,
-                'item_id'          => (int) $m->item_id,
-                'status'           => (string) $m->status,
-                'analysis_version' => (string) $m->analysis_version,
-                'created_at'       => (string) $m->created_at,
-
-                // 追加
-                'decision'         => $m->decision ? (string) $m->decision : null,
-                'decided_at'       => $m->decided_at ? (string) $m->decided_at : null,
+                'id'               => (int)$m->id,
+                'item_id'          => (int)$m->item_id,
+                'status'           => (string)$m->status,
+                'analysis_version' => (string)$m->analysis_version,
+                'created_at'       => (string)$m->created_at,
+                'decision'         => $m->decision ? (string)$m->decision : null,
+                'decided_at'       => $m->decided_at ? (string)$m->decided_at : null,
             ])
             ->toArray();
     }
@@ -183,5 +175,60 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
         $model = AnalysisRequestModel::findOrFail($id);
 
         return AnalysisRequest::fromEloquent($model);
+    }
+
+    public function getById(int $id): AnalysisRequest
+    {
+        $model = AnalysisRequestModel::query()->whereKey($id)->firstOrFail();
+        return AnalysisRequest::fromEloquent($model);
+    }
+
+    public function countReplaysInPeriod(
+        int $originalRequestId,
+        CarbonImmutable $from,
+        CarbonImmutable $to,
+    ): int {
+        return AnalysisRequestModel::query()
+            ->where('original_request_id', $originalRequestId)
+            ->whereBetween('created_at', [$from->toDateTimeString(), $to->toDateTimeString()])
+            ->count();
+    }
+
+    public function save(AnalysisRequest $request): int
+    {
+        $now = CarbonImmutable::now();
+
+        $id = DB::table('analysis_requests')->insertGetId([
+            'tenant_id'           => $request->tenantId,
+            'item_id'             => $request->itemId,
+            'analysis_version'    => $request->analysisVersion,
+            'requested_version'   => $request->requestedVersion,
+            'payload_hash'        => $request->payloadHash,
+            'idempotency_key'     => $request->idempotencyKey,
+            'status'              => $request->status,
+            'started_at'          => $request->startedAt?->format('Y-m-d H:i:s'),
+            'finished_at'         => $request->finishedAt?->format('Y-m-d H:i:s'),
+            'original_request_id' => $request->originalRequestId,
+            'retry_count'         => $request->retryCount,
+            'triggered_by_type'   => $request->triggeredByType,
+            'triggered_by'        => $request->triggeredBy,
+            'trigger_reason'      => $request->triggerReason,
+            'replay_index'        => $request->replayIndex,
+            'created_at'          => $now->toDateTimeString(),
+            'updated_at'          => $now->toDateTimeString(),
+        ]);
+
+        // 任意：event ledger
+        DB::table('analysis_request_events')->insert([
+            'analysis_request_id' => $id,
+            'event_type'          => 'created',
+            'event_payload'       => json_encode([
+                'type'    => $request->originalRequestId ? 'replay' : 'initial',
+                'version' => $request->analysisVersion,
+            ], JSON_UNESCAPED_UNICODE),
+            'created_at'          => $now->toDateTimeString(),
+        ]);
+
+        return (int)$id;
     }
 }

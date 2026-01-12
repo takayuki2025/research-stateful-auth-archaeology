@@ -367,3 +367,10 @@ Route::prefix('shops/{shopCode}/atlas')->group(function () {
         [AtlasDecisionHistoryController::class, 'replay']
     );
 });
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
+
+Route::post(
+    '/shops/{shopCode}/atlas/requests/{requestId}/replay',
+    [AtlasReplayController::class, 'replay']
+);
