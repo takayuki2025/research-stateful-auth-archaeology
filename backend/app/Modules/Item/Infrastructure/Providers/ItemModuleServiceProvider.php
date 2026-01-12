@@ -19,6 +19,8 @@ use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityRep
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityTagRepository;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentAnalysisResultRepository;
+use App\Modules\Item\Domain\Repository\DecisionLedgerRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentDecisionLedgerRepository;
 
 final class ItemModuleServiceProvider extends ServiceProvider
 {
@@ -36,5 +38,10 @@ final class ItemModuleServiceProvider extends ServiceProvider
         $this->app->bind(ItemEntityTagRepository::class, EloquentItemEntityTagRepository::class);
 
         $this->app->bind(AnalysisResultRepository::class,EloquentAnalysisResultRepository::class);
+
+        $this->app->bind(
+            DecisionLedgerRepository::class,
+            EloquentDecisionLedgerRepository::class
+        );
     }
 }

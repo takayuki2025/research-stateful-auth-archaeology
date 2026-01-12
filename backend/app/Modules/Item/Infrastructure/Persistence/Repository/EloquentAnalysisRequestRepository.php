@@ -130,22 +130,52 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
     }
 
     public function listByShopCode(string $shopCode): array
-{
-    return AnalysisRequestModel::query()
-        ->join('items', 'analysis_requests.item_id', '=', 'items.id')
-        ->join('shops', 'items.shop_id', '=', 'shops.id')
-        ->where('shops.shop_code', $shopCode)
-        ->orderByDesc('analysis_requests.created_at')
-        ->get()
-        ->map(fn ($m) => [
-            'id' => $m->id,
-            'item_id' => $m->item_id,
-            'status' => $m->status,
-            'analysis_version' => $m->analysis_version,
-            'created_at' => $m->created_at?->toISOString(),
-        ])
-        ->toArray();
-}
+    {
+        /**
+         * review_decisions の最新（max(id)）を request 単位で拾う
+         */
+        $latestDecisionIdSub = DB::table('review_decisions')
+            ->selectRaw('analysis_request_id, MAX(id) as max_id')
+            ->groupBy('analysis_request_id');
+
+        return AnalysisRequestModel::query()
+            ->select(
+                'analysis_requests.id',
+                'analysis_requests.item_id',
+                'analysis_requests.status',
+                'analysis_requests.analysis_version',
+                'analysis_requests.created_at',
+
+                // 追加（decision ledger）
+                'rd.decision_type as decision',
+                'rd.decided_at as decided_at'
+            )
+            ->join('items', 'analysis_requests.item_id', '=', 'items.id')
+            ->join('shops', 'items.shop_id', '=', 'shops.id')
+            ->where('shops.shop_code', $shopCode)
+
+            // LEFT JOIN: latest decision
+            ->leftJoinSub($latestDecisionIdSub, 'ld', function ($join) {
+                $join->on('ld.analysis_request_id', '=', 'analysis_requests.id');
+            })
+            ->leftJoin('review_decisions as rd', 'rd.id', '=', 'ld.max_id')
+
+            ->orderByDesc('analysis_requests.created_at')
+            ->get()
+            ->map(fn ($m) => [
+                'id'               => (int) $m->id,
+                'item_id'          => (int) $m->item_id,
+                'status'           => (string) $m->status,
+                'analysis_version' => (string) $m->analysis_version,
+                'created_at'       => (string) $m->created_at,
+
+                // 追加
+                'decision'         => $m->decision ? (string) $m->decision : null,
+                'decided_at'       => $m->decided_at ? (string) $m->decided_at : null,
+            ])
+            ->toArray();
+    }
+
 
 
     public function findOrFail(int $id): AnalysisRequest

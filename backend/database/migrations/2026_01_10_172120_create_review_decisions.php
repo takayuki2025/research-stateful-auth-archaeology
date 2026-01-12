@@ -8,26 +8,45 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('review_decisions', function (Blueprint $table) {
-            $table->id();
+    $table->id();
 
-            $table->string('subject_type'); // 'item'
-            $table->unsignedBigInteger('subject_id'); // item_id
+    // ★ Bフェーズ主語（必須）
+    $table->unsignedBigInteger('analysis_request_id');
 
-            $table->string('decision_type'); // confirm | edit_confirm | reject
+    // ★ Cフェーズ主語（将来用）
+    $table->string('subject_type')->nullable();
+    $table->unsignedBigInteger('subject_id')->nullable();
 
-            $table->json('before_snapshot')->nullable();
-            $table->json('after_snapshot')->nullable();
+    // 判断種別
+    $table->string('decision_type'); // approve | reject | edit_confirm | system_approve
 
-            $table->unsignedBigInteger('decided_by');
-            $table->text('note')->nullable();
-            $table->timestamp('decided_at');
+    // 理由・注釈
+    $table->string('decision_reason')->nullable();
+    $table->text('note')->nullable();
 
-            $table->timestamps();
+    // スナップショット
+    $table->json('before_snapshot')->nullable();
+    $table->json('after_snapshot')->nullable();
 
-            $table->index(['subject_type', 'subject_id']);
-            $table->index(['decision_type']);
-            $table->index(['decided_at']);
-        });
+    // 判断者
+    $table->string('decided_by_type')->default('human');
+    $table->unsignedBigInteger('decided_by')->nullable();
+
+    // 判断時刻
+    $table->timestamp('decided_at');
+
+    $table->timestamps();
+
+    $table->index(['analysis_request_id']);
+    $table->index(['subject_type', 'subject_id']);
+    $table->index(['decision_type']);
+    $table->index(['decided_at']);
+
+    $table->foreign('analysis_request_id')
+        ->references('id')
+        ->on('analysis_requests')
+        ->cascadeOnDelete();
+});
     }
 
     public function down(): void

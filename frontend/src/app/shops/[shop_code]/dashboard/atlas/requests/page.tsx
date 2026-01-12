@@ -12,9 +12,13 @@ import { useAuth } from "@/ui/auth/AuthProvider";
 type AnalysisRequestRow = {
   id: number;
   item_id: number;
-  status: "pending" | "running" | "done" | "failed" | "active";
+  status: string;
   analysis_version: string;
   created_at: string;
+
+  // ★ Cフェーズ（判断済み）
+  decision?: "approve" | "reject" | "system_approve" | null;
+  decided_at?: string | null;
 };
 
 type ApiResponse = {
@@ -45,17 +49,13 @@ export default function AtlasRequestsPage() {
   const { authReady, isAuthenticated, user } = useAuth();
 
   /* =========================
-     Reviewer 判定
+     Authorization
   ========================= */
 
   const isReviewer =
     user?.shop_roles?.some(
       (r) => r.shop_code === shop_code && ["owner", "manager"].includes(r.role)
     ) ?? false;
-
-  /* =========================
-     Data Fetch
-  ========================= */
 
   const { data, error, isLoading } = useSWR<ApiResponse>(
     isReviewer ? `/api/shops/${shop_code}/atlas/requests` : null,
@@ -108,9 +108,10 @@ export default function AtlasRequestsPage() {
             <th className="border p-2">Item</th>
             <th className="border p-2">Status</th>
             <th className="border p-2">Version</th>
-            <th className="border p-2">Action</th>
+            <th className="border p-2">Result</th>
           </tr>
         </thead>
+
         <tbody>
           {requests.map((r) => (
             <tr key={r.id}>
@@ -118,13 +119,35 @@ export default function AtlasRequestsPage() {
               <td className="border p-2">{r.item_id}</td>
               <td className="border p-2 font-mono">{r.status}</td>
               <td className="border p-2">{r.analysis_version}</td>
+
+              {/* =========================
+                  Result column
+                  B / C フェーズ完全分離
+              ========================= */}
               <td className="border p-2">
-                <Link
-                  href={`/shops/${shop_code}/dashboard/atlas/review/${r.id}`}
-                  className="text-blue-600 underline"
-                >
-                  Review
-                </Link>
+                {/* Cフェーズ：判断済み → 履歴へ */}
+                {r.decision ? (
+                  <Link
+                    href={`/shops/${shop_code}/dashboard/atlas/history/${r.id}`}
+                    className={
+                      r.decision === "approve"
+                        ? "text-green-600 font-semibold underline"
+                        : "text-red-600 font-semibold underline"
+                    }
+                  >
+                    {r.decision === "approve" ? "Approved" : "Rejected"}
+                  </Link>
+                ) : /* Bフェーズ：未判断 & done → Review */ r.status ===
+                  "done" ? (
+                  <Link
+                    href={`/shops/${shop_code}/dashboard/atlas/review/${r.id}`}
+                    className="text-blue-600 underline"
+                  >
+                    Review
+                  </Link>
+                ) : (
+                  "-"
+                )}
               </td>
             </tr>
           ))}

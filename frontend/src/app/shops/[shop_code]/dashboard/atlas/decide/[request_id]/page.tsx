@@ -2,28 +2,31 @@
 
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
-import { DecisionPanelHistory } from "./DecisionPanelHistory";
-
-type Decision = {
-  id: number;
-  decision_type: "approve" | "reject" | "system_approve";
-  decision_reason?: string | null;
-  note?: string | null;
-  decided_at: string;
-};
+import { DecisionPanelReview } from "../../review/[request_id]/DecisionPanelDecide";
 
 type ApiResponse = {
-  request_id: number;
-  decisions: Decision[];
+  request: {
+    id: number;
+    item_id: number;
+    status: string;
+    analysis_version: string;
+  };
+  analysis: {
+    rule_id?: string;
+    confidence?: number | null;
+  } | null;
 };
 
 const fetcher = async (url: string): Promise<ApiResponse> => {
   const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error("Fetch failed");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.message ?? "Fetch failed");
+  }
   return res.json();
 };
 
-export default function AtlasReviewPage() {
+export default function AtlasDecidePage() {
   const router = useRouter();
   const { shop_code, request_id } = useParams<{
     shop_code: string;
@@ -31,7 +34,7 @@ export default function AtlasReviewPage() {
   }>();
 
   const { data, error, isLoading } = useSWR<ApiResponse>(
-    `/api/shops/${shop_code}/atlas/requests/${request_id}/decisions`,
+    `/api/shops/${shop_code}/atlas/requests/${request_id}`,
     fetcher
   );
 
@@ -40,20 +43,16 @@ export default function AtlasReviewPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">
-        Atlas Decision History #{request_id}
-      </h1>
+      <h1 className="text-2xl font-semibold">Atlas Decide #{request_id}</h1>
 
-      <DecisionPanelHistory decisions={data!.decisions} />
-
-      <button
-        className="text-blue-600 underline"
-        onClick={() =>
+      <DecisionPanelReview
+        shopCode={shop_code}
+        requestId={Number(request_id)}
+        analysis={data?.analysis ?? null}
+        onDecided={() =>
           router.push(`/shops/${shop_code}/dashboard/atlas/requests`)
         }
-      >
-        ← 一覧へ戻る
-      </button>
+      />
     </div>
   );
 }

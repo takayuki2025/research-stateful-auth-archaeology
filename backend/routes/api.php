@@ -341,3 +341,29 @@ Route::get(
   '/shops/{shop_code}/atlas/requests/{request_id}',
   AtlasRequestShowController::class
 );
+
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestDecideController;
+
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // Aルート：Approve/Reject
+    Route::post('/shops/{shop_code}/atlas/requests/{request_id}/decide', AtlasRequestDecideController::class);
+});
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
+
+Route::prefix('shops/{shopCode}/atlas')->group(function () {
+    Route::get(
+        'requests/{requestId}/history',
+        [AtlasDecisionHistoryController::class, 'history']
+    );
+
+    Route::post(
+        'requests/{requestId}/replay',
+        [AtlasDecisionHistoryController::class, 'replay']
+    );
+});

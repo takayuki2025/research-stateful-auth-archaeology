@@ -2,11 +2,12 @@
 
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
-use App\Http\Controllers\Controller;
-use App\Models\Shop as ShopModel;
-use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
+use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
+use App\Modules\Shop\Domain\Repository\ShopRepository;
+use App\Models\Shop as ShopModel;
 
 final class AtlasRequestListController extends Controller
 {
@@ -14,14 +15,13 @@ final class AtlasRequestListController extends Controller
         Request $request,
         string $shop_code,
         AnalysisRequestRepository $requests,
+        ShopRepository $shops
     ): JsonResponse {
-        // 認可用：Eloquent Shop
         $shopModel = ShopModel::where('shop_code', $shop_code)->firstOrFail();
 
-        // ability は list に統一
+        // ability は A ルートで統一
         $this->authorize('list', $shopModel);
 
-        // 一覧取得（Repository 側で shop_code を使う）
         $list = $requests->listByShopCode($shop_code);
 
         return response()->json([
