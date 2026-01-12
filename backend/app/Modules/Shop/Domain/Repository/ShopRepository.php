@@ -19,4 +19,6 @@ interface ShopRepository
         int $shopId,
         Address $address
     ): void;
+
+    public function findByCodeOrFail(string $shopCode): Shop;
 }

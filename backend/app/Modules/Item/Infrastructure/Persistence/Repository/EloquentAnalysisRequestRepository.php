@@ -1,0 +1,157 @@
+<?php
+
+namespace App\Modules\Item\Infrastructure\Persistence\Repository;
+
+use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
+use App\Modules\Item\Domain\ValueObject\AnalysisRequestRecord;
+use App\Modules\Item\Domain\Entity\AnalysisRequest;
+use App\Models\AnalysisRequest as AnalysisRequestModel;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+
+final class EloquentAnalysisRequestRepository implements AnalysisRequestRepository
+{
+    public function reserveOrGet(
+    ?int $tenantId,
+    int $itemId,
+    string $analysisVersion,
+    string $payloadHash,
+    string $idempotencyKey
+): AnalysisRequestRecord {
+    $now = now();
+
+    // ★ DB 方言を吸収（MySQL / SQLite 両対応）
+    DB::table('analysis_requests')->insertOrIgnore([
+        'tenant_id'        => $tenantId,
+        'item_id'          => $itemId,
+        'analysis_version' => $analysisVersion,
+        'payload_hash'     => $payloadHash,
+        'idempotency_key'  => $idempotencyKey,
+        'status'           => 'pending',
+        'retry_count'      => 0,
+        'created_at'       => $now,
+        'updated_at'       => $now,
+    ]);
+
+    $row = DB::table('analysis_requests')
+        ->where('idempotency_key', $idempotencyKey)
+        ->first();
+
+    if (! $row) {
+        throw new \RuntimeException('analysis_requests reserveOrGet failed.');
+    }
+
+    $this->appendEvent($row->id, 'reserved', [
+        'tenant_id' => $tenantId,
+        'item_id' => $itemId,
+        'analysis_version' => $analysisVersion,
+        'payload_hash' => $payloadHash,
+    ]);
+
+    return new AnalysisRequestRecord(
+        id: (int)$row->id,
+        tenantId: $row->tenant_id !== null ? (int)$row->tenant_id : null,
+        itemId: (int)$row->item_id,
+        analysisVersion: (string)$row->analysis_version,
+        payloadHash: (string)$row->payload_hash,
+        idempotencyKey: (string)$row->idempotency_key,
+        status: (string)$row->status,
+        retryCount: (int)$row->retry_count,
+    );
+}
+
+    public function markRunning(int $requestId): bool
+    {
+        $now = CarbonImmutable::now();
+
+        // CAS: pending/failed のみ running に遷移可能
+        $affected = DB::table('analysis_requests')
+            ->where('id', $requestId)
+            ->whereIn('status', ['pending', 'failed'])
+            ->update([
+                'status' => 'running',
+                'started_at' => $now,
+                'retry_count' => DB::raw('retry_count + 1'),
+                'updated_at' => $now,
+            ]);
+
+        if ($affected === 1) {
+            $this->appendEvent($requestId, 'started', ['started_at' => (string)$now]);
+            return true;
+        }
+
+        return false;
+    }
+
+    public function markDone(int $requestId): void
+    {
+        $now = CarbonImmutable::now();
+
+        DB::table('analysis_requests')
+            ->where('id', $requestId)
+            ->update([
+                'status' => 'done',
+                'finished_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+        $this->appendEvent($requestId, 'completed', ['finished_at' => (string)$now]);
+    }
+
+    public function markFailed(int $requestId, string $errorCode, string $errorMessage): void
+    {
+        $now = CarbonImmutable::now();
+
+        DB::table('analysis_requests')
+            ->where('id', $requestId)
+            ->update([
+                'status' => 'failed',
+                'error_code' => mb_substr($errorCode, 0, 64),
+                'error_message' => mb_substr($errorMessage, 0, 65000),
+                'finished_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+        $this->appendEvent($requestId, 'failed', [
+            'error_code' => $errorCode,
+            'error_message' => mb_substr($errorMessage, 0, 2000),
+            'finished_at' => (string)$now,
+        ]);
+    }
+
+    public function appendEvent(int $requestId, string $eventType, array $payload = []): void
+    {
+        DB::table('analysis_request_events')->insert([
+            'analysis_request_id' => $requestId,
+            'event_type' => $eventType,
+            'event_payload' => !empty($payload) ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+            'created_at' => CarbonImmutable::now(),
+        ]);
+    }
+
+    public function listByShopCode(string $shopCode): array
+{
+    return AnalysisRequestModel::query()
+        ->join('items', 'analysis_requests.item_id', '=', 'items.id')
+        ->join('shops', 'items.shop_id', '=', 'shops.id')
+        ->where('shops.shop_code', $shopCode)
+        ->orderByDesc('analysis_requests.created_at')
+        ->get()
+        ->map(fn ($m) => [
+            'id' => $m->id,
+            'item_id' => $m->item_id,
+            'status' => $m->status,
+            'analysis_version' => $m->analysis_version,
+            'created_at' => $m->created_at?->toISOString(),
+        ])
+        ->toArray();
+}
+
+
+    public function findOrFail(int $id): AnalysisRequest
+    {
+        $model = AnalysisRequestModel::findOrFail($id);
+
+        return AnalysisRequest::fromEloquent($model);
+    }
+}

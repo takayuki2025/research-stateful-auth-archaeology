@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             BrandEntitySeeder::class,
             ConditionEntitySeeder::class,
             ColorEntitySeeder::class,
+            AnalysisRequestSeeder::class,
         ]);
     }
 }

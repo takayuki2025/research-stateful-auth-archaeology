@@ -9,7 +9,10 @@ use App\Modules\Shop\Domain\Enum\ShopStatus;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
 use App\Modules\Order\Domain\ValueObject\Address; // ★暫定
 use Illuminate\Support\Facades\DB;
+use App\Models\Shop as EloquentShop;
 
+
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 final class EloquentShopRepository implements ShopRepository
 {
     public function save(Shop $shop): Shop
@@ -115,4 +118,21 @@ final class EloquentShopRepository implements ShopRepository
         ]);
     }
 
+    public function findByCodeOrFail(string $shopCode): Shop
+    {
+        $model = ShopModel::where('shop_code', $shopCode)->first();
+
+        if (! $model) {
+            throw new ModelNotFoundException("Shop not found: {$shopCode}");
+        }
+
+        // ★ Eloquent → Domain 変換
+        return new Shop(
+    id: $model->id,
+    shopCode: $model->shop_code,
+    ownerUserId: $model->owner_user_id,
+    name: $model->name,
+    status: ShopStatus::from($model->status), // ★ ここが重要
+);
+    }
 }

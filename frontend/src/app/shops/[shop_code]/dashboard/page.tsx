@@ -64,6 +64,20 @@ export default function ShopDashboardPage() {
         >
           店舗設定
         </Link>
+
+        <Link
+          href={`/shops/${shop_code}/dashboard/atlas/requests`}
+          className="p-4 border rounded hover:bg-gray-50"
+        >
+          Atlas 分析リクエスト管理
+        </Link>
+
+        <Link
+          href={`/shops/${shop_code}/dashboard/atlas/playground`}
+          className="p-4 border rounded hover:bg-gray-50"
+        >
+          Atlas Playground（検証）
+        </Link>
       </div>
     </div>
   );

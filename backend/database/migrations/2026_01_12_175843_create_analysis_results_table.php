@@ -10,28 +10,43 @@ return new class () extends Migration {
         Schema::create('analysis_results', function (Blueprint $table) {
             $table->id();
 
+            /**
+             * ★ Bフェーズ確定：AnalysisRequest 単位
+             */
+            $table->unsignedBigInteger('analysis_request_id');
+
+            /**
+             * item 参照（集計・検索用）
+             */
             $table->unsignedBigInteger('item_id');
 
             /**
-             * v3: AtlasKernel 正式結果（完全スナップショット）
+             * AtlasKernel 正式結果（完全スナップショット）
              */
             $table->json('payload');
 
             /**
-             * v2互換 / 検索・集計用の冗長カラム
-             * （将来 drop 可能）
+             * Review/UI 用（冗長・将来 drop 可）
              */
             $table->json('tags')->nullable();
             $table->json('confidence')->nullable();
             $table->string('generated_version')->nullable();
             $table->text('raw_text')->nullable();
 
-            // active / rejected / superseded
+            /**
+             * active / rejected / superseded
+             */
             $table->string('status')->default('active');
 
             $table->timestamps();
 
+            $table->index(['analysis_request_id', 'status']);
             $table->index(['item_id', 'status']);
+
+            $table->foreign('analysis_request_id')
+                ->references('id')
+                ->on('analysis_requests')
+                ->cascadeOnDelete();
 
             $table->foreign('item_id')
                 ->references('id')

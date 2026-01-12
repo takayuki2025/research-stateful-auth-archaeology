@@ -315,3 +315,29 @@ Route::post(
     '/items/{itemId}/analysis/reanalyze',
     [ItemAnalysisController::class, 'reanalyze']
 );
+
+// 再解析処理ボタン
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ReplayAnalysisController;
+
+Route::post('/atlas/requests/{id}/replay', ReplayAnalysisController::class);
+
+Route::middleware(['auth:sanctum', 'can:atlas-review'])
+    ->post('/atlas/requests/{id}/replay', ReplayAnalysisController::class);
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestListController;
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get(
+        '/shops/{shop_code}/atlas/requests',
+        AtlasRequestListController::class
+    );
+});
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestShowController;
+
+Route::get(
+  '/shops/{shop_code}/atlas/requests/{request_id}',
+  AtlasRequestShowController::class
+);

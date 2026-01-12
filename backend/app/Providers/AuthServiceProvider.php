@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
-
+use Illuminate\Support\Facades\Gate;
+use App\Models\Shop;
+use App\Policies\AtlasReviewPolicy;
 // use App\Auth\Guards\FirebaseGuard; // ★ 追加: 作成したカスタムGuardをインポート
 // use Illuminate\Support\Facades\Gate;
 // use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -13,6 +15,7 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 // use App\Auth\UserResolver;
 // use App\Auth\JwtUserResolver;
 
+
 class AuthServiceProvider extends ServiceProvider
 {
     /**
@@ -21,7 +24,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        //
+        Shop::class => AtlasReviewPolicy::class,
     ];
 
     /**
@@ -30,18 +33,5 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
-
-        // ★★★ 修正箇所: カスタムGuardをファクトリとして使用 ★★★
-        // Auth::extend('firebase', function ($app, $name, array $config) {
-
-        //     $userProvider = Auth::createUserProvider($config['provider'] ?? null);
-        //     $firebaseAuth = $app->make(FirebaseAuth::class);
-
-        //     // ★ 修正: Requestクラスの完全修飾名を使用 (\Illuminate\Http\Request::class)
-        //     $request = $app->make(\Illuminate\Http\Request::class);
-
-        //     // カスタム作成したFirebaseGuardのインスタンスを生成して返す
-        //     return new FirebaseGuard($userProvider, $firebaseAuth, $request);
-        // });
     }
 }

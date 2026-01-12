@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Modules\Shop\ShopServiceProvider::class,
         App\Modules\Item\Infrastructure\Providers\ItemModuleServiceProvider::class,
         App\Modules\Item\Infrastructure\Providers\ItemEventServiceProvider::class,
+        App\Modules\Item\Infrastructure\Providers\ItemServiceProvider::class,
         App\Modules\Shipment\Infrastructure\Providers\ShipmentServiceProvider::class,
         App\Modules\Review\Infrastructure\ReviewServiceProvider::class,
     ])
