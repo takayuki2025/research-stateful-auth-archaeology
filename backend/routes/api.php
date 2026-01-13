@@ -308,31 +308,15 @@ Route::get(
     GetItemAnalysisForReviewController::class
 );
 
-// 再解析処理
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ItemAnalysisController;
-
-Route::post(
-    '/items/{itemId}/analysis/reanalyze',
-    [ItemAnalysisController::class, 'reanalyze']
-);
 
 // 再解析処理ボタン
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ReplayAnalysisController;
 
-Route::post('/atlas/requests/{id}/replay', ReplayAnalysisController::class);
 
 Route::middleware(['auth:sanctum', 'can:atlas-review'])
     ->post('/atlas/requests/{id}/replay', ReplayAnalysisController::class);
 
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestListController;
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get(
-        '/shops/{shop_code}/atlas/requests',
-        AtlasRequestListController::class
-    );
-});
 
 
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestShowController;
@@ -368,19 +352,10 @@ Route::prefix('shops/{shopCode}/atlas')->group(function () {
     );
 });
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
-
-Route::post(
-    '/shops/{shopCode}/atlas/requests/{requestId}/replay',
-    [AtlasReplayController::class, 'replay']
-);
 
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
 
-// Route::get(
-//     '/shops/{shopCode}/atlas/requests/{requestId}/decision',
-//     [AtlasDecisionController::class, 'show']
-// );
+
 
 Route::post(
     '/shops/{shopCode}/atlas/requests/{requestId}/decide',
@@ -389,27 +364,49 @@ Route::post(
 
 
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestsController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
+
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('shops/{shop_code}/atlas')->group(function () {
 
         // 一覧（既存）
-        Route::get('requests', [AtlasRequestsController::class, 'index']);
+        Route::get('requests', [AtlasRequestController::class, 'index']);
 
-        // Review（Before/After/Diff 取得）
-        Route::get('requests/{request_id}/review', [AtlasReviewController::class, 'show'])
-            ->whereNumber('request_id');
 
-        // Decide（approve/reject/edit_confirm/manual_override）
-        // Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
-        //     ->whereNumber('request_id');
-
-        // Replay（非同期）
-        // Route::post('requests/{request_id}/replay', [AtlasReplayController::class, 'replay'])
-        //     ->whereNumber('request_id');
     });
+});
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecideController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ItemAnalysisController;
+/*
+|--------------------------------------------------------------------------
+| AtlasKernel v3 (Review / Decide / Replay)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Review 取得
+    Route::get(
+        '/shops/{shop_code}/atlas/requests/{request_id}/review',
+        AtlasReviewController::class
+    );
+    // Decide（approve / edit_confirm / reject）
+    Route::post(
+        '/shops/{shop_code}/atlas/requests/{request_id}/decide',
+        AtlasDecideController::class
+    );
+    // Replay（analysis_request 起点）
+    Route::post(
+        '/shops/{shop_code}/atlas/requests/{request_id}/replay',
+        AtlasReplayController::class
+    );
+    // 手動再解析（Item 起点・管理用途）
+    Route::post(
+        '/items/{itemId}/analysis/reanalyze',
+        [ItemAnalysisController::class, 'reanalyze']
+    );
 });

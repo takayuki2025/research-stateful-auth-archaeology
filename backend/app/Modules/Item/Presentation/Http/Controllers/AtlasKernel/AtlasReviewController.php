@@ -14,16 +14,18 @@ final class AtlasReviewController extends Controller
         private GetAtlasReviewUseCase $useCase,
     ) {}
 
-    public function show(string $shop_code, int $request_id): JsonResponse
-    {
+    public function __invoke(
+        string $shop_code,
+        int $request_id
+    ): JsonResponse {
         $dto = $this->useCase->handle(
             shopCode: $shop_code,
             analysisRequestId: $request_id,
         );
 
         return response()->json([
-            'request_id' => $dto->requestId,
-            'review' => $dto->toArray(),
+            'request_id' => $request_id,
+            'review'     => $dto->toArray(),
         ]);
     }
 }

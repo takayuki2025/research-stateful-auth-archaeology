@@ -5,48 +5,36 @@ declare(strict_types=1);
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
 use App\Http\Controllers\Controller;
-use App\Models\Shop;
-use App\Modules\Item\Application\UseCase\AtlasKernel\ReplayAnalysisRequestUseCase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Modules\Item\Application\UseCase\AtlasKernel\ReplayAtlasRequestUseCase;
+use App\Models\Shop as ShopModel;
 
 final class AtlasReplayController extends Controller
 {
     public function __construct(
-        private ReplayAnalysisRequestUseCase $useCase,
+        private ReplayAtlasRequestUseCase $useCase,
     ) {}
 
-    public function replay(Request $request, string $shop_code, int $request_id): JsonResponse
+    public function __invoke(string $shop_code, int $request_id, Request $request): JsonResponse
     {
-        $actor = auth()->user();
-        if (!$actor) {
-            abort(401);
-        }
+        $shopModel = ShopModel::where('shop_code', $shop_code)->firstOrFail();
+        $this->authorize('review', $shopModel);
 
-        $shop = Shop::where('shop_code', $shop_code)->firstOrFail();
-
-        $actorRoleSlug = $actor->roles()
-            ->wherePivot('shop_id', $shop->id)
-            ->select('roles.slug')
-            ->value('roles.slug');
-
-        if (!$actorRoleSlug) {
-            abort(403, 'Shop role not found');
-        }
-
-        $data = $request->validate([
-            'version' => ['nullable', 'string', 'max:32'],
-            'reason'  => ['nullable', 'string', 'max:255'],
+        $validated = $request->validate([
+            'version' => ['required', 'string', 'max:64'],
+            'reason'  => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $this->useCase->handle(
-            originalRequestId: $request_id,
-            requestedVersion: $data['version'] ?? 'v3_ai',
-            actorRole: (string)$actorRoleSlug,
-            actorUserId: (int)$actor->id,
-            triggerReason: $data['reason'] ?? 'manual replay',
+        $newId = $this->useCase->handle(
+            analysisRequestId: $request_id,
+            version: $validated['version'],
+            reason: $validated['reason'] ?? null,
         );
 
-        return response()->json(['status' => 'accepted']);
+        return response()->json([
+            'status' => 'accepted',
+            'new_request_id' => $newId,
+        ]);
     }
 }

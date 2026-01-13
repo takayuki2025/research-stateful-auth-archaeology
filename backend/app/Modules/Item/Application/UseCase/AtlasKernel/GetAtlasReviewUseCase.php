@@ -5,70 +5,108 @@ declare(strict_types=1);
 namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use App\Modules\Item\Application\Dto\AtlasKernel\AtlasReviewDto;
-use App\Modules\Item\Application\Query\AtlasReviewQuery;
+use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
+use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
+use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
 
 final class GetAtlasReviewUseCase
 {
     public function __construct(
-        private AtlasReviewQuery $query,
+        private AnalysisRequestRepository $requests,
+        private AnalysisResultRepository $results,
+        private ReviewDecisionRepository $decisions,
     ) {}
 
-    public function handle(string $shopCode, int $analysisRequestId): AtlasReviewDto
-    {
-        $src = $this->query->fetchReviewSource($shopCode, $analysisRequestId);
+    public function handle(
+        string $shopCode,
+        int $analysisRequestId,
+    ): AtlasReviewDto {
+        // ① Request（Bフェーズ主語）
+        $request = $this->requests->findOrFail($analysisRequestId);
 
-        $req = $src['request'];
-        $before = is_array($src['before']) ? $src['before'] : [];
-        $after  = is_array($src['after'])  ? $src['after']  : [];
-        $attributes = is_array($src['attributes']) ? $src['attributes'] : [];
+        // ② 最新 analysis_result（技術スナップショット）
+        $result = $this->results->findByRequestId($analysisRequestId);
+        if (! $result) {
+            throw new \RuntimeException('analysis_result not found');
+        }
 
-        $diff = $this->buildDiff($before, $after);
+        // ③ 最新 decision（あれば）
+        $decision = $this->decisions->findLatestByRequestId($analysisRequestId);
 
-        // overall_confidence：attributes に confidence が入るようになったら平均等にできる
-        $overall = $this->computeOverallConfidence($attributes);
+        /*
+         * =========================
+         * AFTER（AI提案）
+         * =========================
+         */
+        $after = [
+            'brand'     => $result->brand_name,
+            'condition' => $result->condition_name,
+            'color'     => $result->color_name,
+        ];
+
+        /*
+         * =========================
+         * BEFORE（SoT or decision）
+         * =========================
+         * - decision があれば before_snapshot
+         * - なければ after をそのまま before にする
+         */
+        $before = $decision && $decision->before_snapshot
+            ? $decision->before_snapshot
+            : $after;
+
+        /*
+         * =========================
+         * decision による上書き（edit_confirm）
+         * =========================
+         */
+        if ($decision && $decision->after_snapshot) {
+            $after = array_merge($after, $decision->after_snapshot);
+        }
+
+        /*
+         * =========================
+         * diff 自動生成（v3固定）
+         * =========================
+         */
+        $diff = [];
+        foreach ($after as $key => $afterValue) {
+            $beforeValue = $before[$key] ?? null;
+            if ($beforeValue !== $afterValue) {
+                $diff[$key] = [
+                    'before' => $beforeValue,
+                    'after'  => $afterValue,
+                ];
+            }
+        }
+
+        /*
+         * =========================
+         * confidence / attributes
+         * =========================
+         */
+        $confidenceMap = json_decode(
+            $result->confidence_map ?? '{}',
+            true
+        );
+
+        $attributes = [];
+        foreach ($after as $key => $value) {
+            $attributes[$key] = [
+                'value'      => $value,
+                'confidence' => $confidenceMap[$key] ?? null,
+                'evidence'   => null, // 将来AI説明用
+            ];
+        }
 
         return new AtlasReviewDto(
-            requestId: (int)$req['id'],
-            status: (string)$req['status'],
-            overallConfidence: $overall,
+            requestId: $request->id,
+            status: $request->status,
+            overallConfidence: $result->overall_confidence,
             before: $before,
             after: $after,
             diff: $diff,
             attributes: $attributes,
         );
-    }
-
-    private function buildDiff(array $before, array $after): array
-    {
-        $keys = array_unique(array_merge(array_keys($before), array_keys($after)));
-        $diff = [];
-
-        foreach ($keys as $k) {
-            $b = $before[$k] ?? null;
-            $a = $after[$k] ?? null;
-            if ($b === $a) {
-                continue;
-            }
-            $diff[$k] = [
-                'before' => $b,
-                'after' => $a,
-            ];
-        }
-
-        return $diff;
-    }
-
-    private function computeOverallConfidence(array $attributes): ?float
-    {
-        $vals = [];
-        foreach ($attributes as $row) {
-            $c = $row['confidence'] ?? null;
-            if (is_numeric($c)) {
-                $vals[] = (float)$c;
-            }
-        }
-        if (count($vals) === 0) return null;
-
-        return array_sum($vals) / count($vals);
     }
 }

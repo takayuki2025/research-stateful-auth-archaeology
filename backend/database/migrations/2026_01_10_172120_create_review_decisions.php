@@ -8,45 +8,58 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('review_decisions', function (Blueprint $table) {
-    $table->id();
+            $table->id();
 
-    // ★ Bフェーズ主語（必須）
-    $table->unsignedBigInteger('analysis_request_id');
+            /* =========================
+             * Relation
+             * ========================= */
+            $table->unsignedBigInteger('analysis_request_id');
 
-    // ★ Cフェーズ主語（将来用）
-    $table->string('subject_type')->nullable();
-    $table->unsignedBigInteger('subject_id')->nullable();
+            /* =========================
+             * Decision subject (future-proof)
+             * ========================= */
+            $table->string('subject_type')->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
 
-    // 判断種別
-    $table->string('decision_type'); // approve | reject | edit_confirm | system_approve
+            /* =========================
+             * Decision
+             * ========================= */
+            $table->string('decision_type')
+                ->comment('approve | reject | edit_confirm | system_approve');
 
-    // 理由・注釈
-    $table->string('decision_reason')->nullable();
-    $table->text('note')->nullable();
+            $table->string('decision_reason')->nullable();
+            $table->text('note')->nullable();
 
-    // スナップショット
-    $table->json('before_snapshot')->nullable();
-    $table->json('after_snapshot')->nullable();
+            /* =========================
+             * Snapshots
+             * ========================= */
+            $table->json('before_snapshot')->nullable();
+            $table->json('after_snapshot')->nullable();
 
-    // 判断者
-    $table->string('decided_by_type')->default('human');
-    $table->unsignedBigInteger('decided_by')->nullable();
+            /* =========================
+             * Actor
+             * ========================= */
+            $table->string('decided_by_type', 16)
+                ->default('human'); // human | system | policy
+            $table->unsignedBigInteger('decided_by')->nullable();
 
-    // 判断時刻
-    $table->timestamp('decided_at');
+            $table->timestamp('decided_at');
 
-    $table->timestamps();
+            $table->timestamps();
 
-    $table->index(['analysis_request_id']);
-    $table->index(['subject_type', 'subject_id']);
-    $table->index(['decision_type']);
-    $table->index(['decided_at']);
+            /* =========================
+             * Index / FK
+             * ========================= */
+            $table->index(['analysis_request_id']);
+            $table->index(['subject_type', 'subject_id']);
+            $table->index(['decision_type']);
+            $table->index(['decided_at']);
 
-    $table->foreign('analysis_request_id')
-        ->references('id')
-        ->on('analysis_requests')
-        ->cascadeOnDelete();
-});
+            $table->foreign('analysis_request_id')
+                ->references('id')
+                ->on('analysis_requests')
+                ->cascadeOnDelete();
+        });
     }
 
     public function down(): void

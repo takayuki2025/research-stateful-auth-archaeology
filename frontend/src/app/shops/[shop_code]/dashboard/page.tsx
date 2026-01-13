@@ -75,7 +75,7 @@ export default function ShopDashboardPage() {
 
             {/* 🟡 未決定バッジ（将来 API 連携で動的化） */}
             <span className="text-xs px-2 py-1 rounded bg-yellow-500 text-white">
-              要対応
+              改構築中
             </span>
           </div>
 
@@ -90,14 +90,9 @@ export default function ShopDashboardPage() {
               className="text-blue-600 underline"
             >
               ▶ レビュー一覧
-            </Link>
-
-            {/* 履歴（Ledger） */}
-            <Link
-              href={`/shops/${shop_code}/dashboard/atlas/history`}
-              className="text-gray-700 underline"
-            >
-              📜 判断履歴
+              <p className="text-xs text-gray-500">
+                ※ 判断履歴は各レビュー詳細画面から確認できます
+              </p>
             </Link>
           </div>
         </div>

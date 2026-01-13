@@ -5,53 +5,42 @@ declare(strict_types=1);
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Item\Application\UseCase\AtlasKernel\DecideAtlasReviewUseCase;
-use App\Models\Shop;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Modules\Item\Application\UseCase\AtlasKernel\DecideUseCase;
+use App\Modules\Auth\Application\Context\AuthContext;
+use App\Models\Shop as ShopModel;
 
 final class AtlasDecideController extends Controller
 {
     public function __construct(
-        private DecideAtlasReviewUseCase $useCase,
+        private DecideUseCase $useCase,
+        private AuthContext $auth,
     ) {}
 
-    public function decide(Request $request, string $shopCode, int $requestId)
+    public function __invoke(string $shop_code, int $request_id, Request $request): JsonResponse
     {
-        $actor = auth()->user();
-        if (!$actor) {
-            abort(401);
-        }
+        $shopModel = ShopModel::where('shop_code', $shop_code)->firstOrFail();
+        $this->authorize('review', $shopModel);
 
-        $shop = Shop::where('shop_code', $shopCode)->firstOrFail();
-
-        $actorRoleSlug = $actor
-            ->shopRoles()
-            ->where('shop_id', $shop->id)
-            ->with('role')
-            ->first()
-            ?->role
-            ?->slug;
-
-        if ($actorRoleSlug === null) {
-            abort(403, 'Shop role not found');
+        $principal = $this->auth->principal();
+        if (! $principal) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
         $validated = $request->validate([
-            'decisionType' => 'required|string|in:approve,system_approve,reject,edit_confirm,manual_override',
-            'afterSnapshot' => 'nullable|array',
-            'note' => 'nullable|string|max:2000',
+            'decision_type'  => ['required', 'string', 'in:approve,edit_confirm,reject'],
+            'note'           => ['nullable', 'string', 'max:2000'],
+            'after_snapshot' => ['nullable', 'array'], // edit_confirm のときのみ使う
         ]);
 
         $this->useCase->handle(
-            shopCode: $shopCode,
-            analysisRequestId: $requestId,
-            decisionType: $validated['decisionType'],
-            afterSnapshot: $validated['afterSnapshot'] ?? null,
-            note: $validated['note'] ?? null,
-            actorUserId: (int)$actor->id,
-            actorRole: (string)$actorRoleSlug,
+            analysisRequestId: $request_id,
+            decidedUserId: $principal->userId(),   // あなたの AuthPrincipal に合わせて
+            decidedBy: 'human',
+            input: $validated,
         );
 
-        return response()->json(['status' => 'accepted']);
+        return response()->json(['status' => 'ok']);
     }
 }

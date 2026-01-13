@@ -8,33 +8,37 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('analysis_results', function (Blueprint $table) {
-    $table->id();
+            $table->id();
 
-    $table->unsignedBigInteger('analysis_request_id');
-    $table->unsignedBigInteger('item_id');
+            $table->unsignedBigInteger('analysis_request_id');
+            $table->unsignedBigInteger('item_id');
 
-    // 正規化候補（After）
-    $table->string('brand_name')->nullable();
-    $table->string('condition_name')->nullable();
-    $table->string('color_name')->nullable();
+            // After 候補
+            $table->string('brand_name')->nullable();
+            $table->string('condition_name')->nullable();
+            $table->string('color_name')->nullable();
 
-    // confidence
-    $table->decimal('brand_confidence', 4, 3)->nullable();
-    $table->decimal('condition_confidence', 4, 3)->nullable();
-    $table->decimal('color_confidence', 4, 3)->nullable();
+            // v3固定
+            $table->json('confidence_map')->nullable();
+            $table->decimal('overall_confidence', 4, 3)->nullable();
 
-    // 解析根拠（将来AI用）
-    $table->json('evidence')->nullable();
+            // 根拠（AI / Rule / future replay）
+            $table->json('evidence')->nullable();
 
-    $table->timestamps();
+            // 技術状態のみ
+            $table->enum('status', ['active', 'superseded', 'archived'])
+                ->default('active');
 
-    $table->index(['analysis_request_id']);
-    $table->index(['item_id']);
+            $table->timestamps();
 
-    $table->foreign('analysis_request_id')
-        ->references('id')->on('analysis_requests')
-        ->cascadeOnDelete();
-});
+            $table->index(['analysis_request_id']);
+            $table->index(['item_id']);
+
+            $table->foreign('analysis_request_id')
+                ->references('id')
+                ->on('analysis_requests')
+                ->cascadeOnDelete();
+        });
     }
 
     public function down(): void

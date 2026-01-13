@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
-use App\Http\Controllers\Controller;
-use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
+use App\Modules\Item\Application\Query\AtlasRequestListQuery;
 
-final class AtlasRequestsController extends Controller
+final class AtlasRequestController extends Controller
 {
     public function __construct(
-        private AnalysisRequestRepository $requests,
+        private AtlasRequestListQuery $query
     ) {}
 
     public function index(string $shop_code): JsonResponse
     {
-        $rows = $this->requests->listByShopCode($shop_code);
+        $requests = $this->query->listByShopCode($shop_code);
 
         return response()->json([
-            'requests' => $rows,
+            'requests' => $requests,
         ]);
     }
 }

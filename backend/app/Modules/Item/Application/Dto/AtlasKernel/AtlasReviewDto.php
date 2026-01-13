@@ -19,12 +19,12 @@ final class AtlasReviewDto
     public function toArray(): array
     {
         return [
-            'status' => $this->status,
+            'status'             => $this->status,
             'overall_confidence' => $this->overallConfidence,
-            'before' => $this->before,
-            'after' => $this->after,
-            'diff' => $this->diff,
-            'attributes' => $this->attributes,
+            'before'             => $this->before,
+            'after'              => $this->after,
+            'diff'               => $this->diff,
+            'attributes'         => $this->attributes,
         ];
     }
 }

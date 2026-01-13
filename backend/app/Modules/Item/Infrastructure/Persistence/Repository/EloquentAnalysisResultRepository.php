@@ -2,8 +2,6 @@
 
 namespace App\Modules\Item\Infrastructure\Persistence\Repository;
 
-use App\Models\AnalysisResult as EloquentAnalysisResult;
-use App\Modules\Item\Domain\Entity\AnalysisResult;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use Illuminate\Support\Facades\DB;
 
@@ -11,72 +9,60 @@ final class EloquentAnalysisResultRepository implements AnalysisResultRepository
 {
     public function save(int $itemId, array $payload): void
     {
-        $analysis = $payload['analysis'] ?? $payload;
-
-        $canonical = data_get($analysis, 'integration.brand_identity.canonical');
-        $confBrand = (float) data_get($analysis, 'integration.brand_identity.confidence', 0.0);
-
-        $condition = data_get($analysis, 'extraction.condition', []);
-        $color     = data_get($analysis, 'extraction.color', []);
-
-        $model   = data_get($analysis, 'lineage.model', 'AtlasKernel-unknown');
-        $rawText = data_get($payload, 'input.raw_text') ?? data_get($analysis, 'input.raw_text');
+        /**
+         * v3固定ルール：
+         * - analysis_request_id は payload から取得
+         * - Repository の引数は変えない
+         */
+        $analysisRequestId = $payload['request_id']
+            ?? throw new \InvalidArgumentException('payload.request_id is required');
 
         DB::table('analysis_results')->insert([
-            // ★ analysis_request_id は “save時に分かる”なら入れる。分からないなら後で別UseCaseで紐付ける。
-            // 'analysis_request_id' => $requestId,
+            'analysis_request_id' => $analysisRequestId,
+            'item_id'             => $itemId,
 
-            'item_id' => $itemId,
-            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'tags' => json_encode([
-                'brand'     => $canonical,
-                'condition' => $condition,
-                'color'     => $color,
-            ], JSON_UNESCAPED_UNICODE),
-            'confidence' => json_encode([
-                'score' => $confBrand, // ★ UI側が score を読むなら score に統一
-            ], JSON_UNESCAPED_UNICODE),
-            'generated_version' => $model,
-            'raw_text'          => $rawText,
-            'status'            => 'active',
-            'created_at'        => now(),
-            'updated_at'        => now(),
+            // 正規化候補（After）
+            'brand_name'     => data_get($payload, 'analysis.extraction.brand'),
+            'condition_name' => data_get($payload, 'analysis.extraction.condition'),
+            'color_name'     => data_get($payload, 'analysis.extraction.color'),
+
+            // v3固定：confidence は JSON + overall
+            'confidence_map'     => json_encode(
+                data_get($payload, 'analysis.confidence_map', []),
+                JSON_UNESCAPED_UNICODE
+            ),
+            'overall_confidence' => data_get($payload, 'analysis.overall_confidence'),
+
+            // 根拠（AI・Rule・将来再解析用）
+            'evidence' => json_encode(
+                data_get($payload, 'analysis.evidence'),
+                JSON_UNESCAPED_UNICODE
+            ),
+
+            // 技術状態のみ
+            'status' => 'active',
+
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
-    public function markRejected(int $itemId): void
+    public function supersedeByItem(int $itemId): void
     {
         DB::table('analysis_results')
             ->where('item_id', $itemId)
             ->where('status', 'active')
             ->update([
-                'status'     => 'rejected',
-                'updated_at' => now(),
+                'status'     => 'superseded',
+                'updated_at'=> now(),
             ]);
     }
 
-    public function markDecided(int $itemId, string $decidedBy, int $decidedUserId): void
+    public function findByRequestId(int $analysisRequestId): ?object
     {
-        DB::table('analysis_results')
-            ->where('item_id', $itemId)
-            ->where('status', 'active')
-            ->update([
-                'status'          => 'decided',
-                'decided_by'      => $decidedBy,
-                'decided_user_id' => $decidedUserId,
-                'decided_at'      => now(),
-                'updated_at'      => now(),
-            ]);
-    }
-
-    public function findByRequestId(int $requestId): ?AnalysisResult
-    {
-        $row = EloquentAnalysisResult::query()
-            ->where('analysis_request_id', $requestId)
-            ->where('status', 'active')
-            ->latest('created_at')
+        return DB::table('analysis_results')
+            ->where('analysis_request_id', $analysisRequestId)
+            ->orderByDesc('id')
             ->first();
-
-        return $row ? AnalysisResult::fromEloquent($row) : null;
     }
 }

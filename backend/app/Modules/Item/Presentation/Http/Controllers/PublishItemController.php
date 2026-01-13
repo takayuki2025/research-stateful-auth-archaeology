@@ -24,12 +24,17 @@ final class PublishItemController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ★ Publish では shop_id 必須（SHOP 出品の場合）
+        // ✅ v3固定: Publishは shop_id 必須（Shop出品）
+        $validated = $request->validate([
+            'shop_id' => ['required', 'integer', 'min:1'],
+        ]);
+
         $input = new PublishItemInput(
             draftId: $draftId,
-            shopId: $request->input('shop_id'), // ← ここ
+            shopId: (int) $validated['shop_id'],
         );
 
+        // 第3引数 null は現状の設計通りでOK（tenantなどを後で入れるならここ）
         $this->useCase->execute($input, $principal, null);
 
         return response()->json(['status' => 'ok']);
