@@ -8,4 +8,9 @@ interface ItemEntityRepository
 
     /** @return int created item_entity id */
     public function create(array $attrs): int;
+
+    public function applyAnalysisResult(
+        int $analysisRequestId,
+        int $actorUserId,
+    ): void;
 }

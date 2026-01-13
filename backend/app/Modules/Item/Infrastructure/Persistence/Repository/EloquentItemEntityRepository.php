@@ -35,4 +35,35 @@ final class EloquentItemEntityRepository implements ItemEntityRepository
 
         return (int)$id;
     }
+
+    public function applyAnalysisResult(int $analysisRequestId, int $actorUserId): void
+    {
+        $result = DB::table('analysis_results')
+            ->where('analysis_request_id', $analysisRequestId)
+            ->first();
+
+        if (! $result) {
+            throw new \RuntimeException('analysis_result not found');
+        }
+
+        // 1) 現在の latest を無効化
+        DB::table('item_entities')
+            ->where('item_id', $result->item_id)
+            ->where('is_latest', true)
+            ->update(['is_latest' => false]);
+
+        // 2) 新しい entity 作成
+        DB::table('item_entities')->insert([
+            'item_id'        => $result->item_id,
+            'brand_name'     => $result->brand_name,
+            'condition_name' => $result->condition_name,
+            'color_name'     => $result->color_name,
+            'source_type'    => 'atlas',
+            'source_id'      => $analysisRequestId,
+            'is_latest'      => true,
+            'created_by'     => $actorUserId,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+    }
 }

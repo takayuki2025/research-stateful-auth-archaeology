@@ -4,47 +4,44 @@ declare(strict_types=1);
 
 namespace App\Modules\Item\Infrastructure\Queue;
 
+use App\Modules\Atlas\Application\Service\AtlasKernelAnalyzer;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
-use App\Modules\AtlasKernel\Application\Service\AtlasKernelAnalyzer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 
 final class AnalyzeItemJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        private int $analysisRequestId,
+        public readonly int $analysisRequestId
     ) {}
 
     public function handle(
-        AnalysisRequestRepository $requests,
-        AtlasKernelAnalyzer $analyzer,
-    ): void {
-        // ① running にできなければ終了（多重実行防止）
-        if (! $requests->markRunning($this->analysisRequestId)) {
-            return;
-        }
+    AnalysisRequestRepository $requests,
+    AtlasKernelAnalyzer $analyzer,
+): void {
+    if (! $requests->markRunning($this->analysisRequestId)) {
+        return;
+    }
 
-        try {
-            // ② 実解析（中身は Analyzer に委譲）
-            $analyzer->analyze($this->analysisRequestId);
+    try {
+        $result = $analyzer->analyze($this->analysisRequestId);
 
-            // ③ 成功
-            $requests->markDone($this->analysisRequestId);
-        } catch (Throwable $e) {
-            // ④ 失敗（retry は Queue に任せる）
-            $requests->markFailed(
-                $this->analysisRequestId,
-                errorCode: class_basename($e),
-                errorMessage: $e->getMessage(),
-            );
+        // TODO（次チャット）:
+        // - item_entities 反映
+        // - review_decisions system_approve / edit_confirm 生成
 
-            throw $e; // retry / backoff 用
-        }
+        $requests->markDone($this->analysisRequestId);
+    } catch (\Throwable $e) {
+        $requests->markFailed(
+            $this->analysisRequestId,
+            'ANALYZE_FAILED',
+            $e->getMessage()
+        );
+        throw $e;
     }
 }

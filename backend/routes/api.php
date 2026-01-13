@@ -374,3 +374,42 @@ Route::post(
     '/shops/{shopCode}/atlas/requests/{requestId}/replay',
     [AtlasReplayController::class, 'replay']
 );
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
+
+// Route::get(
+//     '/shops/{shopCode}/atlas/requests/{requestId}/decision',
+//     [AtlasDecisionController::class, 'show']
+// );
+
+Route::post(
+    '/shops/{shopCode}/atlas/requests/{requestId}/decide',
+    [AtlasDecisionController::class, 'decide']
+);
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestsController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::prefix('shops/{shop_code}/atlas')->group(function () {
+
+        // 一覧（既存）
+        Route::get('requests', [AtlasRequestsController::class, 'index']);
+
+        // Review（Before/After/Diff 取得）
+        Route::get('requests/{request_id}/review', [AtlasReviewController::class, 'show'])
+            ->whereNumber('request_id');
+
+        // Decide（approve/reject/edit_confirm/manual_override）
+        // Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
+        //     ->whereNumber('request_id');
+
+        // Replay（非同期）
+        // Route::post('requests/{request_id}/replay', [AtlasReplayController::class, 'replay'])
+        //     ->whereNumber('request_id');
+    });
+});

@@ -8,61 +8,33 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('analysis_results', function (Blueprint $table) {
-            $table->id();
+    $table->id();
 
-            /**
-             * ★ Bフェーズ確定：AnalysisRequest 単位
-             */
-            $table->unsignedBigInteger('analysis_request_id');
+    $table->unsignedBigInteger('analysis_request_id');
+    $table->unsignedBigInteger('item_id');
 
-            /**
-             * item 参照（集計・検索用）
-             */
-            $table->unsignedBigInteger('item_id');
+    // 正規化候補（After）
+    $table->string('brand_name')->nullable();
+    $table->string('condition_name')->nullable();
+    $table->string('color_name')->nullable();
 
-            /**
-             * AtlasKernel 正式結果（完全スナップショット）
-             */
-            $table->json('payload');
+    // confidence
+    $table->decimal('brand_confidence', 4, 3)->nullable();
+    $table->decimal('condition_confidence', 4, 3)->nullable();
+    $table->decimal('color_confidence', 4, 3)->nullable();
 
-            /**
-             * Review/UI 用（冗長・将来 drop 可）
-             */
-            $table->json('tags')->nullable();
-            $table->json('confidence')->nullable();
-            $table->string('generated_version')->nullable();
-            $table->text('raw_text')->nullable();
+    // 解析根拠（将来AI用）
+    $table->json('evidence')->nullable();
 
-            /**
-             * active / rejected / decided / superseded
-             */
-            $table->string('status')->default('active');
+    $table->timestamps();
 
-            /**
-             * ===== Decision Ledger（Aルート）=====
-             */
-            $table->string('decided_by')->nullable();          // human / system / policy
-            $table->unsignedBigInteger('decided_user_id')->nullable();
-            $table->timestamp('decided_at')->nullable();
-            $table->string('decision_reason')->nullable();
-            $table->text('decision_note')->nullable();
+    $table->index(['analysis_request_id']);
+    $table->index(['item_id']);
 
-            $table->timestamps();
-
-            $table->index(['analysis_request_id', 'status']);
-            $table->index(['item_id', 'status']);
-            $table->index(['decided_user_id']);
-
-            $table->foreign('analysis_request_id')
-                ->references('id')
-                ->on('analysis_requests')
-                ->cascadeOnDelete();
-
-            $table->foreign('item_id')
-                ->references('id')
-                ->on('items')
-                ->cascadeOnDelete();
-        });
+    $table->foreign('analysis_request_id')
+        ->references('id')->on('analysis_requests')
+        ->cascadeOnDelete();
+});
     }
 
     public function down(): void

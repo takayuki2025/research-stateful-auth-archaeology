@@ -73,6 +73,11 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
 use App\Modules\User\Domain\Repository\UserRepository;
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentUserRepository;
+use App\Modules\Atlas\Application\Service\AtlasKernelAnalyzer;
+use App\Modules\Item\Application\Query\AtlasReviewQuery;
+use App\Modules\Item\Infrastructure\Persistence\Query\DbAtlasReviewQuery;
+use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentReviewDecisionRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -197,6 +202,11 @@ class AppServiceProvider extends ServiceProvider
         UserRepository::class,
         EloquentUserRepository::class
         );
+
+        $this->app->singleton(AtlasKernelAnalyzer::class, fn() => new AtlasKernelAnalyzer());
+
+        $this->app->bind(AtlasReviewQuery::class, DbAtlasReviewQuery::class);
+        $this->app->bind(ReviewDecisionRepository::class, EloquentReviewDecisionRepository::class);
 
     }
 

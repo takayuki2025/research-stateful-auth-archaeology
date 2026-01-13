@@ -38,6 +38,8 @@ interface AnalysisRequestRepository
 
     public function getById(int $id): AnalysisRequest;
 
+    public function getStatus(int $analysisRequestId): string;
+
     /**
      * Replay 回数カウント
      *

@@ -44,6 +44,7 @@ export default function ShopDashboardPage() {
       <h1 className="text-3xl font-bold">店舗ダッシュボード</h1>
 
       <div className="grid gap-4 md:grid-cols-2">
+        {/* 商品管理 */}
         <Link
           href={`/shops/${shop_code}/dashboard/items`}
           className="p-4 border rounded hover:bg-gray-50"
@@ -51,6 +52,7 @@ export default function ShopDashboardPage() {
           商品管理
         </Link>
 
+        {/* 注文管理 */}
         <Link
           href={`/shops/${shop_code}/dashboard/orders`}
           className="p-4 border rounded hover:bg-gray-50"
@@ -58,6 +60,7 @@ export default function ShopDashboardPage() {
           注文・配送管理
         </Link>
 
+        {/* 店舗設定 */}
         <Link
           href={`/shops/${shop_code}/dashboard/settings`}
           className="p-4 border rounded hover:bg-gray-50"
@@ -65,19 +68,39 @@ export default function ShopDashboardPage() {
           店舗設定
         </Link>
 
-        <Link
-          href={`/shops/${shop_code}/dashboard/atlas/requests`}
-          className="p-4 border rounded hover:bg-gray-50"
-        >
-          Atlas 分析リクエスト管理
-        </Link>
+        {/* ===== AtlasKernel v3 ===== */}
+        <div className="p-4 border rounded space-y-3 bg-yellow-50 border-yellow-300">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg">Atlas 分析レビュー（v3）</h2>
 
-        <Link
-          href={`/shops/${shop_code}/dashboard/atlas/playground`}
-          className="p-4 border rounded hover:bg-gray-50"
-        >
-          Atlas Playground（検証）
-        </Link>
+            {/* 🟡 未決定バッジ（将来 API 連携で動的化） */}
+            <span className="text-xs px-2 py-1 rounded bg-yellow-500 text-white">
+              要対応
+            </span>
+          </div>
+
+          <p className="text-sm text-gray-600">
+            AI解析結果の確認・判断・再解析を行います。
+          </p>
+
+          <div className="flex flex-wrap gap-3 text-sm">
+            {/* 一覧 */}
+            <Link
+              href={`/shops/${shop_code}/dashboard/atlas/requests`}
+              className="text-blue-600 underline"
+            >
+              ▶ レビュー一覧
+            </Link>
+
+            {/* 履歴（Ledger） */}
+            <Link
+              href={`/shops/${shop_code}/dashboard/atlas/history`}
+              className="text-gray-700 underline"
+            >
+              📜 判断履歴
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

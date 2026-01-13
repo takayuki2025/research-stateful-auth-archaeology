@@ -14,6 +14,8 @@ use App\Modules\Order\Infrastructure\EventListener\OnOrderPaidRecordOrderHistory
 use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaid;
 use App\Modules\Shop\Infrastructure\Listener\EnsureShopAddressOnOrderPaid;
 use App\Listeners\SetFirstLoginAtOnVerified;
+use App\Modules\Item\Domain\Event\Atlas\AtlasManualOverrideOccurred;
+use App\Listeners\NotifyAdminOnManualOverride;
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -55,6 +57,10 @@ final class EventServiceProvider extends ServiceProvider
         // 新規登録後プロフィールテーブルの名前だけ登録
         Registered::class => [
         \App\Listeners\CreateInitialProfile::class,
+
+        AtlasManualOverrideOccurred::class => [
+        \App\Listeners\NotifyAdminOnManualOverride::class,
+    ],
     ],
     ];
 
