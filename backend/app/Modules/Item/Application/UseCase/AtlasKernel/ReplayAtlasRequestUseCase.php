@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use Illuminate\Support\Facades\DB;
@@ -12,30 +14,28 @@ final class ReplayAtlasRequestUseCase
         private AnalysisRequestRepository $requests,
     ) {}
 
-    public function handle(int $analysisRequestId, string $version, ?string $reason): int
-    {
-        return DB::transaction(function () use ($analysisRequestId, $version, $reason) {
+    public function handle(
+        int $oldRequestId,
+        string $analysisVersion,
+        ?string $reason,
+    ): int {
+        return DB::transaction(function () use ($oldRequestId, $analysisVersion, $reason) {
 
-            $old = $this->requests->findOrFail($analysisRequestId);
+            $old = $this->requests->findOrFail($oldRequestId);
 
-            // ✅ v3固定：新規 request を作る
-            $newId = $this->requests->create([
+            $newRequestId = $this->requests->create([
+                'tenant_id'        => $old->tenantId(),
                 'item_id'          => $old->itemId(),
-                'status'           => 'pending',
-                'analysis_version' => $version,
-                'reason'           => $reason,
+                // 'item_draft_id'    => $old->itemDraftId(),
+                'raw_text'         => $old->rawText(),
+                'analysis_version' => $analysisVersion,
             ]);
 
-            // ✅ 非同期で再解析（request_id を Job に渡す）
             AnalyzeItemForReviewJob::dispatch(
-                itemId: $old->itemId(),
-                rawText: $old->rawText(),
-                tenantId: $old->tenantId(),
-                source: 'replay',
-                analysisRequestId: $newId,
+                analysisRequestId: $newRequestId
             );
 
-            return $newId;
+            return $newRequestId;
         });
     }
 }

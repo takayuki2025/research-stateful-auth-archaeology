@@ -11,6 +11,8 @@ return new class extends Migration
         Schema::create('analysis_requests', function (Blueprint $table) {
             $table->bigIncrements('id');
 
+            $table->uuid('item_draft_id')->nullable();
+
             /* =========================
              * Identity / Scope
              * ========================= */
@@ -35,16 +37,25 @@ return new class extends Migration
             $table->string('trigger_reason', 255)->nullable();
 
             /* =========================
-             * Analysis specification
-             * ========================= */
-            $table->string('analysis_version', 32)
-                ->comment('Actual analyzer version used');
-            $table->string('requested_version', 32)->nullable()
-                ->comment('Requested analyzer version (optional)');
-            $table->char('payload_hash', 64)
-                ->comment('Hash of input payload for idempotency');
-            $table->string('idempotency_key', 255)
-                ->comment('External idempotency key');
+ * Analysis specification
+ * ========================= */
+$table->string('analysis_version', 32)
+    ->comment('Actual analyzer version used');
+
+$table->string('requested_version', 32)->nullable()
+    ->comment('Requested analyzer version (optional)');
+
+/**
+ * 🔑 v3 必須：解析入力の Source of Truth
+ */
+$table->text('raw_text')
+    ->comment('Normalized raw input text used for analysis');
+
+$table->char('payload_hash', 64)
+    ->comment('Hash of input payload for idempotency');
+
+$table->string('idempotency_key', 255)
+    ->comment('External idempotency key');
 
             /* =========================
              * Execution state

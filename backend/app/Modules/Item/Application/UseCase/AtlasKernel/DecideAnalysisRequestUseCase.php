@@ -54,16 +54,16 @@ final class DecideAnalysisRequestUseCase
             if ($input->decision === 'approved') {
                 // approved → decided
                 // decided_by / decided_user_id を残す（あなたの既存仕様に合わせる）
-                $this->results->markDecided(
-                    itemId: (int)$request->itemId,   // ↓ ここは AnalysisRequest Entity の API に合わせる
-                    decidedBy: $input->decidedBy,
-                    decidedUserId: $input->decidedUserId
-                );
+                $this->results->markDecidedByRequest(
+    analysisRequestId: $request->id(),
+    decidedBy: $input->decidedBy,
+    decidedUserId: $input->decidedUserId
+);
             } else {
                 // rejected
-                $this->results->markRejected(
-                    itemId: (int)$request->itemId
-                );
+                $this->results->markRejectedByRequest(
+    analysisRequestId: $request->id()
+);
             }
         });
     }

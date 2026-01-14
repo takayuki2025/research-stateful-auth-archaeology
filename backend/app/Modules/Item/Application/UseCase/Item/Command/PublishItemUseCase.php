@@ -128,12 +128,13 @@ if (
 
     // 🔥 transaction 完了後に dispatch（最重要）
     Event::dispatch(
-        new ItemImported(
-            itemId: $itemId,
-            rawText: $rawText,
-            tenantId: $tenantId,
-            source: 'publish',
-        )
-    );
+    new ItemImported(
+        $itemId,
+        $rawText,
+        $tenantId,
+        'publish',
+        $input->draftId,
+    )
+);
 }
 }

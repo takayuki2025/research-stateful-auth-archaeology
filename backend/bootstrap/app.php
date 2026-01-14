@@ -7,7 +7,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-
+use Throwable;
 return Application::configure(basePath: dirname(__DIR__))
 
     /*
@@ -133,12 +133,22 @@ return Application::configure(basePath: dirname(__DIR__))
     */
     ->withExceptions(function (Exceptions $exceptions) {
 
-    $exceptions->render(function (\Throwable $e, Request $request) {
+    $exceptions->reportable(function (Throwable $e) {
+        logger()->error('FATAL_EXCEPTION', [
+            'exception' => get_class($e),
+            'message'   => $e->getMessage(),
+            'file'      => $e->getFile(),
+            'line'      => $e->getLine(),
+            'trace'     => $e->getTraceAsString(),
+        ]);
+    });
+
+    // ✅ 次に API 用 JSON レンダリング
+    $exceptions->render(function (Throwable $e, Request $request) {
 
         $isApi = $request->is('api/*');
         $wantsJson = $request->expectsJson() || $isApi;
 
-        // ✅ web リクエストは Laravel 標準に完全委譲
         if (!$wantsJson) {
             throw $e;
         }
@@ -150,7 +160,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 401);
         }
 
-        if ($e instanceof \DomainException) {
+        if ($e instanceof DomainException) {
             return response()->json([
                 'error_type' => 'DomainException',
                 'message' => $e->getMessage(),

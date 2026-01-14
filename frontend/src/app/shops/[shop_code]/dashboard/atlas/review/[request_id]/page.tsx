@@ -18,12 +18,13 @@ type AttributeDecision = {
 };
 
 type ReviewPayload = {
-  analysis_request_id: number;
+  request_id: number;
 
   before: Record<AttributeKey, string | null>;
   after: Record<AttributeKey, string | null>;
   diff: Record<AttributeKey, { before: string | null; after: string | null }>;
 
+  confidence_map?: Record<AttributeKey, number | null>;
   attributes?: Record<AttributeKey, AttributeDecision>;
   overall_confidence?: number | null;
   status?: "pending" | "running" | "done" | "failed";

@@ -6,7 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-final class AnalysisResult extends Model
+final class AnalysisResultRecord extends Model
 {
     protected $table = 'analysis_results';
 

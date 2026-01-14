@@ -10,7 +10,6 @@ final class AnalysisResult
 {
     public function __construct(
         public readonly int $requestId,
-        public readonly int $itemId,
 
         public readonly ?string $brandName,
         public readonly ?string $conditionName,
@@ -24,12 +23,13 @@ final class AnalysisResult
         public readonly DateTimeImmutable $createdAt,
     ) {}
 
+
     /**
      * Repository 再構築専用（v3固定）
      */
     public static function reconstruct(
         int $requestId,
-        int $itemId,
+        // int $itemId,
         ?string $brandName,
         ?string $conditionName,
         ?string $colorName,
@@ -41,7 +41,7 @@ final class AnalysisResult
     ): self {
         return new self(
             requestId: $requestId,
-            itemId: $itemId,
+            // itemId: $itemId,
             brandName: $brandName,
             conditionName: $conditionName,
             colorName: $colorName,

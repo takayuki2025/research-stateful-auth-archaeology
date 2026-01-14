@@ -1,57 +1,34 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Item\Domain\Repository;
 
 use App\Modules\Item\Domain\ValueObject\AnalysisRequestRecord;
-use App\Modules\Item\Domain\Entity\AnalysisRequest;
-use Carbon\CarbonImmutable;
 
 interface AnalysisRequestRepository
 {
     /**
-     * Reserve request by idempotency_key (insert if not exists, never update existing).
-     * Returns the current record (new or existing).
+     * 新規解析リクエスト作成（初回・Replay 共通）
      */
-    public function reserveOrGet(
-        ?int $tenantId,
-        int $itemId,
-        string $analysisVersion,
-        string $payloadHash,
-        string $idempotencyKey
-    ): AnalysisRequestRecord;
+    public function create(array $attributes): int;
 
     /**
-     * Compare-and-swap transition to running.
-     * Returns true if acquired; false if someone else already running/done.
+     * requestId 主語で取得（存在しなければ例外）
      */
-    public function markRunning(int $requestId): bool;
+    public function findOrFail(int $requestId): AnalysisRequestRecord;
 
+    /**
+     * 解析完了マーク
+     */
     public function markDone(int $requestId): void;
 
-    public function markFailed(int $requestId, string $errorCode, string $errorMessage): void;
-
-    public function appendEvent(int $requestId, string $eventType, array $payload = []): void;
-
-    public function listByShopCode(string $shopCode): array;
-
-    public function findOrFail(int $id): AnalysisRequest;
-
-    public function getById(int $id): AnalysisRequest;
-
-    public function getStatus(int $analysisRequestId): string;
-
     /**
-     * Replay 回数カウント
-     *
-     * @param int $originalRequestId 元の AnalysisRequest ID
-     * @param CarbonImmutable $from 開始日時
-     * @param CarbonImmutable $to 終了日時
+     * 解析失敗マーク（将来拡張用）
      */
-    public function countReplaysInPeriod(
-        int $originalRequestId,
-        CarbonImmutable $from,
-        CarbonImmutable $to,
-    ): int;
-
-    public function save(AnalysisRequest $request): int;
+    public function markFailed(
+        int $requestId,
+        ?string $errorCode = null,
+        ?string $errorMessage = null,
+    ): void;
 }

@@ -9,5 +9,6 @@ final class ItemImported
         public readonly string $rawText,
         public readonly ?int $tenantId,
         public readonly string $source, // publish | legacy | replay
+        public readonly ?string $itemDraftId = null,
     ) {}
 }

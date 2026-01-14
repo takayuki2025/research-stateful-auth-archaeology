@@ -6,18 +6,15 @@ use App\Modules\Item\Application\Port\ItemAnalysisPort;
 use App\Jobs\AnalyzeItemEntityWithAtlasKernel;
 use App\Jobs\AnalyzeItemExplainTerms;
 
-class QueueItemAnalysisAdapter implements ItemAnalysisPort
+final class QueueItemAnalysisAdapter implements ItemAnalysisPort
 {
     public function dispatchBrandNormalization(
         int $itemId,
         string $rawBrand,
         ?string $knownAssetsRef = 'brands_v1'
     ): void {
-        AnalyzeItemEntityWithAtlasKernel::dispatch(
-            itemId: $itemId,
-            entityType: 'brand',
-            rawValue: $rawBrand,
-            knownAssetsRef: $knownAssetsRef
+        throw new \LogicException(
+            'QueueItemAnalysisAdapter is deprecated. Use AtlasKernel v3 pipeline.'
         );
     }
 
@@ -26,10 +23,8 @@ class QueueItemAnalysisAdapter implements ItemAnalysisPort
         string $explain,
         ?string $knownAssetsRef = null
     ): void {
-        AnalyzeItemExplainTerms::dispatch(
-            itemId: $itemId,
-            explain: $explain,
-            knownAssetsRef: $knownAssetsRef
+        throw new \LogicException(
+            'QueueItemAnalysisAdapter is deprecated. Use AtlasKernel v3 pipeline.'
         );
     }
 }

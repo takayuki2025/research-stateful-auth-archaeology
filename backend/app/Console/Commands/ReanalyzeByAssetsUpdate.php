@@ -14,29 +14,9 @@ class ReanalyzeByAssetsUpdate extends Command
 
     protected $description = 'Reanalyze latest entities after assets (dictionary) update';
 
-    public function handle(): int
-    {
-        $entityType = $this->argument('entityType');
-        $assetsRef  = $this->argument('assetsRef');
-
-        $count = 0;
-
-        ItemEntity::query()
-            ->where('is_latest', true)
-            ->where('entity_type', $entityType)
-            ->each(function (ItemEntity $entity) use ($assetsRef, &$count) {
-                AnalyzeItemEntityWithAtlasKernel::dispatch(
-                    itemId: $entity->item_id,
-                    entityType: $entity->entity_type,
-                    rawValue: $entity->raw_value,
-                    knownAssetsRef: $assetsRef,
-                    reason: 'assets_updated'
-                );
-                $count++;
-            });
-
-        $this->info("Dispatched reanalysis jobs: {$count}");
-
-        return self::SUCCESS;
-    }
+    public function handle()
+{
+    $this->error('AnalyzeItemEntityWithAtlasKernel is deprecated.');
+    return Command::SUCCESS;
+}
 }

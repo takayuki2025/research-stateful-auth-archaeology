@@ -16,11 +16,11 @@ final class AtlasReviewController extends Controller
 
     public function show(string $shop_code, int $request_id): JsonResponse
     {
-        $result = $this->useCase->handle(
+        $dto = $this->useCase->handle(
             shopCode: $shop_code,
             analysisRequestId: $request_id,
         );
 
-        return response()->json($result);
+        return response()->json($dto->toArray());
     }
 }

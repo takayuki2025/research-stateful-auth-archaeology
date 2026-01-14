@@ -108,7 +108,7 @@ final class EloquentAnalysisResultRepository implements AnalysisResultRepository
 
         return AnalysisResult::reconstruct(
     requestId: (int) $row->analysis_request_id,
-    itemId: (int) $row->item_id,
+    // itemId: (int) $row->item_id,
     brandName: $row->brand_name,
     conditionName: $row->condition_name,
     colorName: $row->color_name,

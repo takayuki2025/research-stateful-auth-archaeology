@@ -3,36 +3,37 @@
 namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
-use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
-use App\Modules\Item\Domain\Service\AtlasKernelService;
+use App\Modules\Item\Application\Job\AnalyzeItemForReviewJob;
+use Illuminate\Support\Facades\DB;
 
 final class ReplayAnalysisUseCase
 {
     public function __construct(
         private AnalysisRequestRepository $requests,
-        private AnalysisResultRepository $results,
-        private AtlasKernelService $atlas,
     ) {}
 
     public function handle(
         int $analysisRequestId,
         string $reason,
-    ): void {
-        $request = $this->requests->findOrFail($analysisRequestId);
+    ): int {
+        return DB::transaction(function () use ($analysisRequestId, $reason) {
 
-        $this->results->supersedeByRequestId($analysisRequestId);
+            $old = $this->requests->findOrFail($analysisRequestId);
 
-        $payload = $this->atlas->analyze(
-            itemId: $request->itemId,
-            rawText: $request->rawText,
-        );
+            // v3 固定：request を複製
+            $newRequestId = $this->requests->create([
+                'item_id'          => $old->itemId(),
+                'raw_text'         => $old->rawText(),
+                'analysis_version' => $old->analysisVersion(),
+                'status'           => 'pending',
+                'replay_of'        => $old->id(),
+                'replay_reason'    => $reason,
+            ]);
 
-        $this->results->save(
-            itemId: $request->itemId,
-            payload: array_merge(
-                $payload,
-                ['request_id' => $analysisRequestId]
-            )
-        );
+            // v3 固定：Job 再投入
+            AnalyzeItemForReviewJob::dispatch($newRequestId);
+
+            return $newRequestId;
+        });
     }
 }

@@ -12,6 +12,7 @@ return new class () extends Migration {
 
             $table->unsignedBigInteger('analysis_request_id');
             $table->unsignedBigInteger('item_id');
+            $table->uuid('item_draft_id')->nullable(); 
 
             // =========================
             // AFTER 候補（AI / 人）

@@ -4,41 +4,31 @@ namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
-use App\Modules\Item\Domain\Service\AtlasKernelService;
-use App\Modules\Item\Application\UseCase\AtlasKernel\SaveAnalysisResultUseCase;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
+use App\Modules\Item\Application\Job\AnalyzeItemForReviewJob;
 
 final class ItemAnalysisController extends Controller
 {
     public function reanalyze(
         int $itemId,
-        AtlasKernelService $atlas,
-        SaveAnalysisResultUseCase $save,
         AnalysisRequestRepository $requests
     ) {
         $item = Item::findOrFail($itemId);
 
-        // 新規 request を作る（v3固定）
+        // v3 固定：AnalysisRequest を作るだけ
         $requestId = $requests->create([
             'item_id'          => $itemId,
-            'status'           => 'pending',
+            'item_draft_id'    => (string) $item->draft_id,
+            'raw_text'         => "{$item->name} {$item->explain}",
             'analysis_version' => 'v3_ai',
+            'status'           => 'pending',
         ]);
 
-        $result = $atlas->requestAnalysis(
-            $itemId,
-            "{$item->name} {$item->explain}",
-            $requestId
-        );
-
-        $save->handle(
-            analysisRequestId: $requestId,
-            itemId: $itemId,
-            analysisPayload: $result->toArray()
-        );
+        // v3 固定：Job に投げる
+        AnalyzeItemForReviewJob::dispatch($requestId);
 
         return response()->json([
-            'status' => 'reanalyzed',
+            'status'     => 'queued',
             'request_id' => $requestId,
         ]);
     }

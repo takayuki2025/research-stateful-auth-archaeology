@@ -8,6 +8,7 @@ use App\Modules\Item\Application\Dto\AtlasKernel\AtlasReviewDto;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
+use App\Modules\Item\Domain\Repository\ItemDraftRepository;
 
 final class GetAtlasReviewUseCase
 {
@@ -15,80 +16,108 @@ final class GetAtlasReviewUseCase
         private AnalysisRequestRepository $requests,
         private AnalysisResultRepository $results,
         private ReviewDecisionRepository $decisions,
+        private ItemDraftRepository $drafts, // ✅ v3固定：BEFORE(SoT)取得
     ) {}
 
-    public function handle(
-        string $shopCode,
-        int $analysisRequestId,
-    ): AtlasReviewDto {
-        // ① Request（Bフェーズ主語）
+    public function handle(string $shopCode, int $analysisRequestId): AtlasReviewDto
+    {
+        // ① request
         $request = $this->requests->findOrFail($analysisRequestId);
 
-        // ② 最新 analysis_result（技術スナップショット）
+        // ② AFTER: analysis_results（AI提案）
         $result = $this->results->findByRequestId($analysisRequestId);
         if (! $result) {
             throw new \RuntimeException('analysis_result not found');
         }
 
-        // ③ 最新 decision（あれば）
+        // ③ decision（存在しても BEFORE の主語にはしない）
         $decision = $this->decisions->findLatestByRequestId($analysisRequestId);
 
-        // AFTER（AI提案）
-        $after = [
-    'brand'     => $result->brandName,
-    'condition' => $result->conditionName,
-    'color'     => $result->colorName,
+
+
+        // ✅ v3固定（安全版）：BEFORE は item_drafts が「あれば使う」
+$draftId = $request->itemDraftId();
+
+$before = [
+    'brand'     => null,
+    'condition' => null,
+    'color'     => null,
 ];
 
-        // BEFORE（SoT or decision）
-        $before = $decision && $decision->before_snapshot
-            ? $decision->before_snapshot
-            : $after;
+if ($draftId !== null) {
+    $draft = $this->drafts->findById($draftId);
 
-        // edit_confirm の after_snapshot で上書き
-        if ($decision && $decision->after_snapshot) {
-            $after = array_merge($after, $decision->after_snapshot);
+    if ($draft) {
+        $before = [
+            'brand'     => $draft->brandRaw(),
+            'condition' => $draft->conditionRaw(),
+            'color'     => $draft->colorRaw(),
+        ];
+    }
+}
+
+        // ✅ v3固定：AFTER は analysis_result そのもの（AI提案）
+        $after = [
+            'brand'     => $result->brandName,
+            'condition' => $result->conditionName,
+            'color'     => $result->colorName,
+        ];
+
+        // ✅ v3固定：edit_confirm の “after_snapshot” がある場合のみ AFTER を上書き（人間の編集確定）
+        if ($decision && is_array($decision->after_snapshot) && ! empty($decision->after_snapshot)) {
+            foreach (['brand', 'condition', 'color'] as $k) {
+                if (array_key_exists($k, $decision->after_snapshot)) {
+                    $after[$k] = $decision->after_snapshot[$k];
+                }
+            }
         }
 
-        // diff 自動生成（v3固定）
+        // ✅ v3固定：diff 自動生成（brand/condition/color のみ）
         $diff = [];
-        foreach ($after as $key => $afterValue) {
-            $beforeValue = $before[$key] ?? null;
-            if ($beforeValue !== $afterValue) {
+        foreach (['brand', 'condition', 'color'] as $key) {
+            $b = $before[$key] ?? null;
+            $a = $after[$key] ?? null;
+
+            // 厳密比較は UI 事故を生みやすいので string 正規化して比較
+            $bs = $b === null ? '' : (string) $b;
+            $as = $a === null ? '' : (string) $a;
+
+            if ($bs !== $as) {
                 $diff[$key] = [
-                    'before' => $beforeValue,
-                    'after'  => $afterValue,
+                    'before' => $b,
+                    'after'  => $a,
                 ];
             }
         }
 
-        // confidence / attributes
-        // ✅ result->confidence_map が「配列」の可能性もあるので吸収
+        // ✅ confidence_map（AFTER側のみ参照）
         $confidenceMap = $result->confidenceMap ?? [];
         if (is_string($confidenceMap)) {
             $confidenceMap = json_decode($confidenceMap, true) ?: [];
         }
-        if (!is_array($confidenceMap)) {
+        if (! is_array($confidenceMap)) {
             $confidenceMap = [];
         }
 
+        // attributes（UI表示用：AFTER + confidence）
         $attributes = [];
-foreach ($after as $key => $value) {
-    $attributes[$key] = [
-        'value'      => $value,
-        'confidence' => $confidenceMap[$key] ?? null,
-        'evidence'   => null,
-    ];
-}
+        foreach (['brand', 'condition', 'color'] as $key) {
+            $attributes[$key] = [
+                'value'      => $after[$key] ?? null,
+                'confidence' => $confidenceMap[$key] ?? null,
+                'evidence'   => null,
+            ];
+        }
 
         return new AtlasReviewDto(
-    requestId: $request->id,
-    status: $request->status,
-    overallConfidence: $result->overallConfidence,
-    before: $before,
-    after: $after,
-    diff: $diff,
-    attributes: $attributes,
-);
+            requestId: $request->id(),
+            status: $request->status(),
+            overallConfidence: $result->overallConfidence,
+            before: $before,
+            after: $after,
+            diff: $diff,
+            confidenceMap: $confidenceMap,
+            attributes: $attributes,
+        );
     }
 }

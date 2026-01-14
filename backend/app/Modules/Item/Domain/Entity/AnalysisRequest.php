@@ -13,6 +13,10 @@ final class AnalysisRequest
         public readonly int $id,
         public readonly ?int $tenantId,
         public readonly int $itemId,
+
+        // ✅ v3：nullable で正式復活
+        public readonly ?string $itemDraftId,
+
         public readonly string $analysisVersion,
         public readonly ?string $requestedVersion,
         public readonly string $payloadHash,
@@ -31,28 +35,32 @@ final class AnalysisRequest
     ) {}
 
     public static function fromEloquent(EloquentAnalysisRequest $row): self
-    {
-        return new self(
-            id: (int)$row->id,
-            tenantId: $row->tenant_id !== null ? (int)$row->tenant_id : null,
-            itemId: (int)$row->item_id,
-            analysisVersion: (string)$row->analysis_version,
-            requestedVersion: $row->requested_version !== null ? (string)$row->requested_version : null,
-            payloadHash: (string)$row->payload_hash,
-            idempotencyKey: (string)$row->idempotency_key,
-            status: (string)$row->status,
-            retryCount: (int)$row->retry_count,
-            originalRequestId: $row->original_request_id !== null ? (int)$row->original_request_id : null,
-            replayIndex: $row->replay_index !== null ? (int)$row->replay_index : null,
-            triggeredByType: (string)$row->triggered_by_type,
-            triggeredBy: $row->triggered_by !== null ? (int)$row->triggered_by : null,
-            triggerReason: $row->trigger_reason !== null ? (string)$row->trigger_reason : null,
-            startedAt: $row->started_at?->toDateTimeImmutable(),
-            finishedAt: $row->finished_at?->toDateTimeImmutable(),
-            createdAt: $row->created_at->toDateTimeImmutable(),
-            updatedAt: $row->updated_at->toDateTimeImmutable(),
-        );
-    }
+{
+    return new self(
+        id: (int)$row->id,
+        tenantId: $row->tenant_id !== null ? (int)$row->tenant_id : null,
+        itemId: (int)$row->item_id,
+
+        // ✅ nullable
+        itemDraftId: $row->item_draft_id !== null ? (string)$row->item_draft_id : null,
+
+        analysisVersion: (string)$row->analysis_version,
+        requestedVersion: $row->requested_version !== null ? (string)$row->requested_version : null,
+        payloadHash: (string)$row->payload_hash,
+        idempotencyKey: (string)$row->idempotency_key,
+        status: (string)$row->status,
+        retryCount: (int)$row->retry_count,
+        originalRequestId: $row->original_request_id !== null ? (int)$row->original_request_id : null,
+        replayIndex: $row->replay_index !== null ? (int)$row->replay_index : null,
+        triggeredByType: (string)$row->triggered_by_type,
+        triggeredBy: $row->triggered_by !== null ? (int)$row->triggered_by : null,
+        triggerReason: $row->trigger_reason !== null ? (string)$row->trigger_reason : null,
+        startedAt: $row->started_at?->toDateTimeImmutable(),
+        finishedAt: $row->finished_at?->toDateTimeImmutable(),
+        createdAt: $row->created_at->toDateTimeImmutable(),
+        updatedAt: $row->updated_at->toDateTimeImmutable(),
+    );
+}
 
     /**
      * Replay 用の新規Entity（idはDB採番前なので0）
@@ -91,4 +99,9 @@ final class AnalysisRequest
             updatedAt: $now,
         );
     }
+
+    public function itemDraftId(): ?string
+{
+    return $this->itemDraftId;
+}
 }

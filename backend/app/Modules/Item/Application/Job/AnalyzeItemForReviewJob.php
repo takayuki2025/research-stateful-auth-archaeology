@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Item\Application\Job;
 
 use Illuminate\Bus\Queueable;
@@ -9,8 +11,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 use App\Modules\Item\Domain\Service\AtlasKernelService;
-use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
+use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Application\UseCase\AtlasKernel\ApplyProvisionalAnalysisUseCase;
 use App\Models\Item;
 
@@ -18,72 +20,109 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * v3 固定：
+     * Job は requestId だけを主語にする
+     */
     public function __construct(
-        private int $itemId,
-        private string $rawText,
-        private ?int $tenantId,
-        private string $source,
+        private int $analysisRequestId,
+        private string $source = 'initial', // initial | replay | system
     ) {}
 
     public function handle(
         AtlasKernelService $atlasKernel,
         AnalysisRequestRepository $requestRepo,
-        AnalysisResultRepository $analysisRepo,
-        ApplyProvisionalAnalysisUseCase $applyUseCase
+        AnalysisResultRepository $resultRepo,
+        ApplyProvisionalAnalysisUseCase $applyUseCase,
     ): void {
 
-        $record = $requestRepo->reserveOrGet(
-            tenantId: $this->tenantId,
-            itemId: $this->itemId,
-            analysisVersion: 'v3',
-            payloadHash: sha1($this->rawText),
-            idempotencyKey: sha1($this->itemId . ':' . $this->rawText)
-        );
+        /**
+         * ① Request を SoT として取得
+         */
+        $request = $requestRepo->findOrFail($this->analysisRequestId);
 
+        /**
+         * ② 冪等ガード（すでに done なら何もしない）
+         */
+        if ($request->isDone()) {
+            return;
+        }
+
+        /**
+         * ③ 入力データは request からのみ取得
+         */
+        $itemId   = $request->itemId();
+        $tenantId = $request->tenantId();
+        $rawText  = $request->rawText();   // item_draft / SoT snapshot
+
+        /**
+         * ④ AtlasKernel へ解析依頼
+         * ※ v3 方針：Domain Service では named argument を使わない
+         */
         $analysisResult = $atlasKernel->requestAnalysis(
-            itemId: $this->itemId,
-            rawText: $this->rawText,
-            tenantId: $this->tenantId,
+            $itemId,
+            $rawText,
+            $tenantId,
         );
 
+        /**
+         * ⑤ 表示用（暫定）構造へ変換
+         */
         $analysis = $analysisResult->toProvisionalDisplay();
 
-        // ★ UX 優先 fallback 用
-        $item = Item::find($this->itemId);
+        /**
+         * ⑥ UX fallback 用の Item 参照（安全）
+         */
+        $item = Item::find($itemId);
 
+        /**
+         * ⑦ analysis_results 保存 payload（requestId 主語）
+         */
         $persistPayload = [
-            // ここは「payloadの一部」でも良いが、保存主語は requestId に固定する
-            'analysis_request_id' => $record->id,
+            'analysis_request_id' => $request->id(),
 
-            'item_id' => $this->itemId, // DBカラムがあるなら保持（参照用途）
-            'brand_name' => data_get($analysis, 'brand.name') ?? $item?->brand,
+            // 参照用途（SoT ではない）
+            'item_id' => $itemId,
+
+
+            'brand_name' => data_get($analysis, 'brand.name')
+                ?? $item?->brand,
+
             'condition_name' => data_get($analysis, 'condition.name'),
             'color_name'     => data_get($analysis, 'color.name'),
 
-            // ★ confidence_map は GetAtlasReviewUseCase が key=brand/color/condition を期待
             'confidence_map' => $analysis['confidence_map'] ?? [
-                'brand' => 0.0,
-                'color' => 0.0,
+                'brand'     => 0.0,
                 'condition' => 0.0,
+                'color'     => 0.0,
             ],
+
             'overall_confidence' => $analysis['overall_confidence'] ?? 0.0,
 
             'source' => 'ai_provisional',
             'status' => 'active',
         ];
 
-        // ✅ requestId 主語で保存（itemIdを引数として渡さない）
-        $analysisRepo->saveByRequestId(
-            requestId: $record->id,
-            payload: $persistPayload
+        /**
+         * ⑧ 保存（requestId 主語）
+         */
+        $resultRepo->saveByRequestId(
+            $request->id(),
+            $persistPayload,
         );
 
-        $requestRepo->markDone($record->id);
+        /**
+         * ⑨ request を done にする
+         */
+        $requestRepo->markDone($request->id());
 
-        // NOTE: Aフェーズなら apply はしない選択もあるが、今は既存通り維持
+        /**
+         * ⑩ Aフェーズ：即時反映（将来は PolicyEngine に委譲）
+         * ※ ApplyUseCase も requestId 主語
+         */
         $applyUseCase->handle(
-            $this->itemId,
-            $analysis
+            $request->id(),
+            $analysis,
         );
     }
 }

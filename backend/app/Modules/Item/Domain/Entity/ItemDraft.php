@@ -2,6 +2,8 @@
 
 namespace App\Modules\Item\Domain\Entity;
 
+use DateTimeImmutable;
+
 use App\Modules\Item\Domain\ValueObject\{
     ItemDraftId,
     SellerId,
@@ -188,4 +190,27 @@ final class ItemDraft
     {
         $this->status = ItemStatus::PUBLISHED;
     }
+
+    /**
+ * v3 固定：
+ * Draft に入力された「人間の生値」を返す
+ */
+public function brandRaw(): ?string
+{
+    return $this->brandRaw?->value();
+}
+
+public function conditionRaw(): ?string
+{
+    return $this->condition !== '' ? $this->condition : null;
+}
+
+/**
+ * color は Draft に存在しない可能性があるため
+ * v3 では null 固定で安全に返す
+ */
+public function colorRaw(): ?string
+{
+    return null;
+}
 }
