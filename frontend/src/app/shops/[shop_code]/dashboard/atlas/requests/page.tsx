@@ -15,8 +15,6 @@ type AnalysisRequestRow = {
   status: string;
   analysis_version: string;
   created_at: string;
-
-  // ★ Cフェーズ（判断済み）
   decision?: "approve" | "reject" | "system_approve" | null;
   decided_at?: string | null;
 };
@@ -31,12 +29,10 @@ type ApiResponse = {
 
 const fetcher = async (url: string): Promise<ApiResponse> => {
   const res = await fetch(url, { credentials: "include" });
-
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.message ?? "Fetch failed");
   }
-
   return res.json();
 };
 
@@ -47,10 +43,6 @@ const fetcher = async (url: string): Promise<ApiResponse> => {
 export default function AtlasRequestsPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
   const { authReady, isAuthenticated, user } = useAuth();
-
-  /* =========================
-     Authorization
-  ========================= */
 
   const isReviewer =
     user?.shop_roles?.some(
@@ -82,16 +74,7 @@ export default function AtlasRequestsPage() {
     return <div className="p-6 text-red-600">取得失敗：{error.message}</div>;
   }
 
-  const requests = Array.isArray(data?.requests) ? data.requests : [];
-
-  if (requests.length === 0) {
-    return (
-      <div className="p-6 space-y-4">
-        <h1 className="text-2xl font-semibold">Atlas 分析リクエスト</h1>
-        <p className="text-gray-600">現在、分析リクエストはありません。</p>
-      </div>
-    );
-  }
+  const requests = data?.requests ?? [];
 
   /* =========================
      Render
@@ -119,26 +102,15 @@ export default function AtlasRequestsPage() {
               <td className="border p-2">{r.item_id}</td>
               <td className="border p-2 font-mono">{r.status}</td>
               <td className="border p-2">{r.analysis_version}</td>
-
-              {/* =========================
-                  Result column
-                  B / C フェーズ完全分離
-              ========================= */}
               <td className="border p-2">
-                {/* Cフェーズ：判断済み → 履歴へ */}
                 {r.decision ? (
                   <Link
                     href={`/shops/${shop_code}/dashboard/atlas/history/${r.id}`}
-                    className={
-                      r.decision === "approve"
-                        ? "text-green-600 font-semibold underline"
-                        : "text-red-600 font-semibold underline"
-                    }
+                    className="underline font-semibold"
                   >
                     {r.decision === "approve" ? "Approved" : "Rejected"}
                   </Link>
-                ) : /* Bフェーズ：未判断 & done → Review */ r.status ===
-                  "done" ? (
+                ) : r.status === "done" ? (
                   <Link
                     href={`/shops/${shop_code}/dashboard/atlas/review/${r.id}`}
                     className="text-blue-600 underline"

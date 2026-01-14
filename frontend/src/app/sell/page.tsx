@@ -84,13 +84,18 @@ export default function ItemSellPage() {
   useEffect(() => {
     if (!user) return;
 
-    if (itemOrigin === "SHOP_MANAGED") {
-      const firstRole = user.shop_roles?.[0];
-      setSelectedShopId(firstRole?.shop_id ?? null);
-    } else {
-      setSelectedShopId(null);
+    // 個人用ショップ（必須）
+    const personalShop = user.shop_roles?.find(
+      (r) => r.role === "owner" // or personal
+    );
+
+    if (!personalShop) {
+      setError("個人ショップが見つかりません");
+      return;
     }
-  }, [itemOrigin, user]);
+
+    setSelectedShopId(personalShop.shop_id);
+  }, [user]);
 
   // Auth 初期化待ち
   if (!authReady || !user) return null;

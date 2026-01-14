@@ -33,42 +33,24 @@ final class GetAtlasReviewUseCase
         // ③ 最新 decision（あれば）
         $decision = $this->decisions->findLatestByRequestId($analysisRequestId);
 
-        /*
-         * =========================
-         * AFTER（AI提案）
-         * =========================
-         */
+        // AFTER（AI提案）
         $after = [
-            'brand'     => $result->brand_name,
-            'condition' => $result->condition_name,
-            'color'     => $result->color_name,
-        ];
+    'brand'     => $result->brandName,
+    'condition' => $result->conditionName,
+    'color'     => $result->colorName,
+];
 
-        /*
-         * =========================
-         * BEFORE（SoT or decision）
-         * =========================
-         * - decision があれば before_snapshot
-         * - なければ after をそのまま before にする
-         */
+        // BEFORE（SoT or decision）
         $before = $decision && $decision->before_snapshot
             ? $decision->before_snapshot
             : $after;
 
-        /*
-         * =========================
-         * decision による上書き（edit_confirm）
-         * =========================
-         */
+        // edit_confirm の after_snapshot で上書き
         if ($decision && $decision->after_snapshot) {
             $after = array_merge($after, $decision->after_snapshot);
         }
 
-        /*
-         * =========================
-         * diff 自動生成（v3固定）
-         * =========================
-         */
+        // diff 自動生成（v3固定）
         $diff = [];
         foreach ($after as $key => $afterValue) {
             $beforeValue = $before[$key] ?? null;
@@ -80,33 +62,33 @@ final class GetAtlasReviewUseCase
             }
         }
 
-        /*
-         * =========================
-         * confidence / attributes
-         * =========================
-         */
-        $confidenceMap = json_decode(
-            $result->confidence_map ?? '{}',
-            true
-        );
-
-        $attributes = [];
-        foreach ($after as $key => $value) {
-            $attributes[$key] = [
-                'value'      => $value,
-                'confidence' => $confidenceMap[$key] ?? null,
-                'evidence'   => null, // 将来AI説明用
-            ];
+        // confidence / attributes
+        // ✅ result->confidence_map が「配列」の可能性もあるので吸収
+        $confidenceMap = $result->confidenceMap ?? [];
+        if (is_string($confidenceMap)) {
+            $confidenceMap = json_decode($confidenceMap, true) ?: [];
+        }
+        if (!is_array($confidenceMap)) {
+            $confidenceMap = [];
         }
 
+        $attributes = [];
+foreach ($after as $key => $value) {
+    $attributes[$key] = [
+        'value'      => $value,
+        'confidence' => $confidenceMap[$key] ?? null,
+        'evidence'   => null,
+    ];
+}
+
         return new AtlasReviewDto(
-            requestId: $request->id,
-            status: $request->status,
-            overallConfidence: $result->overall_confidence,
-            before: $before,
-            after: $after,
-            diff: $diff,
-            attributes: $attributes,
-        );
+    requestId: $request->id,
+    status: $request->status,
+    overallConfidence: $result->overallConfidence,
+    before: $before,
+    after: $after,
+    diff: $diff,
+    attributes: $attributes,
+);
     }
 }

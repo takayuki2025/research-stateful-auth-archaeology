@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+
 use App\Modules\Item\Domain\Service\AtlasKernelService;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
@@ -51,27 +52,35 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         $item = Item::find($this->itemId);
 
         $persistPayload = [
+            // ここは「payloadの一部」でも良いが、保存主語は requestId に固定する
             'analysis_request_id' => $record->id,
 
-            'brand_name' => data_get($analysis, 'brand.name')
-                ?? $item?->brand,
-
+            'item_id' => $this->itemId, // DBカラムがあるなら保持（参照用途）
+            'brand_name' => data_get($analysis, 'brand.name') ?? $item?->brand,
             'condition_name' => data_get($analysis, 'condition.name'),
             'color_name'     => data_get($analysis, 'color.name'),
 
-            'confidence_map' => $analysis['confidence_map'] ?? ['brand' => 0.0],
+            // ★ confidence_map は GetAtlasReviewUseCase が key=brand/color/condition を期待
+            'confidence_map' => $analysis['confidence_map'] ?? [
+                'brand' => 0.0,
+                'color' => 0.0,
+                'condition' => 0.0,
+            ],
             'overall_confidence' => $analysis['overall_confidence'] ?? 0.0,
 
             'source' => 'ai_provisional',
+            'status' => 'active',
         ];
 
-        $analysisRepo->save(
-            itemId: $this->itemId,
+        // ✅ requestId 主語で保存（itemIdを引数として渡さない）
+        $analysisRepo->saveByRequestId(
+            requestId: $record->id,
             payload: $persistPayload
         );
 
         $requestRepo->markDone($record->id);
 
+        // NOTE: Aフェーズなら apply はしない選択もあるが、今は既存通り維持
         $applyUseCase->handle(
             $this->itemId,
             $analysis

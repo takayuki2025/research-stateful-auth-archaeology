@@ -383,8 +383,10 @@ Route::middleware(['auth:sanctum'])
         Route::get('requests', [AtlasRequestController::class, 'index']);
 
         // 2) Review（Before/After/Diff 取得）
-        Route::get('requests/{request_id}/review', [AtlasReviewController::class, 'show'])
-            ->whereNumber('request_id');
+        Route::get(
+    'requests/{request_id}/review',
+    [AtlasReviewController::class, 'show']
+)->whereNumber('request_id');
 
         // 3) Decide（approve/reject/edit_confirm/manual_override）
         Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
@@ -401,3 +403,4 @@ Route::middleware(['auth:sanctum'])
         Route::post('requests/{request_id}/replay', [AtlasReplayController::class, 'replay'])
             ->whereNumber('request_id');
     });
+

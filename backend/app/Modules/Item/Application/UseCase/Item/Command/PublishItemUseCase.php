@@ -38,6 +38,10 @@ final class PublishItemUseCase
     $itemId = null;
     $rawText = null;
 
+    if ($input->shopId === null) {
+    throw new DomainException('shop_id is required to publish item');
+}
+
     DB::transaction(function () use ($input, $principal, &$itemId, &$rawText) {
 
         $draft = $this->draftRepository->findById($input->draftId);
@@ -48,18 +52,25 @@ final class PublishItemUseCase
 
         $sellerId = $draft->sellerId();
 
-        if (! $this->sellerAuth->canOperate($sellerId, $principal)) {
-            throw new DomainException('Not allowed to publish this item');
-        }
+/**
+ * shop_id 解決（個人・ショップ共通）
+ */
+$shopId = match ($sellerId->type()) {
+    SellerType::SHOP => $sellerId->id() ?? $input->shopId,
+    SellerType::INDIVIDUAL => $input->shopId,
+};
 
-        if ($sellerId->type() === SellerType::SHOP) {
-            if ($sellerId->id() === null && $input->shopId === null) {
-                throw new DomainException('shop_id is required to publish');
-            }
-            if ($sellerId->id() !== null && $input->shopId !== null && $sellerId->id() !== $input->shopId) {
-                throw new DomainException('shop_id mismatch');
-            }
-        }
+if ($shopId === null) {
+    throw new DomainException('shop_id is required to publish item');
+}
+
+if (
+    $sellerId->type() === SellerType::SHOP &&
+    $sellerId->id() !== null &&
+    $sellerId->id() !== $shopId
+) {
+    throw new DomainException('shop_id mismatch');
+}
 
         $price = $draft->price();
         if ($price === null) {
@@ -81,25 +92,21 @@ final class PublishItemUseCase
 
         // Item 作成
         $item = Item::createNew(
-            itemOrigin: ItemOriginVO::from(
-                $sellerId->type() === SellerType::SHOP
-                    ? ItemOriginVO::SHOP_MANAGED
-                    : ItemOriginVO::USER_PERSONAL
-            ),
-            shopId: $sellerId->type() === SellerType::SHOP
-                ? ($sellerId->id() ?? $input->shopId)
-                : null,
-            createdByUserId: $sellerId->type() === SellerType::SHOP
-                ? null
-                : $principal->userId(),
-            name: $draft->name()->value(),
-            price: $price,
-            explain: $draft->explain(),
-            condition: $draft->condition(),
-            category: $draft->category(),
-            itemImage: $itemImage,
-            remain: new StockCount(1),
-        );
+    itemOrigin: ItemOriginVO::from(
+        $sellerId->type() === SellerType::SHOP
+            ? ItemOriginVO::SHOP_MANAGED
+            : ItemOriginVO::USER_PERSONAL
+    ),
+    shopId: $shopId, // ★ null 不可
+    createdByUserId: $principal->userId(), // 常に user を記録
+    name: $draft->name()->value(),
+    price: $price,
+    explain: $draft->explain(),
+    condition: $draft->condition(),
+    category: $draft->category(),
+    itemImage: $itemImage,
+    remain: new StockCount(1),
+);
 
         $item->markPublished(new \DateTimeImmutable('now'));
 
