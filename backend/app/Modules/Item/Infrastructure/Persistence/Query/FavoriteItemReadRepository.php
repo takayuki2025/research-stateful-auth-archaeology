@@ -38,6 +38,13 @@ final class FavoriteItemReadRepository
             ])
             ->get();
 
+
+            $analysis = DB::table('analysis_results')
+    ->where('item_id', $itemId)
+    ->where('status', 'active')
+    ->latest('id')
+    ->first();
+
         return $rows->map(fn ($r) => (array)$r)->all();
     }
 }

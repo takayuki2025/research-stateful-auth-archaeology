@@ -116,7 +116,6 @@ export default function ItemDetailPage() {
     return <ItemDetailLoading />;
   }
 
-
   // ✅ ここから下は「必ず item が存在する」ので確定変数に寄せる
   const resolvedItem = item;
 
@@ -219,23 +218,35 @@ export default function ItemDetailPage() {
     }
   };
 
-  const brandTokens: string[] = Array.isArray(resolvedItem.brands)
-    ? resolvedItem.brands
-    : [];
+  // ブランド（AI解析 → 人手入力 fallback）
+  const brandTokens: string[] = resolvedItem.display?.brand?.name
+    ? [resolvedItem.display.brand.name]
+    : resolvedItem.brand
+      ? [resolvedItem.brand]
+      : [];
 
-  const categoryTokens: string[] = Array.isArray(resolvedItem.tags)
-    ? resolvedItem.tags
-        .filter((t: any) => t.type === "category")
-        .map((t: any) => t.display_name)
-    : [];
+  // 状態
+  const rawCondition: string | null =
+    resolvedItem.display?.condition?.name ?? resolvedItem.condition ?? null;
+
+  // カラー
+  const rawColor: string | null =
+    resolvedItem.display?.color?.name ?? resolvedItem.color ?? null;
+
+  const categoryTokens: string[] = Array.isArray(resolvedItem.category)
+    ? resolvedItem.category
+    : resolvedItem.category
+      ? [resolvedItem.category]
+      : [];
 
   const navigateToPurchase = () => {
     router.push(`/purchase/${resolvedItem.id}`);
   };
 
-  const rawCondition: string | null = resolvedItem.condition ?? null;
-  const rawColor: string | null = resolvedItem.color ?? null;
-  const displayColor: string | null = resolvedItem.color ?? null;
+  const badge =
+    resolvedItem.display?.brand?.source === "ai_provisional"
+      ? "AI解析（仮）"
+      : null;
 
   /* =========================
      JSX
@@ -257,7 +268,7 @@ export default function ItemDetailPage() {
           {/* 商品情報エリア */}
           <div className={styles.infoArea}>
             <h2 className={styles.itemTitle}>{resolvedItem.name}</h2>
-
+            {badge && <span className={styles.aiBadge}>{badge}</span>}
             {/* ブランド */}
             <div className={styles.brandBlock}>
               <p className={styles.brandLabel}>ブランド名</p>
@@ -383,7 +394,9 @@ export default function ItemDetailPage() {
                 <div className={styles.conditionRow} style={{ marginTop: 10 }}>
                   <p className={styles.conditionLabel}>カラー：</p>
                   <p className={styles.conditionValue}>
-                    {displayColor || rawColor || "未登録"}
+                    <p className={styles.conditionValue}>
+                      {rawColor || "未登録"}
+                    </p>
                   </p>
                 </div>
               </div>

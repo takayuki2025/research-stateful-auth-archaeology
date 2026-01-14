@@ -16,6 +16,8 @@ use App\Modules\Shop\Infrastructure\Listener\EnsureShopAddressOnOrderPaid;
 use App\Listeners\SetFirstLoginAtOnVerified;
 use App\Modules\Item\Domain\Event\Atlas\AtlasManualOverrideOccurred;
 use App\Listeners\NotifyAdminOnManualOverride;
+use App\Modules\Item\Domain\Event\Atlas\ReviewDecisionMade;
+use App\Modules\Item\Application\Listener\ApplyConfirmedDecisionListener;
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -28,44 +30,44 @@ final class EventServiceProvider extends ServiceProvider
         */
         Registered::class => [
             SendEmailVerificationNotification::class,
+            \App\Listeners\CreateInitialProfile::class,
         ],
 
         Verified::class => [
             \App\Listeners\RedirectAfterEmailVerified::class,
+            SetFirstLoginAtOnVerified::class,
         ],
 
-        Verified::class => [
-        SetFirstLoginAtOnVerified::class,
-    ],
-
-    \App\Modules\Item\Application\Event\ItemImported::class => [
-        \App\Modules\Item\Application\Listener\DispatchAnalyzeItemForReview::class,
-    ],
         /*
         |--------------------------------------------------------------------------
-        | Domain Events（唯一の定義）
+        | Item / Atlas
         |--------------------------------------------------------------------------
-        | OrderPaid = 支払いが確定したという「業務的事実」
-        | ここから副作用（配送・履歴）を派生させる
+        */
+        \App\Modules\Item\Application\Event\ItemImported::class => [
+            \App\Modules\Item\Application\Listener\AnalyzeImportedItemListener::class,
+        ],
+
+        \App\Modules\Item\Domain\Event\Atlas\AtlasManualOverrideOccurred::class => [
+            \App\Listeners\NotifyAdminOnManualOverride::class,
+        ],
+
+        ReviewDecisionMade::class => [
+        ApplyConfirmedDecisionListener::class,
+    ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Domain Events
+        |--------------------------------------------------------------------------
         */
         OrderPaid::class => [
             OnOrderPaidRecordOrderHistory::class,
-            // CreateShipmentOnOrderPaid::class,
             EnsureShopAddressOnOrderPaid::class,
         ],
-
-        // 新規登録後プロフィールテーブルの名前だけ登録
-        Registered::class => [
-        \App\Listeners\CreateInitialProfile::class,
-
-        AtlasManualOverrideOccurred::class => [
-        \App\Listeners\NotifyAdminOnManualOverride::class,
-    ],
-    ],
     ];
 
     public function boot(): void
     {
-        // 何もしない（明示的でOK）
+        //
     }
 }

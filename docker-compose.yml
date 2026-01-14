@@ -15,10 +15,8 @@ services:
       - ./backend:/var/www/backend
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      php:
-        condition: service_healthy
-      frontend_dev:
-        condition: service_started
+      - php
+      - frontend_dev
     networks:
       - simulation1_network
 
@@ -26,7 +24,7 @@ services:
   # 2) PHP-FPM（Laravel）
   # ============================================================
   php:
-    build: ./docker/php
+    image: research-stateful-auth-archaeology-php:latest
     working_dir: /var/www/backend
     env_file:
       - ./backend/.env
@@ -36,13 +34,6 @@ services:
     command: php-fpm
     depends_on:
       - mysql
-    healthcheck:
-      # ★ 実際に 9000 が LISTEN しているか確認
-      test: ["CMD", "php-fpm", "-t"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     networks:
       - simulation1_network
 

@@ -56,78 +56,93 @@ final class ItemReadRepository
      * 商品詳細（entity 優先）
      */
     public function findWithDisplayEntities(int $itemId): ?array
-    {
-        $item = Item::query()
-            ->leftJoin('item_entities as ie', function ($join) {
-                $join->on('items.id', '=', 'ie.item_id')
-                     ->where('ie.is_latest', true);
-            })
-            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
-            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
-            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
-            ->where('items.id', $itemId)
-            ->select([
-                'items.id',
-                'items.shop_id',
-                'items.name',
-                'items.price',
-                'items.explain',
-                'items.remain',
-                'items.item_image',
+{
+    $item = Item::find($itemId);
+    if (! $item) return null;
 
-                DB::raw('be.canonical_name  as brand_primary'),
-                DB::raw('ce.canonical_name  as condition_name'),
-                DB::raw('coe.canonical_name as color_name'),
-            ])
-            ->first();
+    // ① 最新 entity（確定 or 仮）
+    $entity = DB::table('item_entities as ie')
+        ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+        ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+        ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
+        ->where('ie.item_id', $itemId)
+        ->where('ie.is_latest', true)
+        ->orderByRaw("
+            CASE ie.source
+                WHEN 'human_confirmed' THEN 1
+                WHEN 'ai_provisional' THEN 2
+                ELSE 3
+            END
+        ")
+        ->select([
+            'ie.source',
 
-        if (! $item) {
-            return null;
-        }
+            'be.canonical_name as brand_name',
+            'ce.canonical_name as condition_name',
+            'coe.canonical_name as color_name',
+        ])
+        ->first();
 
-        $tags = $this->tagRepo->getGroupedByItemId($itemId);
+    // ② AI解析 fallback
+    $analysis = DB::table('analysis_results')
+        ->where('item_id', $itemId)
+        ->where('status', 'active')
+        ->orderByDesc('id')
+        ->first();
 
-        $brandTags = $tags['brand'] ?? [];
-        $conditionTags = $tags['condition'] ?? [];
-        $colorTags = $tags['color'] ?? [];
+    $display = null;
 
-        $categoryTags = $tags['category'] ?? [];
+    $hasEntityValue =
+    $entity &&
+    (
+        $entity->brand_name !== null ||
+        $entity->condition_name !== null ||
+        $entity->color_name !== null
+    );
 
+if ($hasEntityValue) {
+    $display = [
+        'brand' => [
+            'name'   => $entity->brand_name,
+            'source' => $entity->source,
+        ],
+        'condition' => [
+            'name'   => $entity->condition_name,
+            'source' => $entity->source,
+        ],
+        'color' => [
+            'name'   => $entity->color_name,
+            'source' => $entity->source,
+        ],
+    ];
+} elseif ($analysis) {
+    $display = [
+        'brand' => [
+            'name'   => $analysis->brand_name,
+            'source' => 'ai_provisional',
+        ],
+        'condition' => [
+            'name'   => $analysis->condition_name,
+            'source' => 'ai_provisional',
+        ],
+        'color' => [
+            'name'   => $analysis->color_name,
+            'source' => 'ai_provisional',
+        ],
+    ];
+}
 
-
-
-
-
-        return [
-            'id'        => $item->id,
-            'shop_id'   => $item->shop_id,
-            'name'      => $item->name,
-            'price'     => $item->price,
-            'explain'   => $item->explain,
-            'remain'    => $item->remain,
-
-            'brands'        => array_column($brandTags, 'display_name'),
-            'brand_primary' => $item->brand_primary,
-
-            'condition' => $conditionTags[0]['display_name']
-                ?? $item->condition_name
-                ?? null,
-
-            'color' => $colorTags[0]['display_name']
-                ?? $item->color_name
-                ?? null,
-
-            'categories' => array_column($categoryTags, 'display_name'),
-
-            'tags' => $tags,
-
-            // ✅ 生パスのみ（Presentation/Resource側でURL化）
-            'item_image' => $item->item_image ?: null,
-        ];
-
-
-
-    }
+    return [
+        'id'        => $item->id,
+        'shop_id'   => $item->shop_id,
+        'name'      => $item->name,
+        'price'     => $item->price,
+        'explain'   => $item->explain,
+        'remain'    => $item->remain,
+        'display'   => $display,
+        'item_image'=> $item->item_image,
+    ];
+}
 
     /**
      * 一覧（entity 優先・軽量）

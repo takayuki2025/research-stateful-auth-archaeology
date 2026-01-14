@@ -16,6 +16,7 @@ final class PublicCatalogItemResource
             'brandPrimary'  => $dto->brandPrimary,
             'conditionName' => $dto->conditionName,
             'colorName'    => $dto->colorName,
+            'display' => $dto->display,
 
             'itemImagePath' => $dto->itemImagePath
                 ? asset('storage/' . $dto->itemImagePath)

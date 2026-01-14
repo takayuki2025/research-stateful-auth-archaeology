@@ -1,37 +1,47 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use App\Modules\Item\Application\UseCase\AtlasKernel\DecideUseCase;
-use App\Modules\Auth\Application\Context\AuthContext;
+use App\Modules\Item\Application\UseCase\AtlasKernel\DecideAtlasReviewUseCase;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final class AtlasDecisionController extends Controller
 {
     public function __construct(
-        private DecideUseCase $useCase,
-        private AuthContext $auth,
+        private DecideAtlasReviewUseCase $useCase
     ) {}
 
-    public function decide(
-        Request $request,
-        string $shopCode,
-        int $requestId,
-    ): JsonResponse {
-        $principal = $this->auth->principal();
-        if (! $principal) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+    public function decide(Request $request, string $shop_code, int $request_id): JsonResponse
+    {
+        $actor = $request->user();
+
+        // role slug を shop_code で解決（あなたのRoleUser設計前提）
+        $actorRole = collect($actor->formattedRoles() ?? [])
+            ->first(fn ($r) => ($r['shop_id'] ?? null) !== null) // shop_idベースにしたいならここを shop_code解決に置換
+            ['slug'] ?? null;
+
+        // ※ここは既に「shop_id→shop_code解決」をあなたが作っているはずなので、
+        // 　確実化するなら「shop_code→shop_id」→ role_user.shop_idで拾う方式に統一してください。
+        if (!$actorRole) {
+            abort(403, 'Shop role not found');
         }
 
+        $decisionType  = (string) $request->input('decision_type');
+        $afterSnapshot = $request->input('after_snapshot');
+        $note          = $request->input('note');
+
         $this->useCase->handle(
-            analysisRequestId: $requestId,
-            decisionType: $request->string('decision_type'),
-            decidedUserId: $principal->userId(),
-            beforeSnapshot: $request->input('before_snapshot'),
-            afterSnapshot: $request->input('after_snapshot'),
-            note: $request->input('note'),
+            shopCode: $shop_code,
+            analysisRequestId: $request_id,
+            decisionType: $decisionType,
+            afterSnapshot: is_array($afterSnapshot) ? $afterSnapshot : null,
+            note: is_string($note) ? $note : null,
+            actorUserId: (int) $actor->id,
+            actorRole: (string) $actorRole,
         );
 
         return response()->json(['status' => 'ok']);

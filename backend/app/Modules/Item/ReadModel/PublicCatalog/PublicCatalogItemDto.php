@@ -15,6 +15,7 @@ final class PublicCatalogItemDto
         public readonly \DateTimeInterface $publishedAt,
         public readonly ?string $itemOrigin,
         public readonly ?string $displayType, // 'STAR' | 'COMET' | null
+        public readonly ?array $display,
     ) {
     }
 

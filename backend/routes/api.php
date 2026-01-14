@@ -338,75 +338,66 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
 
-Route::prefix('shops/{shopCode}/atlas')->group(function () {
-    Route::get(
-        'requests/{requestId}/history',
-        [AtlasDecisionHistoryController::class, 'history']
-    );
+// Route::prefix('shops/{shopCode}/atlas')->group(function () {
+//     Route::get(
+//         'requests/{requestId}/history',
+//         [AtlasDecisionHistoryController::class, 'history']
+//     );
 
-    Route::post(
-        'requests/{requestId}/replay',
-        [AtlasDecisionHistoryController::class, 'replay']
-    );
-});
-
-
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
+//     Route::post(
+//         'requests/{requestId}/replay',
+//         [AtlasDecisionHistoryController::class, 'replay']
+//     );
+// });
 
 
-
-Route::post(
-    '/shops/{shopCode}/atlas/requests/{requestId}/decide',
-    [AtlasDecisionController::class, 'decide']
-);
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
 
 
 
+// Route::post(
+//     '/shops/{shopCode}/atlas/requests/{requestId}/decide',
+//     [AtlasDecisionController::class, 'decide']
+// );
+
+
+
+
+
+
+// v3 Controllers
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryListController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
 
+Route::middleware(['auth:sanctum'])
+    ->prefix('shops/{shop_code}/atlas')
+    ->group(function () {
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::prefix('shops/{shop_code}/atlas')->group(function () {
-
-        // 一覧（既存）
+        // 1) 一覧（Review一覧ページが叩く）
         Route::get('requests', [AtlasRequestController::class, 'index']);
 
+        // 2) Review（Before/After/Diff 取得）
+        Route::get('requests/{request_id}/review', [AtlasReviewController::class, 'show'])
+            ->whereNumber('request_id');
 
+        // 3) Decide（approve/reject/edit_confirm/manual_override）
+        Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
+            ->whereNumber('request_id');
+
+        // 4) 履歴（1件のrequestのdecision履歴）
+        Route::get('requests/{request_id}/history', [AtlasDecisionHistoryController::class, 'history'])
+            ->whereNumber('request_id');
+
+        // 5) 履歴一覧（dashboard/atlas/history が叩く：あなたのURLに合わせる）
+        Route::get('decision-histories', [AtlasDecisionHistoryListController::class, 'index']);
+
+        // 6) Replay（非同期再解析）
+        Route::post('requests/{request_id}/replay', [AtlasReplayController::class, 'replay'])
+            ->whereNumber('request_id');
     });
-});
-
-
-
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecideController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ItemAnalysisController;
-/*
-|--------------------------------------------------------------------------
-| AtlasKernel v3 (Review / Decide / Replay)
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Review 取得
-    Route::get(
-        '/shops/{shop_code}/atlas/requests/{request_id}/review',
-        AtlasReviewController::class
-    );
-    // Decide（approve / edit_confirm / reject）
-    Route::post(
-        '/shops/{shop_code}/atlas/requests/{request_id}/decide',
-        AtlasDecideController::class
-    );
-    // Replay（analysis_request 起点）
-    Route::post(
-        '/shops/{shop_code}/atlas/requests/{request_id}/replay',
-        AtlasReplayController::class
-    );
-    // 手動再解析（Item 起点・管理用途）
-    Route::post(
-        '/items/{itemId}/analysis/reanalyze',
-        [ItemAnalysisController::class, 'reanalyze']
-    );
-});

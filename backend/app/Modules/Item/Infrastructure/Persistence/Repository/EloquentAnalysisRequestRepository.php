@@ -231,4 +231,17 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
 
         return (int)$id;
     }
+
+        public function getStatus(int $requestId): string
+{
+    $status = DB::table('analysis_requests')
+        ->where('id', $requestId)
+        ->value('status');
+
+    if ($status === null) {
+        throw new \RuntimeException("analysis_request not found: {$requestId}");
+    }
+
+    return (string) $status;
+}
 }

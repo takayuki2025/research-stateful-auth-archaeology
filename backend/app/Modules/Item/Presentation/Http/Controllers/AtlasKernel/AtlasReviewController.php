@@ -11,21 +11,16 @@ use Illuminate\Http\JsonResponse;
 final class AtlasReviewController extends Controller
 {
     public function __construct(
-        private GetAtlasReviewUseCase $useCase,
+        private GetAtlasReviewUseCase $useCase
     ) {}
 
-    public function __invoke(
-        string $shop_code,
-        int $request_id
-    ): JsonResponse {
-        $dto = $this->useCase->handle(
+    public function show(string $shop_code, int $request_id): JsonResponse
+    {
+        $result = $this->useCase->handle(
             shopCode: $shop_code,
             analysisRequestId: $request_id,
         );
 
-        return response()->json([
-            'request_id' => $request_id,
-            'review'     => $dto->toArray(),
-        ]);
+        return response()->json($result);
     }
 }

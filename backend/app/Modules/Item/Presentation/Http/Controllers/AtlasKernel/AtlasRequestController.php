@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Item\Presentation\Http\Controllers\AtlasKernel;
 
-use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\Query\AtlasRequestListQuery;
+use Illuminate\Http\JsonResponse;
 
 final class AtlasRequestController extends Controller
 {

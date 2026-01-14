@@ -3,37 +3,11 @@
 import { useEffect } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/ui/auth/AuthProvider";
+import type { Item, ItemComment } from "@/types/item";
 
 export type ItemDetailResponse = {
-  item: {
-    id: number;
-    shop_id: number;
-    name: string;
-    price: number;
-    explain: string;
-    remain: number;
-
-    brands: string[];
-    brand_primary: string | null;
-    condition: string | null;
-    color: string | null;
-    categories: string[];
-
-    tags: Record<string, any[]>;
-    item_image: string | null;
-  };
-
-  comments: {
-    id: number;
-    comment: string;
-    created_at: string;
-    user: {
-      id: number;
-      name: string;
-      user_image: string | null;
-    };
-  }[];
-
+  item: Item; // ★ ここを統一
+  comments: ItemComment[];
   is_favorited: boolean;
   favorites_count: number;
 };

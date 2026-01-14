@@ -7,27 +7,26 @@ final class ItemDetailResource
     public static function fromReadModel(array $row): array
     {
         return [
-            'id'         => $row['id'],
-            'shop_id'    => $row['shop_id'],
-            'name'       => $row['name'],
-            'price'      => $row['price'],
-            'explain'    => $row['explain'],
-            'remain'     => $row['remain'],
+            'id'        => $row['id'],
+            'shop_id'   => $row['shop_id'] ?? null,
+            'name'      => $row['name'],
+            'price'     => $row['price'],
+            'explain'   => $row['explain'],
+            'remain'    => $row['remain'],
+            'item_image'=> $row['item_image'],
 
-            // brand / condition / color
-            'brands'         => $row['brands'] ?? [],
-            'brand_primary'  => $row['brand_primary'] ?? null,
-            'condition'      => $row['condition'] ?? null,
-            'color'          => $row['color'] ?? null,
+            // ★ 主役（これが表示される）
+            'display'   => $row['display'] ?? null,
 
-            // categories
-            'categories' => $row['categories'] ?? [],
+            // ★ UI fallback（安全）
+            'brand'     => $row['display']['brand']['name'] ?? null,
+            'condition' => $row['display']['condition']['name'] ?? null,
+            'color'     => $row['display']['color']['name'] ?? null,
 
-            // tags（将来 UI 拡張用・そのまま返す）
-            'tags' => $row['tags'] ?? [],
-
-            // image（生パス）
-            'item_image' => $row['item_image'],
+            // 付随情報
+            'comments'         => $row['comments'] ?? [],
+            'is_favorited'     => $row['is_favorited'] ?? false,
+            'favorites_count' => $row['favorites_count'] ?? 0,
         ];
     }
 }

@@ -18,25 +18,22 @@ final class PublishItemController extends Controller
     }
 
     public function __invoke(Request $request, string $draftId): JsonResponse
-    {
-        $principal = $this->authContext->principal();
-        if (! $principal) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        // ✅ v3固定: Publishは shop_id 必須（Shop出品）
-        $validated = $request->validate([
-            'shop_id' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $input = new PublishItemInput(
-            draftId: $draftId,
-            shopId: (int) $validated['shop_id'],
-        );
-
-        // 第3引数 null は現状の設計通りでOK（tenantなどを後で入れるならここ）
-        $this->useCase->execute($input, $principal, null);
-
-        return response()->json(['status' => 'ok']);
+{
+    $principal = $this->authContext->principal();
+    if (! $principal) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
+
+    /** @var ShopContext|null $shopContext */
+    $shopContext = $request->attributes->get(ShopContext::class);
+
+    $input = new PublishItemInput(
+        draftId: $draftId,
+        shopId: $shopContext?->shopId, // ★ null 許容
+    );
+
+    $this->useCase->execute($input, $principal, null);
+
+    return response()->json(['status' => 'ok']);
+}
 }

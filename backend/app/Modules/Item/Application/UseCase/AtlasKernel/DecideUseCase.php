@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
+use App\Modules\Item\Domain\Event\Atlas\ReviewDecisionMade;
+use Illuminate\Support\Facades\Event;
+
 use Illuminate\Support\Facades\DB;
 
 final class DecideUseCase
@@ -39,6 +42,9 @@ final class DecideUseCase
                 'note'                => $note,
                 'created_at'          => now(),
             ]);
+            Event::dispatch(
+    new ReviewDecisionMade($analysisRequestId)
+);
         });
     }
 }
