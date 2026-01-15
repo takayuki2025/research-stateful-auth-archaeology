@@ -19,6 +19,7 @@ type AttributeDecision = {
 
 type ReviewPayload = {
   request_id: number;
+  learning?: string | null;
 
   before: Record<AttributeKey, string | null>;
   after: Record<AttributeKey, string | null>;
@@ -175,14 +176,10 @@ export default function AtlasReviewPage() {
 
   const keys = useMemo(() => {
     if (!review) return [];
-    const merged = new Set<string>([
-      ...Object.keys(review.diff ?? {}),
-      ...Object.keys(review.before ?? {}),
-      ...Object.keys(review.after ?? {}),
-    ]);
 
     const priority = ["brand", "color", "condition"];
-    return Array.from(merged).sort((a, b) => {
+
+    return Object.keys(review.diff ?? {}).sort((a, b) => {
       const pa = priority.indexOf(a);
       const pb = priority.indexOf(b);
       if (pa !== -1 && pb !== -1) return pa - pb;
@@ -239,6 +236,14 @@ export default function AtlasReviewPage() {
 
   const overall = review.overall_confidence ?? null;
 
+
+
+  const LABEL_MAP: Record<string, string> = {
+    brand: "ブランド",
+    color: "カラー",
+    condition: "コンディション",
+  };
+
   /* =========================
      UI
   ========================= */
@@ -246,6 +251,20 @@ export default function AtlasReviewPage() {
   return (
     <div className="p-6 space-y-5">
       <h1 className="text-2xl font-semibold">Atlas Review #{requestId}</h1>
+
+      {/* =========================
+   Learning (Human Input)
+========================= */}
+      {review.learning && (
+        <div className="border rounded bg-blue-50 p-4">
+          <div className="text-xs text-blue-700 font-semibold mb-1">
+            learning_writing（人間が最初に入力した内容）
+          </div>
+          <div className="whitespace-pre-wrap text-sm text-gray-900">
+            {review.learning}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {keys.map((k) => {
@@ -256,7 +275,7 @@ export default function AtlasReviewPage() {
           return (
             <DiffRow
               key={k}
-              label={k}
+              label={LABEL_MAP[k] ?? k}
               before={before}
               after={after}
               confidence={attr?.confidence ?? null}
@@ -265,6 +284,7 @@ export default function AtlasReviewPage() {
           );
         })}
       </div>
+
     </div>
   );
 }

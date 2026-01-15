@@ -4,9 +4,9 @@ namespace App\Modules\Item\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
-use App\Modules\Atlas\Domain\Repository\AnalysisResultRepository;
+use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentAnalysisRequestRepository;
-use App\Modules\Atlas\Infrastructure\Persistence\EloquentAnalysisResultRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentAnalysisResultRepository;
 
 final class ItemServiceProvider extends ServiceProvider
 {

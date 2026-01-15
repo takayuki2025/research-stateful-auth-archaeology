@@ -14,6 +14,7 @@ final class AnalysisResult
         public readonly ?string $brandName,
         public readonly ?string $conditionName,
         public readonly ?string $colorName,
+        public readonly ?array $classifiedTokens,
 
         public readonly array $confidenceMap,
         public readonly ?float $overallConfidence,
@@ -28,28 +29,53 @@ final class AnalysisResult
      * Repository 再構築専用（v3固定）
      */
     public static function reconstruct(
-        int $requestId,
-        // int $itemId,
-        ?string $brandName,
-        ?string $conditionName,
-        ?string $colorName,
-        ?array $confidenceMap,
-        ?float $overallConfidence,
-        ?array $evidence,
-        string $status,
-        DateTimeImmutable $createdAt,
-    ): self {
-        return new self(
-            requestId: $requestId,
-            // itemId: $itemId,
-            brandName: $brandName,
-            conditionName: $conditionName,
-            colorName: $colorName,
-            confidenceMap: $confidenceMap ?? [],
-            overallConfidence: $overallConfidence,
-            evidence: $evidence,
-            status: $status,
-            createdAt: $createdAt,
-        );
+    int $requestId,
+    ?string $brandName,
+    ?string $conditionName,
+    ?string $colorName,
+    ?array $classifiedTokens,
+    array $confidenceMap,
+    ?float $overallConfidence,
+    ?array $evidence,
+    string $status,
+    DateTimeImmutable $createdAt,
+): self {
+    return new self(
+        requestId: $requestId,
+        brandName: $brandName,
+        conditionName: $conditionName,
+        colorName: $colorName,
+        classifiedTokens: $classifiedTokens,
+        confidenceMap: $confidenceMap,
+        overallConfidence: $overallConfidence,
+        evidence: $evidence,
+        status: $status,
+        createdAt: $createdAt,
+    );
     }
+
+    public function toProvisionalDisplay(): array
+{
+    return [
+        'brand' => [
+            'name' => $this->brandName,
+        ],
+        'condition' => [
+            'name' => $this->conditionName,
+        ],
+        'color' => [
+            'name' => $this->colorName,
+        ],
+
+        // ✅ Review / Learning 用の証跡
+        'tokens' => [
+            'brand'     => $this->classifiedTokens['brand']     ?? [],
+            'condition' => $this->classifiedTokens['condition'] ?? [],
+            'color'     => $this->classifiedTokens['color']     ?? [],
+        ],
+
+        'confidence_map' => $this->confidenceMap,
+        'overall_confidence' => $this->overallConfidence,
+    ];
+}
 }

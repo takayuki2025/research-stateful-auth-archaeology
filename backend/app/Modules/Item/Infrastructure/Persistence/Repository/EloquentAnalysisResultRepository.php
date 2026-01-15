@@ -24,43 +24,45 @@ final class EloquentAnalysisResultRepository implements AnalysisResultRepository
             : null;
 
         DB::table('analysis_results')->updateOrInsert(
-            ['analysis_request_id' => $requestId],
-            [
-                'item_id'            => $itemId,
+    ['analysis_request_id' => $requestId],
+    [
+        'item_id'            => $itemId,
 
-                'brand_name'         => $payload['brand_name'] ?? null,
-                'condition_name'     => $payload['condition_name'] ?? null,
-                'color_name'         => $payload['color_name'] ?? null,
+        'brand_name'         => $payload['brand_name'] ?? null,
+        'condition_name'     => $payload['condition_name'] ?? null,
+        'color_name'         => $payload['color_name'] ?? null,
 
-                'confidence_map'     => $this->toJsonOrNull($payload['confidence_map'] ?? null),
-                'overall_confidence' => is_numeric($payload['overall_confidence'] ?? null)
-                    ? (float)$payload['overall_confidence']
-                    : null,
+        // ✅ 追加
+        'classified_tokens'  => $this->toJsonOrNull($payload['classified_tokens'] ?? null),
 
-                'evidence'           => $this->toJsonOrNull($payload['evidence'] ?? null),
-                'source'             => $payload['source'] ?? null,
+        'confidence_map'     => $this->toJsonOrNull($payload['confidence_map'] ?? null),
+        'overall_confidence' => is_numeric($payload['overall_confidence'] ?? null)
+            ? (float)$payload['overall_confidence']
+            : null,
 
-                'status'             => $payload['status'] ?? 'active',
-                'updated_at'         => now(),
-                // insert 時だけ created_at が必要なので updateOrInsert の仕様に合わせて埋める
-                'created_at'         => now(),
-            ]
-        );
+        'evidence'           => $this->toJsonOrNull($payload['evidence'] ?? null),
+        'source'             => $payload['source'] ?? null,
+
+        'status'             => $payload['status'] ?? 'active',
+        'updated_at'         => now(),
+        'created_at'         => now(),
+    ]
+);
     }
 
     /**
      * （任意）過去互換が必要なら残す。不要なら削除でOK。
      * ただし「主語は requestId」であることを崩さない。
      */
-    public function save(int $itemId, array $payload): void
-    {
-        $requestId = $payload['analysis_request_id']
-            ?? throw new InvalidArgumentException('analysis_request_id is required');
+    // public function save(int $itemId, array $payload): void
+    // {
+    //     $requestId = $payload['analysis_request_id']
+    //         ?? throw new InvalidArgumentException('analysis_request_id is required');
 
-        $payload['item_id'] = $payload['item_id'] ?? $itemId;
+    //     $payload['item_id'] = $payload['item_id'] ?? $itemId;
 
-        $this->saveByRequestId((int)$requestId, $payload);
-    }
+    //     $this->saveByRequestId((int)$requestId, $payload);
+    // }
 
     private function toJsonOrNull(mixed $value): ?string
     {
@@ -106,17 +108,32 @@ final class EloquentAnalysisResultRepository implements AnalysisResultRepository
             return null;
         }
 
-        return AnalysisResult::reconstruct(
-    requestId: (int) $row->analysis_request_id,
-    // itemId: (int) $row->item_id,
+        $tokens = $row->classified_tokens
+    ? json_decode($row->classified_tokens, true)
+    : null;
+
+$confidenceMap = $row->confidence_map
+    ? json_decode($row->confidence_map, true)
+    : [];
+
+$evidence = $row->evidence
+    ? json_decode($row->evidence, true)
+    : null;
+
+return AnalysisResult::reconstruct(
+    requestId: (int)$row->analysis_request_id,
     brandName: $row->brand_name,
     conditionName: $row->condition_name,
     colorName: $row->color_name,
-    confidenceMap: json_decode($row->confidence_map, true),
-    overallConfidence: (float) $row->overall_confidence,
-    evidence: json_decode($row->evidence, true),
-    status: $row->status,
+    classifiedTokens: $tokens,          // ✅
+    confidenceMap: $confidenceMap,       // ✅
+    overallConfidence: $row->overall_confidence !== null
+        ? (float)$row->overall_confidence
+        : null,
+    evidence: $evidence,
+    status: (string)$row->status,
     createdAt: new \DateTimeImmutable($row->created_at),
 );
+
     }
 }

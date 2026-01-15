@@ -12,7 +12,7 @@ return new class () extends Migration {
 
             $table->unsignedBigInteger('analysis_request_id');
             $table->unsignedBigInteger('item_id');
-            $table->uuid('item_draft_id')->nullable(); 
+            $table->uuid('item_draft_id')->nullable();
 
             // =========================
             // AFTER 候補（AI / 人）
@@ -24,26 +24,28 @@ return new class () extends Migration {
             // =========================
             // v3 固定（判断材料）
             // =========================
+            $table->json('classified_tokens')->nullable();
             $table->json('confidence_map')->nullable();
             $table->decimal('overall_confidence', 4, 3)->nullable();
 
             // 根拠（AI説明 / Rule / future replay）
             $table->json('evidence')->nullable();
 
-            // ★ 追加①：解析結果の出自
+            // 解析結果の出自
             // ai_provisional / human_confirmed / replayed_ai など
             $table->string('source')->nullable();
 
-            // 技術状態（人間判断とは無関係）
-            $table->enum('status', ['active', 'superseded', 'archived'])
-                ->default('active');
+            // =========================
+            // 技術状態（★ enum 廃止）
+            // =========================
+            $table->string('status', 32)->default('provisional');
 
             $table->timestamps();
 
             // =========================
             // Index / Constraint
             // =========================
-            $table->unique('analysis_request_id'); // ★ 追加②
+            $table->unique('analysis_request_id');
             $table->index('item_id');
 
             $table->foreign('analysis_request_id')

@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-
 use App\Modules\Item\Domain\Service\AtlasKernelService;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
@@ -68,7 +67,7 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         /**
          * ⑤ 表示用（暫定）構造へ変換
          */
-        $analysis = $analysisResult->toProvisionalDisplay();
+        $analysis = $analysisResult;
 
         /**
          * ⑥ UX fallback 用の Item 参照（安全）
@@ -90,6 +89,11 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
 
             'condition_name' => data_get($analysis, 'condition.name'),
             'color_name'     => data_get($analysis, 'color.name'),
+            'classified_tokens' => [
+                'brand'     => data_get($analysis, 'tokens.brand', []),
+                'condition' => data_get($analysis, 'tokens.condition', []),
+                'color'     => data_get($analysis, 'tokens.color', []),
+            ],
 
             'confidence_map' => $analysis['confidence_map'] ?? [
                 'brand'     => 0.0,

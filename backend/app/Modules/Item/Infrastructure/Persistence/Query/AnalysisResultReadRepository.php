@@ -6,14 +6,11 @@ use Illuminate\Support\Facades\DB;
 
 final class AnalysisResultReadRepository
 {
-    /**
-     * 最新の active な解析結果を取得
-     */
     public function findLatestActiveByItemId(int $itemId): ?array
     {
         $row = DB::table('analysis_results')
             ->where('item_id', $itemId)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'provisional'])
             ->orderByDesc('id')
             ->first();
 
@@ -21,6 +18,31 @@ final class AnalysisResultReadRepository
             return null;
         }
 
-        return json_decode($row->payload, true);
+        $display = [];
+
+        if ($row->brand_name) {
+            $display['brand'] = [
+                'name'   => $row->brand_name,
+                'source' => $row->source,
+            ];
+        }
+
+        if ($row->condition_name) {
+            $display['condition'] = [
+                'name' => $row->condition_name,
+            ];
+        }
+
+        if ($row->color_name) {
+            $display['color'] = [
+                'name' => $row->color_name,
+            ];
+        }
+
+        if ($row->confidence_map) {
+            $display['confidence_map'] = json_decode($row->confidence_map, true);
+        }
+
+        return $display ?: null;
     }
 }

@@ -9,11 +9,27 @@ final class AtlasReviewDto
     public function __construct(
         public readonly int $requestId,
         public readonly string $status,
+
+        // 🔹 追加①：Learning（人間入力）
+        public readonly ?string $learning,
+
+        // 🔹 追加②：分類済みトークン
+        // [
+        //   'brand' => string[],
+        //   'condition' => string[],
+        //   'color' => string[],
+        // ]
+        public readonly ?array $tokens,
+
         public readonly ?float $overallConfidence,
         public readonly array $before,
         public readonly array $after,
         public readonly array $diff,
-        public readonly array $confidenceMap, // ✅ 追加：UI固定仕様
+
+        // v3固定：AFTER 側のみ
+        public readonly array $confidenceMap,
+
+        // UI表示補助
         public readonly array $attributes,
     ) {}
 
@@ -22,6 +38,11 @@ final class AtlasReviewDto
         return [
             'request_id'         => $this->requestId,
             'status'             => $this->status,
+
+            // 🔹 新規（後方互換）
+            'learning'           => $this->learning,
+            'tokens'             => $this->tokens,
+
             'overall_confidence' => $this->overallConfidence,
 
             // v3固定

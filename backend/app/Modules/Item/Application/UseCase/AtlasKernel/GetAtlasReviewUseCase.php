@@ -36,23 +36,47 @@ final class GetAtlasReviewUseCase
 
 
         // ✅ v3固定（安全版）：BEFORE は item_drafts が「あれば使う」
-$draftId = $request->itemDraftId();
+$learning = $request->rawText();
 
-$before = [
-    'brand'     => null,
-    'condition' => null,
-    'color'     => null,
+$tokens = [
+    'brand'     => [],
+    'condition' => [],
+    'color'     => [],
 ];
 
-if ($draftId !== null) {
-    $draft = $this->drafts->findById($draftId);
+if (is_array($result->classifiedTokens)) {
+    $tokens = array_merge($tokens, $result->classifiedTokens);
+}
 
-    if ($draft) {
-        $before = [
-            'brand'     => $draft->brandRaw(),
-            'condition' => $draft->conditionRaw(),
-            'color'     => $draft->colorRaw(),
-        ];
+/**
+ * ✅ v3固定：BEFORE は tokens から作る
+ */
+$before = [
+    'brand'     => $tokens['brand'][0]     ?? null,
+    'condition' => $tokens['condition'][0] ?? null,
+    'color'     => $tokens['color'][0]     ?? null,
+];
+
+/**
+ * フォールバック（tokens が空のときのみ）
+ */
+if (
+    $before['brand'] === null &&
+    $before['condition'] === null &&
+    $before['color'] === null
+) {
+    $draftId = $request->itemDraftId();
+
+    if (is_string($draftId)) {
+        $draft = $this->drafts->findById($draftId);
+
+        if ($draft !== null) {
+            $before = [
+                'brand'     => $draft->brandRaw(),
+                'condition' => $draft->conditionRaw(),
+                'color'     => $draft->colorRaw(),
+            ];
+        }
     }
 }
 
@@ -112,6 +136,8 @@ if ($draftId !== null) {
         return new AtlasReviewDto(
             requestId: $request->id(),
             status: $request->status(),
+            learning: $learning,
+            tokens: $tokens,
             overallConfidence: $result->overallConfidence,
             before: $before,
             after: $after,
