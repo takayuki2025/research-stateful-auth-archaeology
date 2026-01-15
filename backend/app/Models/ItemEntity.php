@@ -16,6 +16,7 @@ class ItemEntity extends Model
         'color_entity_id',
         'confidence',
         'is_latest',
+        'source',
         'generated_version',
         'generated_at',
     ];

@@ -13,4 +13,7 @@ interface ItemEntityRepository
         int $analysisRequestId,
         int $actorUserId,
     ): void;
+
+    public function existsLatestHumanConfirmed(int $itemId, string $version): bool;
+
 }

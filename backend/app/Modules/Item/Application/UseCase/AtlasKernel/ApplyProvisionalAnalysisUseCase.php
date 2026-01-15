@@ -25,6 +25,21 @@ final class ApplyProvisionalAnalysisUseCase
         int $analysisRequestId,
         array $analysisRaw,
     ): void {
+
+$request = $this->requests->findOrFail($analysisRequestId);
+$itemId  = $request->itemId();
+
+$hasHumanConfirmed = DB::table('item_entities')
+    ->where('item_id', $itemId)
+    ->where('source', 'human_confirmed')
+    ->exists();
+
+if ($hasHumanConfirmed) {
+    Log::info('[ApplyProvisionalAnalysis] skipped (human_confirmed exists)');
+    return;
+}
+
+
         DB::transaction(function () use ($analysisRequestId, $analysisRaw) {
 
             $request = $this->requests->findOrFail($analysisRequestId);

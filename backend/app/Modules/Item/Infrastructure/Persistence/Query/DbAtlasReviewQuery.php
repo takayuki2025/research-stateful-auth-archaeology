@@ -34,16 +34,24 @@ final class DbAtlasReviewQuery implements AtlasReviewQuery
         // =========================
         // 2) BEFORE（現行 item_entities）
         // =========================
-        $beforeEntity = DB::table('item_entities')
-            ->where('item_id', $req->item_id)
-            ->where('is_latest', true)
-            ->first();
+        $beforeEntity = DB::table('item_entities as ie')
+    ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+    ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+    ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
+    ->where('ie.item_id', $req->item_id)
+    ->where('ie.is_latest', true)
+    ->select([
+        'be.canonical_name as brand',
+        'ce.canonical_name as condition',
+        'coe.canonical_name as color',
+    ])
+    ->first();
 
-        $before = $beforeEntity ? [
-            'brand'     => $beforeEntity->brand_name,
-            'condition' => $beforeEntity->condition_name,
-            'color'     => $beforeEntity->color_name,
-        ] : [];
+$before = $beforeEntity ? [
+    'brand'     => $beforeEntity->brand ?? null,
+    'condition' => $beforeEntity->condition ?? null,
+    'color'     => $beforeEntity->color ?? null,
+] : [];
 
         // =========================
         // 3) AFTER（analysis_results）

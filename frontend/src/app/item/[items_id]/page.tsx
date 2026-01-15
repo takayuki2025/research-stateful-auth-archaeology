@@ -243,9 +243,13 @@ export default function ItemDetailPage() {
     router.push(`/purchase/${resolvedItem.id}`);
   };
 
-  const badge =
-    resolvedItem.display?.brand?.source === "ai_provisional"
-      ? "AI解析（仮）"
+const source = resolvedItem.display?.brand?.source;
+
+const badge =
+  source === "human_confirmed"
+    ? "管理確定"
+    : source === "ai_provisional"
+      ? "AI解析"
       : null;
 
   /* =========================

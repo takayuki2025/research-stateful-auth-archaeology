@@ -128,6 +128,13 @@ final class GetAtlasReviewUseCase
             }
         }
 
+
+/**
+ * UI補助用：BEFORE を分解（v3補助・SoT非侵食）
+ */
+$beforeParsed = $this->parseBeforeText($learning, $tokens);
+
+
         /**
          * diff 自動生成（BEFORE value vs AFTER value）
          */
@@ -197,6 +204,119 @@ final class GetAtlasReviewUseCase
             diff: $diff,
             confidenceMap: $confidenceMap,
             attributes: $attributes,
+            beforeParsed: $beforeParsed,
         );
     }
+
+/**
+ * UI補助用（v3固定・確定）
+ * - BEFORE は必ず rawText 由来
+ * - tokens は「切り分けのヒント」にのみ使用（正規化しない）
+ * - 日本語連結（例: あっぷる美品あお）を安定分解
+ */
+private function parseBeforeText(?string $rawText, array $tokens): array
+{
+    if (!$rawText) {
+        return [];
+    }
+
+    $rawText = trim($rawText);
+
+    // 日本語安全：先頭2語 + 残り
+    $parts = preg_split('/\s+/u', $rawText, 3);
+
+    $name        = $parts[0] ?? null;
+    $description = $parts[1] ?? null;
+    $tail        = trim($parts[2] ?? '');
+
+    $brand = null;
+    $condition = null;
+    $color = null;
+
+    if ($tail === '') {
+        return [
+            'name'         => $this->nullIfEmpty($name),
+            'description'  => $this->nullIfEmpty($description),
+            'brand'        => null,
+            'condition'    => null,
+            'color'        => null,
+            'raw'          => $rawText,
+            'derived_from' => 'rawText(v3_tail_empty)',
+        ];
+    }
+
+    /**
+     * ① color（tokens ヒントで rawText 末尾から切り出す）
+     *    ※ 比較時のみ かな正規化
+     */
+    if (!empty($tokens['color']) && is_array($tokens['color'])) {
+        foreach ($tokens['color'] as $hint) {
+            if (!is_string($hint)) continue;
+
+            $normTail = $this->normalizeKana($tail);
+            $normHint = $this->normalizeKana($hint);
+
+            if (mb_substr($normTail, -mb_strlen($normHint)) === $normHint) {
+                // raw 側の実文字を切り出す
+                $color = mb_substr($tail, -mb_strlen($normHint));
+                $tail  = mb_substr($tail, 0, mb_strlen($tail) - mb_strlen($normHint));
+                break;
+            }
+        }
+    }
+
+    $tail = trim($tail);
+
+    /**
+     * ② condition（同様に後ろから）
+     */
+    if (!empty($tokens['condition']) && is_array($tokens['condition'])) {
+        foreach ($tokens['condition'] as $hint) {
+            if (!is_string($hint)) continue;
+
+            $normTail = $this->normalizeKana($tail);
+            $normHint = $this->normalizeKana($hint);
+
+            if (mb_substr($normTail, -mb_strlen($normHint)) === $normHint) {
+                $condition = mb_substr($tail, -mb_strlen($normHint));
+                $tail      = mb_substr($tail, 0, mb_strlen($tail) - mb_strlen($normHint));
+                break;
+            }
+        }
+    }
+
+    $tail = trim($tail);
+
+    /**
+     * ③ 残りすべて brand（raw 痕跡を最優先）
+     */
+    $brand = $this->nullIfEmpty($tail);
+
+    return [
+        'name'         => $this->nullIfEmpty($name),
+        'description'  => $this->nullIfEmpty($description),
+        'brand'        => $brand,
+        'condition'    => $this->nullIfEmpty($condition),
+        'color'        => $this->nullIfEmpty($color),
+        'raw'          => $rawText,
+        'derived_from' => 'rawText(v3_tokens_suffix_split_kana_safe)',
+    ];
+}
+
+private function nullIfEmpty(?string $v): ?string
+{
+    if ($v === null) return null;
+    $v = trim($v);
+    return $v === '' ? null : $v;
+}
+
+/**
+ * 比較専用：カタカナ → ひらがな
+ * ※ 値の保存には絶対に使わない
+ */
+private function normalizeKana(string $s): string
+{
+    return mb_convert_kana($s, 'c', 'UTF-8');
+}
+
 }

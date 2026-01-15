@@ -54,16 +54,23 @@ final class EloquentItemEntityRepository implements ItemEntityRepository
 
         // 2) 新しい entity 作成
         DB::table('item_entities')->insert([
-            'item_id'        => $result->item_id,
-            'brand_name'     => $result->brand_name,
-            'condition_name' => $result->condition_name,
-            'color_name'     => $result->color_name,
-            'source_type'    => 'atlas',
-            'source_id'      => $analysisRequestId,
-            'is_latest'      => true,
-            'created_by'     => $actorUserId,
-            'created_at'     => now(),
-            'updated_at'     => now(),
-        ]);
+    'item_id'             => $result->item_id,
+    'brand_entity_id'     => $brandEntityId,
+    'condition_entity_id' => $conditionEntityId,
+    'color_entity_id'     => $colorEntityId,
+    'source'              => 'ai_provisional',
+    'is_latest'           => true,
+    'generated_at'        => now(),
+]);
     }
+
+    public function existsLatestHumanConfirmed(int $itemId, string $version): bool
+{
+    return DB::table('item_entities')
+        ->where('item_id', $itemId)
+        ->where('source', 'human_confirmed')
+        ->where('generated_version', $version)
+        ->where('is_latest', true)
+        ->exists();
+}
 }

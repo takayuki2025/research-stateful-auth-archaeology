@@ -37,13 +37,7 @@ final class DecideAtlasReviewUseCase
         int $actorUserId,
         string $actorRole,
     ): void {
-\Log::info('[DecideAtlasReview] handle start', [
-    'request_id' => $analysisRequestId,
-    'decision_type' => $decisionType,
-    'after_snapshot' => $afterSnapshot,
-    'actor_user_id' => $actorUserId,
-    'actor_role' => $actorRole,
-]);
+
         // 0) 入力の最小バリデーション（UX仕様に一致）
         if (in_array($decisionType, ['edit_confirm', 'manual_override'], true)) {
             if (!$afterSnapshot || !is_array($afterSnapshot) || count($afterSnapshot) === 0) {
@@ -73,10 +67,7 @@ final class DecideAtlasReviewUseCase
             $actorUserId,
             $actorRole
         ) {
-\Log::info('[DecideAtlasReview] decision saved', [
-    'request_id' => $analysisRequestId,
-    'decision_type' => $decisionType,
-]);
+
             // 2) Guard（状態/二重決定/整合性）
             $this->guard->assertDecidable(
                 analysisRequestId: $analysisRequestId,
@@ -102,15 +93,6 @@ final class DecideAtlasReviewUseCase
     'decided_by'          => $actorUserId,
     'decided_at'          => now(),
 ]);
-
-if (in_array($decisionType, ['approve', 'edit_confirm'], true)) {
-    \Log::info('[DecideAtlasReview] calling ApplyConfirmedDecision', [
-        'request_id' => $analysisRequestId,
-        'decision_type' => $decisionType,
-    ]);
-
-    $this->applyConfirmedDecision->handle($analysisRequestId);
-}
 
 
             // 5) approve / edit_confirm のときだけ SoT へ反映

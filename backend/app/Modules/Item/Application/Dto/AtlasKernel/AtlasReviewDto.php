@@ -31,6 +31,8 @@ final class AtlasReviewDto
 
         // UI表示補助
         public readonly array $attributes,
+
+        public readonly array $beforeParsed,
     ) {}
 
     public function toArray(): array
@@ -55,6 +57,8 @@ final class AtlasReviewDto
 
             // UI表示補助
             'attributes'         => $this->attributes,
+
+            'beforeParsed'       => $this->beforeParsed,
         ];
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+
 use App\Modules\Item\Domain\Service\AtlasKernelService;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
@@ -21,7 +22,7 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
 
     /**
      * v3 固定：
-     * Job は requestId だけを主語にする
+     * Job は analysisRequestId だけを主語にする
      */
     public function __construct(
         private int $analysisRequestId,
@@ -36,7 +37,7 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
     ): void {
 
         /**
-         * ① Request を SoT として取得
+         * ① Request を SoT として取得（唯一の主語）
          */
         $request = $requestRepo->findOrFail($this->analysisRequestId);
 
@@ -48,34 +49,29 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         }
 
         /**
-         * ③ 入力データは request からのみ取得
+         * ③ 入力は request からのみ取得
          */
         $itemId   = $request->itemId();
         $tenantId = $request->tenantId();
-        $rawText  = $request->rawText();   // item_draft / SoT snapshot
+        $rawText  = $request->rawText();
 
         /**
          * ④ AtlasKernel へ解析依頼
-         * ※ v3 方針：Domain Service では named argument を使わない
+         * ※ v3 方針：named argument を使わない
          */
-        $analysisResult = $atlasKernel->requestAnalysis(
+        $analysis = $atlasKernel->requestAnalysis(
             $itemId,
             $rawText,
             $tenantId,
         );
 
         /**
-         * ⑤ 表示用（暫定）構造へ変換
-         */
-        $analysis = $analysisResult;
-
-        /**
-         * ⑥ UX fallback 用の Item 参照（安全）
+         * ⑤ UX fallback 用 Item（安全参照）
          */
         $item = Item::find($itemId);
 
         /**
-         * ⑦ analysis_results 保存 payload（requestId 主語）
+         * ⑥ analysis_results 保存 payload（requestId 主語）
          */
         $persistPayload = [
             'analysis_request_id' => $request->id(),
@@ -83,12 +79,12 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
             // 参照用途（SoT ではない）
             'item_id' => $itemId,
 
-
             'brand_name' => data_get($analysis, 'brand.name')
                 ?? $item?->brand,
 
             'condition_name' => data_get($analysis, 'condition.name'),
             'color_name'     => data_get($analysis, 'color.name'),
+
             'classified_tokens' => [
                 'brand'     => data_get($analysis, 'tokens.brand', []),
                 'condition' => data_get($analysis, 'tokens.condition', []),
@@ -108,7 +104,7 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         ];
 
         /**
-         * ⑧ 保存（requestId 主語）
+         * ⑦ 保存（requestId 主語）
          */
         $resultRepo->saveByRequestId(
             $request->id(),
@@ -116,17 +112,11 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         );
 
         /**
-         * ⑨ request を done にする
+         * ⑧ request を done にする
          */
         $requestRepo->markDone($request->id());
 
-        /**
-         * ⑩ Aフェーズ：即時反映（将来は PolicyEngine に委譲）
-         * ※ ApplyUseCase も requestId 主語
-         */
-        $applyUseCase->handle(
-            $request->id(),
-            $analysis,
-        );
+        // v3 Aフェーズでは SoT 反映しない
+        // $applyUseCase->handle($request->id(), $analysis);
     }
 }

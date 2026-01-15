@@ -7,27 +7,26 @@ namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
-use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
-use App\Models\ItemEntity;
+use App\Modules\Item\Domain\Repository\ItemEntityRepository;
 
 final class ApplyConfirmedDecisionUseCase
 {
     public function __construct(
-        private ReviewDecisionRepository $decisions,
-        private AnalysisResultRepository $analysisResults,
-        private AnalysisRequestRepository $analysisRequests, // ★ 必須
+        private ReviewDecisionRepository  $decisions,
+        private AnalysisRequestRepository $requests,
+        private ItemEntityRepository      $itemEntities,
     ) {}
 
     public function handle(int $analysisRequestId): void
     {
-        Log::info('[ApplyConfirmedDecision] handle start', [
-            'request_id' => $analysisRequestId,
+        Log::info('[🔥ApplyConfirmedDecision] START', [
+            'analysis_request_id' => $analysisRequestId,
         ]);
 
         DB::transaction(function () use ($analysisRequestId) {
 
-            /** 1️⃣ 最新 decision */
+            /** 1) decision 取得 */
             $decision = $this->decisions
                 ->findLatestByAnalysisRequestId($analysisRequestId);
 
@@ -36,87 +35,57 @@ final class ApplyConfirmedDecisionUseCase
                 return;
             }
 
-            /** 2️⃣ snapshot 選択 */
-            $snapshot = match ($decision->decision_type) {
-                'approve'      => $decision->before_snapshot,
-                'edit_confirm' => $decision->after_snapshot,
-                default        => null,
-            };
+            /** 2) approve / edit_confirm のみ適用 */
+            if (! in_array($decision->decision_type, ['approve', 'edit_confirm'], true)) {
+                Log::info('[ApplyConfirmedDecision] decision rejected. skip apply.');
+                return;
+            }
+
+            /** 3) after_snapshot（entity_id 前提） */
+            $snapshot = $decision->after_snapshot;
 
             if (! is_array($snapshot)) {
-                Log::warning('[ApplyConfirmedDecision] snapshot invalid');
+                Log::error('[ApplyConfirmedDecision] snapshot invalid');
                 return;
             }
 
-            /** 3️⃣ analysis_request → item_id 解決（ここが正） */
-            $analysisRequest = $this->analysisRequests
-                ->findOrFail($analysisRequestId);
+            $brandEntityId     = $snapshot['brand_entity_id']     ?? null;
+            $conditionEntityId = $snapshot['condition_entity_id'] ?? null;
+            $colorEntityId     = $snapshot['color_entity_id']     ?? null;
 
-            if (! $analysisRequest) {
-                Log::error('[ApplyConfirmedDecision] analysis_request not found');
+            if (! $brandEntityId && ! $conditionEntityId && ! $colorEntityId) {
+                Log::warning('[ApplyConfirmedDecision] no entity ids. skip.');
                 return;
             }
 
-            $itemId = $analysisRequest->itemId();
+            /** 4) request → item */
+            $request = $this->requests->findOrFail($analysisRequestId);
+            $itemId  = $request->itemId();
 
-            Log::info('[ApplyConfirmedDecision] resolved item_id', [
-                'item_id' => $itemId,
-            ]);
+            /** 5) 冪等 */
+            if ($this->itemEntities->existsLatestHumanConfirmed($itemId, 'v3_confirmed')) {
+                Log::info('[ApplyConfirmedDecision] already applied. skip.');
+                return;
+            }
 
-            /** 4️⃣ 既存 latest 無効化 */
-            ItemEntity::where('item_id', $itemId)
-                ->where('is_latest', true)
-                ->update(['is_latest' => false]);
+            /** 6) latest 無効化 */
+            $this->itemEntities->markAllAsNotLatest($itemId);
 
-            /** 5️⃣ snapshot.value を正しく読む（超重要） */
-            $brandName     = $snapshot['brand']['value']     ?? null;
-            $conditionName = $snapshot['condition']['value'] ?? null;
-            $colorName     = $snapshot['color']['value']     ?? null;
-
-            Log::info('[ApplyConfirmedDecision] snapshot values', [
-                'brand' => $brandName,
-                'condition' => $conditionName,
-                'color' => $colorName,
-            ]);
-
-            /** 6️⃣ entity 解決 */
-            $brandEntityId = $brandName
-                ? DB::table('brand_entities')
-                    ->where('canonical_name', $brandName)
-                    ->value('id')
-                : null;
-
-            $conditionEntityId = $conditionName
-                ? DB::table('condition_entities')
-                    ->where('canonical_name', $conditionName)
-                    ->value('id')
-                : null;
-
-            $colorEntityId = $colorName
-                ? DB::table('color_entities')
-                    ->where('canonical_name', $colorName)
-                    ->value('id')
-                : null;
-
-            Log::info('[ApplyConfirmedDecision] resolved entity ids', [
-                'brand_entity_id' => $brandEntityId,
-                'condition_entity_id' => $conditionEntityId,
-                'color_entity_id' => $colorEntityId,
-            ]);
-
-            /** 7️⃣ human_confirmed 作成（唯一の SoT） */
-            ItemEntity::create([
+            /** 7) human_confirmed 作成 */
+            $this->itemEntities->create([
                 'item_id'             => $itemId,
                 'brand_entity_id'     => $brandEntityId,
                 'condition_entity_id' => $conditionEntityId,
                 'color_entity_id'     => $colorEntityId,
-                'is_latest'           => true,
                 'source'              => 'human_confirmed',
+                'is_latest'           => true,
                 'generated_version'   => 'v3_confirmed',
                 'generated_at'        => now(),
             ]);
 
-            Log::info('[ApplyConfirmedDecision] ItemEntity created');
+            Log::info('[🔥ApplyConfirmedDecision] DONE', [
+                'item_id' => $itemId,
+            ]);
         });
     }
 }

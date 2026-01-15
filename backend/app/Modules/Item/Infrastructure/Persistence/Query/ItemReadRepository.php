@@ -3,7 +3,6 @@
 namespace App\Modules\Item\Infrastructure\Persistence\Query;
 
 use App\Models\Item;
-use App\Modules\Item\Infrastructure\Persistence\Query\ItemEntityTagReadRepository;
 use Illuminate\Support\Facades\DB;
 
 final class ItemReadRepository
@@ -13,17 +12,11 @@ final class ItemReadRepository
     ) {
     }
 
-
     public function findWithDisplayBrand(int $itemId)
     {
         return Item::query()
             ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
-            ->leftJoin(
-                'brand_entities',
-                'item_entities.brand_entity_id',
-                '=',
-                'brand_entities.id'
-            )
+            ->leftJoin('brand_entities', 'item_entities.brand_entity_id', '=', 'brand_entities.id')
             ->where('items.id', $itemId)
             ->select([
                 'items.*',
@@ -39,12 +32,7 @@ final class ItemReadRepository
                 $join->on('items.id', '=', 'item_entities.item_id')
                     ->where('item_entities.is_latest', true);
             })
-            ->leftJoin(
-                'brand_entities',
-                'item_entities.brand_entity_id',
-                '=',
-                'brand_entities.id'
-            )
+            ->leftJoin('brand_entities', 'item_entities.brand_entity_id', '=', 'brand_entities.id')
             ->select([
                 'items.*',
                 DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
@@ -53,108 +41,155 @@ final class ItemReadRepository
     }
 
     /**
-     * 商品詳細（entity 優先）
+     * 商品詳細（v3固定）
+     * 優先順位：
+     * 1) human_confirmed（存在するなら必ずこれ）
+     * 2) is_latest=true の entity（ai_provisional 等）
+     * 3) analysis_results（human_confirmed が無い時のみ）
+     * 4) items（raw）
      */
     public function findWithDisplayEntities(int $itemId): ?array
-{
-    $item = Item::find($itemId);
-    if (! $item) return null;
+    {
+        $item = Item::find($itemId);
+        if (! $item) {
+            return null;
+        }
 
-    // ① 最新 entity（確定 or 仮）
-    $entity = DB::table('item_entities as ie')
-        ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
-        ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
-        ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
-        ->where('ie.item_id', $itemId)
-        ->where('ie.is_latest', true)
-        ->orderByRaw("
-            CASE ie.source
-                WHEN 'human_confirmed' THEN 1
-                WHEN 'ai_provisional' THEN 2
-                ELSE 3
-            END
-        ")
-        ->select([
-            'ie.source',
+        // ① entity を確定（human_confirmed優先）
+        $entity = $this->pickBestEntityRow($itemId);
 
-            'be.canonical_name as brand_name',
-            'ce.canonical_name as condition_name',
-            'coe.canonical_name as color_name',
-        ])
-        ->first();
+        // ② display を構築
+        $display = null;
 
-    // ② AI解析 fallback
-    $analysis = DB::table('analysis_results')
-        ->where('item_id', $itemId)
-        ->where('status', 'active')
-        ->orderByDesc('id')
-        ->first();
+        if ($entity !== null) {
+            // ★重要：entity が取れた時点で analysis_results は使わない
+            $display = [
+                'brand' => [
+                    'name'   => $entity->brand_name ?? null,
+                    'source' => (string) ($entity->source ?? 'unknown'),
+                ],
+                'condition' => [
+                    'name'   => $entity->condition_name ?? null,
+                    'source' => (string) ($entity->source ?? 'unknown'),
+                ],
+                'color' => [
+                    'name'   => $entity->color_name ?? null,
+                    'source' => (string) ($entity->source ?? 'unknown'),
+                ],
+            ];
+        } else {
+            // entity が無い時だけ analysis_results を暫定表示に使う
+            $analysis = DB::table('analysis_results')
+                ->where('item_id', $itemId)
+                ->where('status', 'active')
+                ->orderByDesc('id')
+                ->first();
 
-    $display = null;
+            if ($analysis) {
+                $display = [
+                    'brand' => [
+                        'name'   => $analysis->brand_name ?? null,
+                        'source' => 'ai_provisional',
+                    ],
+                    'condition' => [
+                        'name'   => $analysis->condition_name ?? null,
+                        'source' => 'ai_provisional',
+                    ],
+                    'color' => [
+                        'name'   => $analysis->color_name ?? null,
+                        'source' => 'ai_provisional',
+                    ],
+                    'confidence_map'     => $analysis->confidence_map ?? null,
+                    'overall_confidence' => $analysis->overall_confidence ?? null,
+                ];
+            }
+        }
 
-    $hasEntityValue =
-    $entity &&
-    (
-        $entity->brand_name !== null ||
-        $entity->condition_name !== null ||
-        $entity->color_name !== null
-    );
+        return [
+            'id'         => $item->id,
+            'shop_id'    => $item->shop_id,
+            'name'       => $item->name,
+            'price'      => $item->price,
+            'explain'    => $item->explain,
+            'remain'     => $item->remain,
 
-if ($hasEntityValue) {
-    $display = [
-        'brand' => [
-            'name'   => $entity->brand_name,
-            'source' => $entity->source,
-        ],
-        'condition' => [
-            'name'   => $entity->condition_name,
-            'source' => $entity->source,
-        ],
-        'color' => [
-            'name'   => $entity->color_name,
-            'source' => $entity->source,
-        ],
-    ];
-} elseif ($analysis) {
-    $display = [
-        'brand' => [
-            'name'   => $analysis->brand_name,
-            'source' => 'ai_provisional',
-        ],
-        'condition' => [
-            'name'   => $analysis->condition_name,
-            'source' => 'ai_provisional',
-        ],
-        'color' => [
-            'name'   => $analysis->color_name,
-            'source' => 'ai_provisional',
-        ],
-    ];
-}
+            // SoT（raw）
+            'brand'      => $item->brand,
+            'condition'  => $item->condition,
+            'color'      => $item->color,
 
-    return [
-        'id'        => $item->id,
-        'shop_id'   => $item->shop_id,
-        'name'      => $item->name,
-        'price'     => $item->price,
-        'explain'   => $item->explain,
-        'remain'    => $item->remain,
-        'display'   => $display,
-        'item_image'=> $item->item_image,
-    ];
-}
+            // 表示（確定/暫定）
+            'display'    => $display,
+
+            'item_image' => $item->item_image,
+        ];
+    }
 
     /**
-     * 一覧（entity 優先・軽量）
+     * v3固定：entity選択（最重要）
+     * - human_confirmed が 1件でもあるなら、それを返す（is_latest を信用しない）
+     * - ない場合だけ is_latest=true の entity を返す
+     *
+     * 返却は canonical_name JOIN済みの行（brand_name/condition_name/color_name を必ず持つ）
      */
-    public function paginateWithDisplayEntities(
-        int $limit,
-        int $page
-    ) {
+    private function pickBestEntityRow(int $itemId): ?object
+    {
+        // A) human_confirmed を最優先（is_latest が壊れてても拾う）
+        $human = DB::table('item_entities as ie')
+            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
+            ->where('ie.item_id', $itemId)
+            ->where('ie.source', 'human_confirmed')
+            ->orderByDesc('ie.id')
+            ->select([
+                'ie.id',
+                'ie.source',
+                'be.canonical_name as brand_name',
+                'ce.canonical_name as condition_name',
+                'coe.canonical_name as color_name',
+            ])
+            ->first();
+
+        if ($human !== null) {
+            return $human;
+        }
+
+        // B) human_confirmed が無い時だけ is_latest を採用
+        return DB::table('item_entities as ie')
+            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
+            ->where('ie.item_id', $itemId)
+            ->where('ie.is_latest', true)
+            ->orderByRaw("
+                CASE ie.source
+                    WHEN 'ai_provisional' THEN 1
+                    ELSE 2
+                END
+            ")
+            ->orderByDesc('ie.id')
+            ->select([
+                'ie.id',
+                'ie.source',
+                'be.canonical_name as brand_name',
+                'ce.canonical_name as condition_name',
+                'coe.canonical_name as color_name',
+            ])
+            ->first();
+    }
+
+    /**
+     * 一覧（軽量）
+     * - ここは is_latest 前提（ApplyConfirmedDecision 側で is_latest を保証する）
+     * - 一覧で human_confirmed を完全優先したいなら、後で View / subquery 化する（今は重くしない）
+     */
+    public function paginateWithDisplayEntities(int $limit, int $page)
+    {
         return Item::query()
             ->leftJoin('item_entities as ie', function ($join) {
                 $join->on('items.id', '=', 'ie.item_id')
-                     ->where('ie.is_latest', true);
+                    ->where('ie.is_latest', true);
             })
             ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
             ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
@@ -164,10 +199,10 @@ if ($hasEntityValue) {
                 'items.name',
                 'items.price',
                 'items.item_image',
-
-                DB::raw('be.canonical_name  as brand_primary'),
-                DB::raw('ce.canonical_name  as condition_name'),
-                DB::raw('coe.canonical_name as color_name'),
+                'be.canonical_name as brand_primary',
+                'ce.canonical_name as condition_name',
+                'coe.canonical_name as color_name',
+                'ie.source as entity_source',
             ])
             ->paginate($limit, ['*'], 'page', $page)
             ->through(function ($row) {
@@ -178,6 +213,9 @@ if ($hasEntityValue) {
                     'brand'     => $row->brand_primary,
                     'condition' => $row->condition_name,
                     'color'     => $row->color_name,
+                    'meta'      => [
+                        'source' => $row->entity_source,
+                    ],
                     'item_image' => $row->item_image
                         ? asset('storage/' . $row->item_image)
                         : null,
@@ -185,24 +223,12 @@ if ($hasEntityValue) {
             });
     }
 
-    private function loadTags(int $itemId): array
-    {
-        return DB::table('item_entity_tags')
-            ->where('item_id', $itemId)
-            ->select('entity_type', 'canonical_name')
-            ->get()
-            ->groupBy('entity_type')
-            ->map(fn ($rows) => $rows->pluck('canonical_name')->values())
-            ->toArray();
-    }
-
     public function findWithDisplayEntitiesAndTags(
         int $itemId,
         ItemEntityTagReadRepository $tagRepo
     ): ?array {
         $item = $this->findWithDisplayEntities($itemId);
-
-        if (!$item) {
+        if (! $item) {
             return null;
         }
 
@@ -212,13 +238,14 @@ if ($hasEntityValue) {
         ];
     }
 
+    /**
+     * NOTE: Repository の責務ではないので削除推奨（現状維持なら残しても良いが動かない）
+     * $this->toArray() はこのクラスに存在しないので実行すると落ちます。
+     */
     public function withFavorite(bool $isFavorited): array
     {
-        return array_merge(
-            $this->toArray(),
-            [
-                'isFavorited' => $isFavorited,
-            ]
-        );
+        return [
+            'isFavorited' => $isFavorited,
+        ];
     }
 }

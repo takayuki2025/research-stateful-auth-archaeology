@@ -41,6 +41,14 @@ type ReviewSourceResponse = {
     decided_by?: number | null;
     note?: string | null;
   } | null;
+
+  beforeParsed?: {
+    name?: string | null;
+    description?: string | null;
+    brand?: string | null;
+    color?: string | null;
+    condition?: string | null;
+  } | null;
 };
 
 
@@ -121,6 +129,11 @@ function labelForDiff(s: ReturnType<typeof diffState>) {
   }
 }
 
+/**
+ * normalizeSnapshot
+ * - AFTER（解析・正規化結果）専用
+ * - before / beforeParsed には絶対に使わない
+ */
 function normalizeSnapshot(
   raw: Record<string, any> | null | undefined,
   confidenceMap?: Record<string, number | null>
@@ -176,10 +189,42 @@ export default function AtlasReviewPage() {
     "approve" | "edit_confirm" | "manual_override" | "reject"
   >("approve");
 
-  const before = useMemo(
-    () => normalizeSnapshot(data?.before as any),
-    [data?.before]
-  );
+  const before = useMemo(() => {
+    // v3: before は value-object 形式のときのみ SoT と認める
+    const rawBefore = data?.before as any;
+
+    const isValueObject =
+      rawBefore &&
+      typeof rawBefore === "object" &&
+      ["brand", "color", "condition"].some(
+        (k) =>
+          typeof rawBefore?.[k] === "object" &&
+          rawBefore?.[k]?.value !== undefined
+      );
+
+    if (isValueObject) {
+      return rawBefore as Snapshot;
+    }
+
+    // ⬇️ ここで初めて beforeParsed を使う
+    if (data?.beforeParsed) {
+      const out: Snapshot = {};
+      for (const k of ["brand", "color", "condition"] as AttrKey[]) {
+        const v = data.beforeParsed[k];
+        if (v && String(v).trim() !== "") {
+          out[k] = {
+            value: String(v),
+            confidence: null,
+            confidence_version: "v3_raw_input",
+            source: "manual",
+          };
+        }
+      }
+      return Object.keys(out).length ? out : null;
+    }
+
+    return null;
+  }, [data?.before, data?.beforeParsed]);
 
   const after = useMemo(
     () => normalizeSnapshot(data?.after as any, data?.confidence_map),
@@ -189,12 +234,30 @@ export default function AtlasReviewPage() {
   // 初回に analyzer(after) を編集フォームへ流し込み（安全に一度だけ）
   const initialEdit = useMemo(() => {
     const base: Snapshot = {};
+
     for (const a of ATTRS) {
-      const v = after?.[a.key] ?? null;
-      if (v) base[a.key] = { ...v };
+      // ① 人入力（beforeParsed）
+      const raw = (data as any)?.beforeParsed?.[a.key] ?? null;
+
+      if (raw && String(raw).trim() !== "") {
+        base[a.key] = {
+          value: String(raw),
+          confidence: null,
+          confidence_version: "v3_raw_input",
+          source: "manual",
+        };
+        continue;
+      }
+
+      // ② fallback：解析結果
+      const ai = after?.[a.key] ?? null;
+      if (ai?.value) {
+        base[a.key] = { ...ai };
+      }
     }
+
     return base;
-  }, [after]);
+  }, [data?.beforeParsed, after]);
 
   useMemo(() => {
     // edit が空なら初期化
@@ -333,14 +396,23 @@ export default function AtlasReviewPage() {
           </div>
 
           {/* ================= 🆕 Learning Writing ================= */}
-          {data.learning && (
-            <div className="border rounded-lg p-4 bg-blue-50">
-              <div className="text-sm font-semibold mb-2">
-                Learning Writing（ブランド・カラー・コンディション、の他、商品名、商品説明、商品画像も解析計画です。）
-              </div>
-              <div className="text-sm whitespace-pre-wrap">
-                {data.learning}
-              </div>
+          {data.beforeParsed && (
+            <div className="border rounded-lg p-4 bg-green-50 space-y-2">
+              <div className="text-sm font-semibold">フィールドを広げ解析エリア拡張計画</div>
+
+              {data.beforeParsed.name && (
+                <div className="text-sm">
+                  <span className="font-medium">商品名：</span>
+                  {data.beforeParsed.name}
+                </div>
+              )}
+
+              {data.beforeParsed.description && (
+                <div className="text-sm">
+                  <span className="font-medium">商品説明：</span>
+                  {data.beforeParsed.description}
+                </div>
+              )}
             </div>
           )}
 
