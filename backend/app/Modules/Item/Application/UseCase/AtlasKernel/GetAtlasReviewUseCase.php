@@ -16,78 +16,80 @@ final class GetAtlasReviewUseCase
         private AnalysisRequestRepository $requests,
         private AnalysisResultRepository $results,
         private ReviewDecisionRepository $decisions,
-        private ItemDraftRepository $drafts, // ✅ v3固定：BEFORE(SoT)取得
+        private ItemDraftRepository $drafts, // ✅ BEFORE（SoT）
     ) {}
 
     public function handle(string $shopCode, int $analysisRequestId): AtlasReviewDto
     {
-        // ① request
+        /**
+         * ① Analysis Request
+         */
         $request = $this->requests->findOrFail($analysisRequestId);
 
-        // ② AFTER: analysis_results（AI提案）
+        /**
+         * ② Analysis Result（AI提案・AFTER）
+         */
         $result = $this->results->findByRequestId($analysisRequestId);
         if (! $result) {
             throw new \RuntimeException('analysis_result not found');
         }
 
-        // ③ decision（存在しても BEFORE の主語にはしない）
+        /**
+         * ③ Review Decision（あれば AFTER を上書き）
+         */
         $decision = $this->decisions->findLatestByRequestId($analysisRequestId);
 
+        /**
+         * learning（人間入力そのもの）
+         */
+        $learning = $request->rawText();
 
+        /**
+         * tokens（AI抽出の副産物・UI補助用）
+         */
+        $tokens = [
+            'brand'     => [],
+            'condition' => [],
+            'color'     => [],
+        ];
 
-        // ✅ v3固定（安全版）：BEFORE は item_drafts が「あれば使う」
-$learning = $request->rawText();
-
-$tokens = [
-    'brand'     => [],
-    'condition' => [],
-    'color'     => [],
-];
-
-if (is_array($result->classifiedTokens)) {
-    $tokens = array_merge($tokens, $result->classifiedTokens);
-}
-
-/**
- * ✅ v3固定：BEFORE は tokens から作る
- */
-$before = [
-    'brand'     => $tokens['brand'][0]     ?? null,
-    'condition' => $tokens['condition'][0] ?? null,
-    'color'     => $tokens['color'][0]     ?? null,
-];
-
-/**
- * フォールバック（tokens が空のときのみ）
- */
-if (
-    $before['brand'] === null &&
-    $before['condition'] === null &&
-    $before['color'] === null
-) {
-    $draftId = $request->itemDraftId();
-
-    if (is_string($draftId)) {
-        $draft = $this->drafts->findById($draftId);
-
-        if ($draft !== null) {
-            $before = [
-                'brand'     => $draft->brandRaw(),
-                'condition' => $draft->conditionRaw(),
-                'color'     => $draft->colorRaw(),
-            ];
+        if (is_array($result->classifiedTokens)) {
+            $tokens = array_merge($tokens, $result->classifiedTokens);
         }
-    }
-}
 
-        // ✅ v3固定：AFTER は analysis_result そのもの（AI提案）
+        /**
+         * ✅ v3固定：BEFORE = item_drafts（人間SoT）
+         */
+        $before = [
+            'brand'     => null,
+            'condition' => null,
+            'color'     => null,
+        ];
+
+        $draftId = $request->itemDraftId();
+        if (is_string($draftId)) {
+            $draft = $this->drafts->findById($draftId);
+            if ($draft !== null) {
+                $before = [
+                    'brand'     => $draft->brandRaw(),
+                    'condition' => $draft->conditionRaw(),
+                    'color'     => $draft->colorRaw(),
+                ];
+            }
+        }
+
+        /**
+         * ✅ v3固定：AFTER = analysis_results（AI提案）
+         */
         $after = [
             'brand'     => $result->brandName,
             'condition' => $result->conditionName,
             'color'     => $result->colorName,
         ];
 
-        // ✅ v3固定：edit_confirm の “after_snapshot” がある場合のみ AFTER を上書き（人間の編集確定）
+        /**
+         * 人間の edit_confirm があれば AFTER を上書き
+         */
         if ($decision && is_array($decision->after_snapshot) && ! empty($decision->after_snapshot)) {
             foreach (['brand', 'condition', 'color'] as $k) {
                 if (array_key_exists($k, $decision->after_snapshot)) {
@@ -96,13 +98,14 @@ if (
             }
         }
 
-        // ✅ v3固定：diff 自動生成（brand/condition/color のみ）
+        /**
+         * diff 自動生成（BEFORE vs AFTER）
+         */
         $diff = [];
         foreach (['brand', 'condition', 'color'] as $key) {
-            $b = $before[$key] ?? null;
-            $a = $after[$key] ?? null;
+            $b = $before[$key];
+            $a = $after[$key];
 
-            // 厳密比較は UI 事故を生みやすいので string 正規化して比較
             $bs = $b === null ? '' : (string) $b;
             $as = $a === null ? '' : (string) $a;
 
@@ -114,7 +117,9 @@ if (
             }
         }
 
-        // ✅ confidence_map（AFTER側のみ参照）
+        /**
+         * confidence_map（AFTER 側）
+         */
         $confidenceMap = $result->confidenceMap ?? [];
         if (is_string($confidenceMap)) {
             $confidenceMap = json_decode($confidenceMap, true) ?: [];
@@ -123,16 +128,21 @@ if (
             $confidenceMap = [];
         }
 
-        // attributes（UI表示用：AFTER + confidence）
+        /**
+         * attributes（UI表示用）
+         */
         $attributes = [];
         foreach (['brand', 'condition', 'color'] as $key) {
             $attributes[$key] = [
-                'value'      => $after[$key] ?? null,
+                'value'      => $after[$key],
                 'confidence' => $confidenceMap[$key] ?? null,
                 'evidence'   => null,
             ];
         }
 
+        /**
+         * DTO
+         */
         return new AtlasReviewDto(
             requestId: $request->id(),
             status: $request->status(),

@@ -82,7 +82,18 @@ export default function AtlasRequestsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Atlas 分析リクエスト</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Atlas 分析リクエスト</h1>
+
+        {/* 🔍 Decision History link */}
+        <Link
+          href={`/shops/${shop_code}/dashboard/atlas/history`}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          判断履歴（History）
+        </Link>
+      </div>
 
       <table className="w-full border text-sm">
         <thead className="bg-gray-50">

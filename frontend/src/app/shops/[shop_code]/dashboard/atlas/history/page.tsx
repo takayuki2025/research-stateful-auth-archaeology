@@ -110,7 +110,7 @@ export default function AtlasDecisionHistoryPage() {
               <td className="p-2 border">
                 {h.decided_by
                   ? `${h.decided_by.name} (${h.decided_by.role})`
-                  : "system"}
+                  : "system"}　
               </td>
 
               <td className="p-2 border text-gray-600">{h.note ?? "—"}</td>

@@ -36,7 +36,7 @@ const fetcher = async (url: string): Promise<ApiResponse> => {
    Page
 ========================= */
 
-export default function AtlasDecisionHistoryPage() {
+export default function AtlasDecisionHistoryDetailPage() {
   const router = useRouter();
   const { shop_code, request_id } = useParams<{
     shop_code: string;

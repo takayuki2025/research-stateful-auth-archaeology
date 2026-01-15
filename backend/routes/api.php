@@ -371,7 +371,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryListController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
 
@@ -392,9 +392,9 @@ Route::middleware(['auth:sanctum'])
         Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
             ->whereNumber('request_id');
 
-        // 4) 履歴（1件のrequestのdecision履歴）
-        Route::get('requests/{request_id}/history', [AtlasDecisionHistoryController::class, 'history'])
-            ->whereNumber('request_id');
+        // // 4) 履歴（1件のrequestのdecision履歴）
+        // Route::get('requests/{request_id}/history', [AtlasDecisionHistoryController::class, 'history'])
+        //     ->whereNumber('request_id');
 
         // 5) 履歴一覧（dashboard/atlas/history が叩く：あなたのURLに合わせる）
         Route::get('decision-histories', [AtlasDecisionHistoryListController::class, 'index']);
@@ -404,3 +404,27 @@ Route::middleware(['auth:sanctum'])
             ->whereNumber('request_id');
     });
 
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
+
+Route::prefix('shops/{shop_code}/atlas')->group(function () {
+
+    // 🟢 History 一覧
+    Route::get(
+        'history',
+        [AtlasDecisionHistoryController::class, 'index']
+    );
+
+    // 🟢 History 詳細
+    Route::get(
+        'requests/{requestId}/history',
+        [AtlasDecisionHistoryController::class, 'history']
+    );
+
+    // 🟡 Replay（Dフェーズ）
+    // Route::post(
+    //     'requests/{requestId}/replay',
+    //     [AtlasDecisionHistoryController::class, 'replay']
+    // );
+});

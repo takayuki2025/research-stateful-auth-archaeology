@@ -8,6 +8,24 @@ use Illuminate\Http\JsonResponse;
 
 final class AtlasDecisionHistoryController extends Controller
 {
+    public function index(string $shopCode): JsonResponse
+{
+    $histories = ReviewDecision::orderByDesc('decided_at')
+        ->get([
+            'id',
+            'analysis_request_id as request_id',
+            'decision_type',
+            'note',
+            'decided_by_type',
+            'decided_by',
+            'decided_at',
+        ]);
+
+    return response()->json([
+        'histories' => $histories,
+    ]);
+}
+
     public function history(
         string $shopCode,
         int $requestId
