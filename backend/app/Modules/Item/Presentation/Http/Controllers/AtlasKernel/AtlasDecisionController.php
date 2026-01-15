@@ -30,8 +30,10 @@ final class AtlasDecisionController extends Controller
             abort(403, 'Shop role not found');
         }
 
-        $decisionType  = (string) $request->input('decision_type');
-        $afterSnapshot = $request->input('after_snapshot');
+
+
+        $decisionType = $request->input('decisionType');
+        $afterSnapshot = $request->input('afterSnapshot');
         $note          = $request->input('note');
 
         $this->useCase->handle(
@@ -43,6 +45,9 @@ final class AtlasDecisionController extends Controller
             actorUserId: (int) $actor->id,
             actorRole: (string) $actorRole,
         );
+                if (!is_string($decisionType) || $decisionType === '') {
+    throw new \DomainException('decision_type is required');
+}
 
         return response()->json(['status' => 'ok']);
     }

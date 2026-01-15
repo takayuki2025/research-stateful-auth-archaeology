@@ -336,7 +336,7 @@ export default function AtlasReviewPage() {
           {data.learning && (
             <div className="border rounded-lg p-4 bg-blue-50">
               <div className="text-sm font-semibold mb-2">
-                Learning Writing（人間が最初に入力した内容）
+                Learning Writing（ブランド・カラー・コンディション、の他、商品名、商品説明、商品画像も解析計画です。）
               </div>
               <div className="text-sm whitespace-pre-wrap">
                 {data.learning}

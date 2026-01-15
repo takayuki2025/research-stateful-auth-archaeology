@@ -13,12 +13,18 @@ final class EloquentReviewDecisionRepository
         ReviewDecision::create($data);
     }
 
-    public function findLatestByRequestId(
+    public function appendDecision(array $data): void
+    {
+        ReviewDecision::create($data);
+    }
+
+    public function findLatestByAnalysisRequestId(
         int $analysisRequestId
-    ): ?object {
+    ): ?ReviewDecision {
         return ReviewDecision::query()
             ->where('analysis_request_id', $analysisRequestId)
-            ->latest('created_at')
+            ->orderByDesc('decided_at')
             ->first();
     }
+
 }

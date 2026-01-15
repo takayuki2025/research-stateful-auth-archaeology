@@ -37,7 +37,7 @@ final class GetAtlasReviewUseCase
         /**
          * ③ Review Decision（あれば AFTER を上書き）
          */
-        $decision = $this->decisions->findLatestByRequestId($analysisRequestId);
+        $decision = $this->decisions->findLatestByAnalysisRequestId($analysisRequestId);
 
         /**
          * learning（人間入力そのもの）
@@ -53,8 +53,19 @@ final class GetAtlasReviewUseCase
             'color'     => [],
         ];
 
-        if (is_array($result->classifiedTokens)) {
-            $tokens = array_merge($tokens, $result->classifiedTokens);
+        // classifiedTokens の実体が JSON string の可能性もあるのでガード
+        $classifiedTokens = $result->classifiedTokens ?? null;
+        if (is_string($classifiedTokens)) {
+            $decoded = json_decode($classifiedTokens, true);
+            $classifiedTokens = is_array($decoded) ? $decoded : null;
+        }
+        if (is_array($classifiedTokens)) {
+            // 想定キーのみマージ（余計なキーが混ざっても安全）
+            foreach (['brand', 'condition', 'color'] as $k) {
+                if (isset($classifiedTokens[$k]) && is_array($classifiedTokens[$k])) {
+                    $tokens[$k] = $classifiedTokens[$k];
+                }
+            }
         }
 
         /**
@@ -67,7 +78,7 @@ final class GetAtlasReviewUseCase
         ];
 
         $draftId = $request->itemDraftId();
-        if (is_string($draftId)) {
+        if (is_string($draftId) && $draftId !== '') {
             $draft = $this->drafts->findById($draftId);
             if ($draft !== null) {
                 $before = [
@@ -79,32 +90,51 @@ final class GetAtlasReviewUseCase
         }
 
         /**
-         * ✅ v3固定：AFTER = analysis_results（AI提案）
+         * ✅ v3固定：AFTER（value主語）
+         * - afterValue: UI/差分比較の主語（string|null）
+         * - afterMeta : human_confirmed 等の付随情報（confidence/source等）
          */
-        $after = [
-            'brand'     => $result->brandName,
-            'condition' => $result->conditionName,
-            'color'     => $result->colorName,
+        $afterValue = [
+            'brand'     => $result->brandName ?? null,
+            'condition' => $result->conditionName ?? null,
+            'color'     => $result->colorName ?? null,
+        ];
+
+        $afterMeta = [
+            'brand'     => null,
+            'condition' => null,
+            'color'     => null,
         ];
 
         /**
-         * 人間の edit_confirm があれば AFTER を上書き
+         * 人間の edit_confirm があれば AFTER を上書き（v3: {value, confidence, ...}）
          */
         if ($decision && is_array($decision->after_snapshot) && ! empty($decision->after_snapshot)) {
             foreach (['brand', 'condition', 'color'] as $k) {
-                if (array_key_exists($k, $decision->after_snapshot)) {
-                    $after[$k] = $decision->after_snapshot[$k];
+                $node = $decision->after_snapshot[$k] ?? null;
+
+                // v3形式: ['value' => 'Apple', 'confidence' => 0.9, ...]
+                if (is_array($node) && array_key_exists('value', $node)) {
+                    $afterValue[$k] = $node['value'];
+                    $afterMeta[$k]  = $node;
+                    continue;
+                }
+
+                // 互換: 古い形式で 'Apple' のように直接入ってくる場合
+                if (is_string($node) || is_null($node)) {
+                    $afterValue[$k] = $node;
+                    $afterMeta[$k]  = null;
                 }
             }
         }
 
         /**
-         * diff 自動生成（BEFORE vs AFTER）
+         * diff 自動生成（BEFORE value vs AFTER value）
          */
         $diff = [];
         foreach (['brand', 'condition', 'color'] as $key) {
             $b = $before[$key];
-            $a = $after[$key];
+            $a = $afterValue[$key];
 
             $bs = $b === null ? '' : (string) $b;
             $as = $a === null ? '' : (string) $a;
@@ -118,11 +148,12 @@ final class GetAtlasReviewUseCase
         }
 
         /**
-         * confidence_map（AFTER 側）
+         * confidence_map（AI側）
          */
         $confidenceMap = $result->confidenceMap ?? [];
         if (is_string($confidenceMap)) {
-            $confidenceMap = json_decode($confidenceMap, true) ?: [];
+            $decoded = json_decode($confidenceMap, true);
+            $confidenceMap = is_array($decoded) ? $decoded : [];
         }
         if (! is_array($confidenceMap)) {
             $confidenceMap = [];
@@ -130,18 +161,30 @@ final class GetAtlasReviewUseCase
 
         /**
          * attributes（UI表示用）
+         * - value は afterValue（必ず string|null）
+         * - confidence は human(afterMeta) があれば優先。なければ AI(confidenceMap)
          */
         $attributes = [];
         foreach (['brand', 'condition', 'color'] as $key) {
+            $humanConfidence = null;
+            $humanSource = null;
+
+            if (is_array($afterMeta[$key])) {
+                $humanConfidence = $afterMeta[$key]['confidence'] ?? null;
+                $humanSource     = $afterMeta[$key]['source'] ?? null;
+            }
+
             $attributes[$key] = [
-                'value'      => $after[$key],
-                'confidence' => $confidenceMap[$key] ?? null,
+                'value'      => $afterValue[$key],
+                'confidence' => $humanConfidence ?? ($confidenceMap[$key] ?? null),
+                'source'     => $humanSource ?? 'ai',
                 'evidence'   => null,
             ];
         }
 
         /**
          * DTO
+         * ✅ after は value 主語（string|null）で返す（ここが v3 固定）
          */
         return new AtlasReviewDto(
             requestId: $request->id(),
@@ -150,7 +193,7 @@ final class GetAtlasReviewUseCase
             tokens: $tokens,
             overallConfidence: $result->overallConfidence,
             before: $before,
-            after: $after,
+            after: $afterValue,
             diff: $diff,
             confidenceMap: $confidenceMap,
             attributes: $attributes,

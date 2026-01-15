@@ -10,6 +10,8 @@ final class ReviewDecision extends Model
 {
     protected $table = 'review_decisions';
 
+    public $timestamps = false;
+
     protected $fillable = [
         'analysis_request_id',
         'subject_type',

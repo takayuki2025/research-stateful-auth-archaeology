@@ -14,18 +14,19 @@ use App\Modules\Item\Domain\Event\Atlas\AtlasReviewApproved;
 use App\Modules\Item\Domain\Event\Atlas\AtlasReviewRejected;
 use App\Modules\Item\Domain\Event\Atlas\AtlasReviewEditConfirmed;
 use App\Modules\Item\Domain\Event\Atlas\AtlasManualOverrideOccurred;
+use App\Modules\Item\Application\UseCase\AtlasKernel\ApplyConfirmedDecisionUseCase;
 use Illuminate\Support\Facades\DB;
 
 final class DecideAtlasReviewUseCase
 {
     public function __construct(
-        private AtlasReviewQuery $reviewQuery,
-        private ReviewDecisionRepository $decisions,
-        private ItemEntityRepository $itemEntities,
-        private AnalysisRequestRepository $requests,
-        private AtlasDecisionPolicy $policy,   // confidence×role
-        private AtlasDecisionGuard $guard,     // 状態/二重決定
-    ) {}
+    private AtlasReviewQuery $reviewQuery,
+    private ReviewDecisionRepository $decisions,
+    private AnalysisRequestRepository $requests,
+    private AtlasDecisionPolicy $policy,
+    private AtlasDecisionGuard $guard,
+    private ApplyConfirmedDecisionUseCase $applyConfirmedDecision, // ← 追加
+) {}
 
     public function handle(
         string $shopCode,
@@ -36,7 +37,13 @@ final class DecideAtlasReviewUseCase
         int $actorUserId,
         string $actorRole,
     ): void {
-
+\Log::info('[DecideAtlasReview] handle start', [
+    'request_id' => $analysisRequestId,
+    'decision_type' => $decisionType,
+    'after_snapshot' => $afterSnapshot,
+    'actor_user_id' => $actorUserId,
+    'actor_role' => $actorRole,
+]);
         // 0) 入力の最小バリデーション（UX仕様に一致）
         if (in_array($decisionType, ['edit_confirm', 'manual_override'], true)) {
             if (!$afterSnapshot || !is_array($afterSnapshot) || count($afterSnapshot) === 0) {
@@ -66,7 +73,10 @@ final class DecideAtlasReviewUseCase
             $actorUserId,
             $actorRole
         ) {
-
+\Log::info('[DecideAtlasReview] decision saved', [
+    'request_id' => $analysisRequestId,
+    'decision_type' => $decisionType,
+]);
             // 2) Guard（状態/二重決定/整合性）
             $this->guard->assertDecidable(
                 analysisRequestId: $analysisRequestId,
@@ -81,23 +91,32 @@ final class DecideAtlasReviewUseCase
             $before = $src['before'] ?? null;
 
             // 4) ledger 保存（review_decisions）
-            $this->decisions->appendDecision(
-                analysisRequestId: $analysisRequestId,
-                decisionType: $decisionType,
-                beforeSnapshot: is_array($before) ? $before : null,
-                afterSnapshot: $afterSnapshot,
-                note: $note,
-                actorUserId: $actorUserId,
-                actorRole: $actorRole,
-            );
+            $this->decisions->appendDecision([
+    'analysis_request_id' => $analysisRequestId,
+    'decision_type'       => $decisionType,
+    'decision_reason'     => null, // 将来用
+    'note'                => $note,
+    'before_snapshot'     => is_array($before) ? $before : null,
+    'after_snapshot'      => $afterSnapshot,
+    'decided_by_type'     => 'human',
+    'decided_by'          => $actorUserId,
+    'decided_at'          => now(),
+]);
 
-            // 5) approve のときだけ SoT(item_entities) へ反映（v3要件）
-            if (in_array($decisionType, ['approve', 'system_approve'], true)) {
-                $this->itemEntities->applyDecisionResult(
-                    analysisRequestId: $analysisRequestId,
-                    actorUserId: $actorUserId,
-                );
-            }
+if (in_array($decisionType, ['approve', 'edit_confirm'], true)) {
+    \Log::info('[DecideAtlasReview] calling ApplyConfirmedDecision', [
+        'request_id' => $analysisRequestId,
+        'decision_type' => $decisionType,
+    ]);
+
+    $this->applyConfirmedDecision->handle($analysisRequestId);
+}
+
+
+            // 5) approve / edit_confirm のときだけ SoT へ反映
+if (in_array($decisionType, ['approve', 'edit_confirm'], true)) {
+    $this->applyConfirmedDecision->handle($analysisRequestId);
+}
 
             // 6) イベント（通知/監査/学習）
             match ($decisionType) {

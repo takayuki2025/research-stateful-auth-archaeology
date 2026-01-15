@@ -75,7 +75,7 @@ export default function ShopDashboardPage() {
 
             {/* 🟡 未決定バッジ（将来 API 連携で動的化） */}
             <span className="text-xs px-2 py-1 rounded bg-yellow-500 text-white">
-              改構築中
+              テスト 管理者用
             </span>
           </div>
 

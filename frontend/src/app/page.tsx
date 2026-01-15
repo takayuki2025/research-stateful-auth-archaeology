@@ -126,7 +126,7 @@ export default function Home() {
                 className={styles.shopButton}
                 onClick={() => router.push(`/shops/shop-${code}`)}
               >
-                ショップ {code.toUpperCase()} へ
+                テスト ショップ {code.toUpperCase()} へ
               </button>
             ))}
           </div>
