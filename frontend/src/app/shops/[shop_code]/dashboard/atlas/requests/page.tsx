@@ -36,6 +36,7 @@ const fetcher = async (url: string): Promise<ApiResponse> => {
   return res.json();
 };
 
+
 /* =========================
    Page
 ========================= */
@@ -51,7 +52,10 @@ export default function AtlasRequestsPage() {
 
   const { data, error, isLoading } = useSWR<ApiResponse>(
     isReviewer ? `/api/shops/${shop_code}/atlas/requests` : null,
-    fetcher
+    fetcher,
+    {
+      revalidateOnMount: true,
+    }
   );
 
   /* =========================

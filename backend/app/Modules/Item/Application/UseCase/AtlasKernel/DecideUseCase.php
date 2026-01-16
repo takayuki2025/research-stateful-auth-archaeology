@@ -58,6 +58,17 @@ if (!$hasAnyEntity) {
 
         $resolved = $input['resolvedEntities'] ?? null;
 
+if (!is_array($resolved)) {
+    throw new \LogicException('resolved_entities must be array');
+}
+
+// ★ v3 FIXED：Approve 系は「欠けていたらエラー」
+foreach (['brand_entity_id', 'condition_entity_id', 'color_entity_id'] as $key) {
+    if (!array_key_exists($key, $resolved)) {
+        throw new \LogicException("resolved_entities.$key is required");
+    }
+}
+
         $this->decisions->appendDecision([
     'analysis_request_id' => $analysisRequestId,
     'decision_type'       => $decisionType,

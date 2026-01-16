@@ -426,11 +426,9 @@ const badge =
                 {/* カラー：新規追加 */}
                 <div className={styles.conditionRow} style={{ marginTop: 10 }}>
                   <p className={styles.conditionLabel}>カラー：</p>
-                  <p className={styles.conditionValue}>
-                    <p className={styles.conditionValue}>
-                      {rawColor || "未登録"}
-                    </p>
-                  </p>
+                  <div className={styles.conditionValue}>
+                    {rawColor || "未登録"}
+                  </div>
                 </div>
               </div>
 

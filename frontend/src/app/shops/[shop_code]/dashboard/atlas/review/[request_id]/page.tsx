@@ -422,7 +422,9 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
       }
       await res.json().catch(() => ({}) as DecideResponse);
       await mutate(ENDPOINT.review);
+      // router.refresh();
       router.push(ENDPOINT.back);
+      // router.refresh();
     } finally {
       setIsSubmitting(false);
     }

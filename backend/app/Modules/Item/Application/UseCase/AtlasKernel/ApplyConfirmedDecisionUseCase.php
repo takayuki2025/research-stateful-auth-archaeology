@@ -49,8 +49,10 @@ $conditionEntityId = $resolved['condition_entity_id'] ?? null;
 $colorEntityId     = $resolved['color_entity_id'] ?? null;
 
 // Decide で保証されているので、ここは assert 的扱い
-if (!$brandEntityId && !$conditionEntityId && !$colorEntityId) {
-    throw new \LogicException('no resolved entity ids');
+foreach (['brand_entity_id', 'condition_entity_id', 'color_entity_id'] as $key) {
+    if (!array_key_exists($key, $resolved)) {
+        throw new \LogicException("resolved_entities.$key is required");
+    }
 }
 
             /** 4) request → item */
@@ -67,7 +69,9 @@ if (!$brandEntityId && !$conditionEntityId && !$colorEntityId) {
 
             /** 6) latest 無効化 */
             $this->itemEntities->markAllAsNotLatest($itemId);
-
+\Log::info('[ApplyConfirmedDecision] resolved', [
+    'resolved' => $resolved,
+]);
             /** 7) human_confirmed 作成 */
             $this->itemEntities->create([
                 'item_id'             => $itemId,

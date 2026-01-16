@@ -263,7 +263,7 @@ use App\Http\Controllers\{
 };
 
 Route::get('/entity-reviews', [ItemEntityReviewController::class, 'index']);
-Route::post('/entity-reviews/{id}/approve', [ItemEntityReviewController::class, 'approve']);
+// Route::post('/entity-reviews/{id}/approve', [ItemEntityReviewController::class, 'approve']);
 Route::post('/entity-reviews/{id}/reject', [ItemEntityReviewController::class, 'reject']);
 Route::get('/item-entities/{id}/audits', [ItemEntityAuditController::class, 'index']);
 Route::get('/entity-kpis', EntityKpiController::class);
