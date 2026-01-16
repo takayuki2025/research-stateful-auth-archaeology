@@ -8,25 +8,35 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('condition_entities', function (Blueprint $table) {
-            $table->id();
+    $table->id();
 
-            // 正規化された正式名
-            $table->string('canonical_name');
+    // 正規化キー（検索・JOIN 用）
+    $table->string('normalized_key')->index();
 
-            // 検索・同一判定用（lower 済み）
-            // $table->string('normalized_key')->unique();
+    // Canonical 論理名
+    $table->string('canonical_name');
 
-            // AtlasKernel の信頼度
-            $table->float('confidence')->nullable();
+    // UI 表示名
+    $table->string('display_name');
 
-            // 生成元（atlaskernel_v1 など）
-            $table->string('created_from')->default('atlaskernel_v1');
+    // 同義語
+    $table->json('synonyms_json')->nullable();
 
-            $table->timestamps();
+    // canonical merge 用
+    $table->unsignedBigInteger('merged_to_id')->nullable()->index();
+    $table->boolean('is_primary')->default(false)->index();
 
-            // index
-            $table->index('canonical_name');
-        });
+    // 学習・由来
+    $table->decimal('confidence', 3, 2)->nullable();
+    $table->string('created_from')->default('manual');
+
+    $table->timestamps();
+
+    $table->foreign('merged_to_id')
+        ->references('id')
+        ->on('condition_entities')
+        ->nullOnDelete();
+});
     }
 
     public function down(): void

@@ -1,17 +1,80 @@
 新品
+しんぴん
+シンピン
+brand new
+new
+
 未使用
+みしよう
+ミシヨウ
+unused
+未着用
+
 未開封
+みかいふう
+ミカイフウ
+sealed
+factory sealed
+
 ほぼ新品
-美品
+新品同様
+like new
+almost new
+
 極美品
+極上美品
+mint
+excellent
+
+美品
+びひん
+ビヒン
+綺麗
+きれい
+clean
+good condition
 
 中古
-使用済み
+ちゅうこ
+used
+second hand
+
 使用感あり
+使用済み
+使用感有
+visible wear
+used item
+
 傷あり
+きずあり
+キズあり
+擦り傷あり
+scratched
+
 汚れあり
+よごれあり
+シミあり
+dirty
+stained
+
 訳あり
+わけあり
+難あり
+一部不具合
+as is
+
+動作未確認
+未確認
+untested
+operation unchecked
+
+故障
+こしょう
+壊れています
+broken
+defective
 
 ジャンク
-動作未確認
-故障
+junk
+部品取り
+for parts

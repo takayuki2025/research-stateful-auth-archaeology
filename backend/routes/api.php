@@ -446,3 +446,19 @@ Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function (
     Route::post('/resolve', AtlasResolveController::class); // ✅ 追加
     Route::post('/decide',  AtlasDecideController::class);  // ✅ 既存
 });
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EntityController;
+
+Route::prefix('entities')->group(function () {
+    Route::get('brands', [EntityController::class, 'brands']);
+    Route::get('conditions', [EntityController::class, 'conditions']);
+    Route::get('colors', [EntityController::class, 'colors']);
+});
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\CanonicalEntityController;
+
+Route::get('/entities/{type}', [
+    CanonicalEntityController::class,
+    'index',
+]);

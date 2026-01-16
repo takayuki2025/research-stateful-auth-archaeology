@@ -67,22 +67,25 @@ export type ReviewSourceResponse = {
 type DecideRequestBody = {
   decision_type: "approve" | "reject" | "edit_confirm" | "manual_override";
 
-  /**
-   * edit_confirm / manual_override のとき必須
-   * approve / reject のとき undefined
-   */
-  after_snapshot?: AfterSnapshot;
-
-  /**
-   * Resolve API の結果（entity_id 主語）
-   * approve / edit_confirm / manual_override で使用
-   */
   resolvedEntities?: {
     brand_entity_id?: number | null;
     condition_entity_id?: number | null;
     color_entity_id?: number | null;
   };
 
+  beforeParsed?: {
+    brand?: string | null;
+    color?: string | null;
+    condition?: string | null;
+  };
+
+  afterParsed?: {
+    brand?: string | null;
+    color?: string | null;
+    condition?: string | null;
+  };
+
+  after_snapshot?: AfterSnapshot;
   note?: string | null;
 };
 
@@ -235,21 +238,17 @@ export default function AtlasReviewPage() {
 
 async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
   const resolved = await resolve({
-    brand: edit.brand?.value ?? null,
-    condition: edit.condition?.value ?? null,
-    color: edit.color?.value ?? null,
+    brand: after?.brand?.value ?? null,
+    condition: after?.condition?.value ?? null,
+    color: after?.color?.value ?? null,
   });
 
-  // ✅ snake_case をそのまま使う
   const resolvedForBackend: ResolvedEntitiesForBackend = {
     brand_entity_id: resolved.brand_entity_id ?? null,
     condition_entity_id: resolved.condition_entity_id ?? null,
     color_entity_id: resolved.color_entity_id ?? null,
   };
 
-  console.log("[resolvedForBackend]", resolvedForBackend);
-
-  setResolvedEntities(resolvedForBackend);
   return resolvedForBackend;
 }
 
@@ -402,7 +401,17 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
     return maxConfidence >= 0.7;
   }, [mode, maxConfidence]);
 
+const beforeParsedPayload = {
+  brand: before?.brand?.value ?? null,
+  color: before?.color?.value ?? null,
+  condition: before?.condition?.value ?? null,
+};
 
+const afterParsedPayload = {
+  brand: after?.brand?.value ?? null,
+  color: after?.color?.value ?? null,
+  condition: after?.condition?.value ?? null,
+};
 
   async function submitDecision(body: DecideRequestBody) {
     setIsSubmitting(true);
@@ -687,7 +696,7 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
                 }
 
                 // approve / edit_confirm / manual_override は必ず resolve
-                const resolved = await resolveBeforeDecide();
+                // const resolved = await resolveBeforeDecide();
 
                 let afterSnapshot: AfterSnapshot | undefined = undefined;
 
@@ -702,24 +711,40 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
                   if (!ok) return;
                 }
 
-const resolvedForBackend = await resolveBeforeDecide();
+let resolvedForBackend: ResolvedEntitiesForBackend | undefined = undefined;
 
-if (
-  !resolvedForBackend.brand_entity_id &&
-  !resolvedForBackend.condition_entity_id &&
-  !resolvedForBackend.color_entity_id
-) {
-  alert("確定できるエンティティがありません。入力を確認してください。");
-  return;
+if (mode === "approve" || mode === "edit_confirm") {
+  resolvedForBackend = await resolveBeforeDecide();
+
+  if (
+    !resolvedForBackend.brand_entity_id &&
+    !resolvedForBackend.condition_entity_id &&
+    !resolvedForBackend.color_entity_id
+  ) {
+    alert("確定できるエンティティがありません。入力を確認してください。");
+    return;
+  }
 }
 
 await submitDecision({
   decision_type: mode,
+
+  resolvedEntities:
+    mode === "manual_override" || mode === "reject"
+      ? {
+          brand_entity_id: null,
+          condition_entity_id: null,
+          color_entity_id: null,
+        }
+      : resolvedForBackend,
+
   after_snapshot:
     mode === "edit_confirm" || mode === "manual_override"
       ? buildAfterSnapshot(edit)
       : undefined,
-  resolvedEntities: resolvedForBackend,
+
+  beforeParsed: beforeParsedPayload,
+  afterParsed: afterParsedPayload,
   note: note || null,
 });
               } catch (e) {

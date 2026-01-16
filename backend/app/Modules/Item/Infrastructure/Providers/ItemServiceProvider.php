@@ -22,6 +22,20 @@ use App\Modules\Item\Infrastructure\Persistence\Repository\{
     EloquentConditionEntityRepository,
 };
 
+use App\Modules\Item\Domain\Repository\CanonicalEntityRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentCanonicalEntityRepository;
+use App\Modules\Item\Domain\Repository\LearningCandidateRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentLearningCandidateRepository;
+use App\Modules\Item\Domain\Repository\BrandEntityQueryRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentBrandEntityQueryRepository;
+use App\Modules\Item\Domain\Repository\ColorEntityQueryRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentColorEntityQueryRepository;
+use App\Modules\Item\Domain\Repository\ConditionEntityQueryRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentConditionEntityQueryRepository;
+
+
+
+
 final class ItemServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -52,5 +66,30 @@ final class ItemServiceProvider extends ServiceProvider
             ConditionEntityRepository::class,
             EloquentConditionEntityRepository::class
         );
+
+        $this->app->bind(
+    CanonicalEntityRepository::class,
+    EloquentCanonicalEntityRepository::class
+);
+
+$this->app->bind(
+            LearningCandidateRepository::class,
+            EloquentLearningCandidateRepository::class
+        );
+
+        $this->app->bind(
+    BrandEntityQueryRepository::class,
+    EloquentBrandEntityQueryRepository::class
+);
+
+$this->app->bind(
+    ColorEntityQueryRepository::class,
+    EloquentColorEntityQueryRepository::class
+);
+
+$this->app->bind(
+    ConditionEntityQueryRepository::class,
+    EloquentConditionEntityQueryRepository::class
+);
     }
 }
