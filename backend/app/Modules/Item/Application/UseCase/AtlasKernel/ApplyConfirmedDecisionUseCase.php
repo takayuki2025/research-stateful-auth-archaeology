@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\ItemEntityRepository;
@@ -20,51 +19,49 @@ final class ApplyConfirmedDecisionUseCase
 
     public function handle(int $analysisRequestId): void
     {
-        Log::info('[🔥ApplyConfirmedDecision] START', [
-            'analysis_request_id' => $analysisRequestId,
-        ]);
-
         DB::transaction(function () use ($analysisRequestId) {
 
-            /** 1) decision 取得 */
+            /** 1) 最新 decision */
             $decision = $this->decisions
                 ->findLatestByAnalysisRequestId($analysisRequestId);
 
-            if (! $decision) {
-                Log::warning('[ApplyConfirmedDecision] decision not found');
+            if (!$decision) {
+                throw new \RuntimeException('review_decision not found');
+            }
+
+            /** 2) 採用系のみ */
+            if (!in_array(
+                $decision->decision_type,
+                ['approve', 'edit_confirm', 'manual_override'],
+                true
+            )) {
                 return;
             }
 
-            /** 2) approve / edit_confirm のみ適用 */
-            if (! in_array($decision->decision_type, ['approve', 'edit_confirm'], true)) {
-                Log::info('[ApplyConfirmedDecision] decision rejected. skip apply.');
-                return;
-            }
+            $resolved = $decision->resolved_entities;
 
-            /** 3) after_snapshot（entity_id 前提） */
-            $snapshot = $decision->after_snapshot;
+if (!is_array($resolved)) {
+    throw new \LogicException('resolved_entities must be array');
+}
 
-            if (! is_array($snapshot)) {
-                Log::error('[ApplyConfirmedDecision] snapshot invalid');
-                return;
-            }
+$brandEntityId     = $resolved['brand_entity_id'] ?? null;
+$conditionEntityId = $resolved['condition_entity_id'] ?? null;
+$colorEntityId     = $resolved['color_entity_id'] ?? null;
 
-            $brandEntityId     = $snapshot['brand_entity_id']     ?? null;
-            $conditionEntityId = $snapshot['condition_entity_id'] ?? null;
-            $colorEntityId     = $snapshot['color_entity_id']     ?? null;
-
-            if (! $brandEntityId && ! $conditionEntityId && ! $colorEntityId) {
-                Log::warning('[ApplyConfirmedDecision] no entity ids. skip.');
-                return;
-            }
+// Decide で保証されているので、ここは assert 的扱い
+if (!$brandEntityId && !$conditionEntityId && !$colorEntityId) {
+    throw new \LogicException('no resolved entity ids');
+}
 
             /** 4) request → item */
             $request = $this->requests->findOrFail($analysisRequestId);
             $itemId  = $request->itemId();
 
             /** 5) 冪等 */
-            if ($this->itemEntities->existsLatestHumanConfirmed($itemId, 'v3_confirmed')) {
-                Log::info('[ApplyConfirmedDecision] already applied. skip.');
+            if ($this->itemEntities->existsLatestHumanConfirmed(
+                $itemId,
+                'v3_confirmed'
+            )) {
                 return;
             }
 
@@ -81,10 +78,6 @@ final class ApplyConfirmedDecisionUseCase
                 'is_latest'           => true,
                 'generated_version'   => 'v3_confirmed',
                 'generated_at'        => now(),
-            ]);
-
-            Log::info('[🔥ApplyConfirmedDecision] DONE', [
-                'item_id' => $itemId,
             ]);
         });
     }

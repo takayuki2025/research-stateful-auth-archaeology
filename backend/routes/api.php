@@ -370,7 +370,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 // v3 Controllers
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
 // use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryListController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
@@ -389,8 +389,8 @@ Route::middleware(['auth:sanctum'])
 )->whereNumber('request_id');
 
         // 3) Decide（approve/reject/edit_confirm/manual_override）
-        Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
-            ->whereNumber('request_id');
+        // Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
+        //     ->whereNumber('request_id');
 
         // // 4) 履歴（1件のrequestのdecision履歴）
         // Route::get('requests/{request_id}/history', [AtlasDecisionHistoryController::class, 'history'])
@@ -427,4 +427,22 @@ Route::prefix('shops/{shop_code}/atlas')->group(function () {
     //     'requests/{requestId}/replay',
     //     [AtlasDecisionHistoryController::class, 'replay']
     // );
+});
+
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ResolveAtlasEntitiesController;
+
+// Route::post(
+//     '/shops/{shop_code}/atlas/requests/{request_id}/resolve',
+//     ResolveAtlasEntitiesController::class
+// );
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasResolveController;
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecideController;
+
+Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function () {
+    // Route::get('/review',  /* 既存 */);
+    Route::post('/resolve', AtlasResolveController::class); // ✅ 追加
+    Route::post('/decide',  AtlasDecideController::class);  // ✅ 既存
 });

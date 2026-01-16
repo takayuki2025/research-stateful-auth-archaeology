@@ -3,6 +3,14 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
+import { useResolveEntities } from "@/ui/atlas/hooks/useResolveEntities";
+import type {
+  AtlasTokens,
+  ConfidenceMap,
+  AtlasAttributes,
+  AfterSnapshot,
+} from "@/ui/atlas/types";
+import { useEffect } from "react";
 
 /* =========================================================
    Types
@@ -14,25 +22,28 @@ type AttrValue = {
   value: string | null;
   confidence?: number | null;
   confidence_version?: string | null;
-  source?: "rule" | "gpt" | "vision" | "ocr" | "manual" | "unknown";
+  source?: "ai" | "manual" | "rule" | "gpt" | "vision" | "ocr" | "unknown";
 };
 
 type Snapshot = Partial<Record<AttrKey, AttrValue>>;
 
-type ReviewSourceResponse = {
+export type ReviewSourceResponse = {
   analysis_request_id: number;
   item_id: number;
 
-  // 🆕 人間が最初に入力した全文
   learning?: string | null;
-
-  // 🆕 全体入力（raw snapshot）
   input_snapshot?: Record<string, unknown> | null;
+
+  /* ========= v3 core ========= */
+
+  tokens?: AtlasTokens | null;
+  attributes?: AtlasAttributes | null;
+  confidence_map?: ConfidenceMap | null;
 
   before: Snapshot | null;
   after: Snapshot | null;
 
-  confidence_map?: Record<AttrKey, number | null>;
+  /* ========= decision ========= */
 
   latest_decision?: {
     decision_type: string;
@@ -41,6 +52,8 @@ type ReviewSourceResponse = {
     decided_by?: number | null;
     note?: string | null;
   } | null;
+
+  /* ========= raw ========= */
 
   beforeParsed?: {
     name?: string | null;
@@ -51,15 +64,35 @@ type ReviewSourceResponse = {
   } | null;
 };
 
-
-
 type DecideRequestBody = {
-  decisionType: "approve" | "reject" | "edit_confirm" | "manual_override";
-  afterSnapshot?: Snapshot | null;
+  decision_type: "approve" | "reject" | "edit_confirm" | "manual_override";
+
+  /**
+   * edit_confirm / manual_override のとき必須
+   * approve / reject のとき undefined
+   */
+  after_snapshot?: AfterSnapshot;
+
+  /**
+   * Resolve API の結果（entity_id 主語）
+   * approve / edit_confirm / manual_override で使用
+   */
+  resolvedEntities?: {
+    brand_entity_id?: number | null;
+    condition_entity_id?: number | null;
+    color_entity_id?: number | null;
+  };
+
   note?: string | null;
 };
 
 type DecideResponse = { status: "ok" | "accepted" };
+
+type ResolvedEntitiesForBackend = {
+  brand_entity_id?: number | null;
+  condition_entity_id?: number | null;
+  color_entity_id?: number | null;
+};
 
 /* =========================================================
    Fetcher
@@ -135,25 +168,50 @@ function labelForDiff(s: ReturnType<typeof diffState>) {
  * - before / beforeParsed には絶対に使わない
  */
 function normalizeSnapshot(
-  raw: Record<string, any> | null | undefined,
-  confidenceMap?: Record<string, number | null>
+  attributes: AtlasAttributes | null | undefined,
+  tokens: AtlasTokens | null | undefined,
+  confidenceMap: ConfidenceMap | null | undefined
 ): Snapshot | null {
-  if (!raw) return null;
+  if (!tokens) return null;
 
   const out: Snapshot = {};
 
-  for (const key of ["brand", "color", "condition"] as AttrKey[]) {
-    const v = raw[key];
-    if (typeof v === "string" && v.trim() !== "") {
+  (["brand", "color", "condition"] as const).forEach((key) => {
+    const token = tokens[key]?.[0] ?? null;
+
+    if (token) {
       out[key] = {
-        value: v,
+        value: token,
         confidence: confidenceMap?.[key] ?? null,
-        source: "gpt",
+        source: "ai",
       };
     }
-  }
+  });
 
   return Object.keys(out).length ? out : null;
+}
+
+
+
+function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
+  const out: AfterSnapshot = {};
+
+  (["brand", "condition", "color"] as const).forEach((key) => {
+    const v = edit[key];
+    if (v?.value && v.value.trim() !== "") {
+      out[key] = {
+        value: v.value.trim(),
+        source: "manual",
+        confidence: v.confidence ?? null,
+      };
+    }
+  });
+
+  if (Object.keys(out).length === 0) {
+    throw new Error("after_snapshot is empty. 手動入力がありません。");
+  }
+
+  return out;
 }
 
 /* =========================================================
@@ -162,10 +220,40 @@ function normalizeSnapshot(
 
 export default function AtlasReviewPage() {
   const router = useRouter();
-  const { shop_code, request_id } = useParams<{
-    shop_code: string;
-    request_id: string;
-  }>();
+  const params = useParams();
+
+  const shop_code = params.shop_code as string;
+  const request_id = params.request_id as string;
+
+  const { resolve } = useResolveEntities(shop_code, request_id);
+
+  const [resolvedEntities, setResolvedEntities] = useState<{
+    brand_entity_id?: number | null;
+    condition_entity_id?: number | null;
+    color_entity_id?: number | null;
+  }>({});
+
+async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
+  const resolved = await resolve({
+    brand: edit.brand?.value ?? null,
+    condition: edit.condition?.value ?? null,
+    color: edit.color?.value ?? null,
+  });
+
+  // ✅ snake_case をそのまま使う
+  const resolvedForBackend: ResolvedEntitiesForBackend = {
+    brand_entity_id: resolved.brand_entity_id ?? null,
+    condition_entity_id: resolved.condition_entity_id ?? null,
+    color_entity_id: resolved.color_entity_id ?? null,
+  };
+
+  console.log("[resolvedForBackend]", resolvedForBackend);
+
+  setResolvedEntities(resolvedForBackend);
+  return resolvedForBackend;
+}
+
+
 
   // ---- endpoints（必要ならここだけ変更）----
   const ENDPOINT = {
@@ -227,8 +315,9 @@ export default function AtlasReviewPage() {
   }, [data?.before, data?.beforeParsed]);
 
   const after = useMemo(
-    () => normalizeSnapshot(data?.after as any, data?.confidence_map),
-    [data?.after, data?.confidence_map] // ✅ ここが重要
+    () =>
+      normalizeSnapshot(data?.attributes, data?.tokens, data?.confidence_map),
+    [data?.attributes, data?.tokens, data?.confidence_map]
   );
 
   // 初回に analyzer(after) を編集フォームへ流し込み（安全に一度だけ）
@@ -259,13 +348,11 @@ export default function AtlasReviewPage() {
     return base;
   }, [data?.beforeParsed, after]);
 
-  useMemo(() => {
-    // edit が空なら初期化
+  useEffect(() => {
     if (Object.keys(edit).length === 0 && Object.keys(initialEdit).length > 0) {
       setEdit(initialEdit);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialEdit]);
+  }, [initialEdit, edit]);
 
   const rows = useMemo(() => {
     return ATTRS.map((a) => {
@@ -315,6 +402,8 @@ export default function AtlasReviewPage() {
     return maxConfidence >= 0.7;
   }, [mode, maxConfidence]);
 
+
+
   async function submitDecision(body: DecideRequestBody) {
     setIsSubmitting(true);
     try {
@@ -338,36 +427,6 @@ export default function AtlasReviewPage() {
       setIsSubmitting(false);
     }
   }
-
-  function buildAfterSnapshotForHuman(): Snapshot {
-    // 人手決定の afterSnapshot：edit に入っている value を採用
-    // confidence / version は「manual」へ寄せる（サーバ側で最終正規化してもOK）
-    const out: Snapshot = {};
-    for (const a of ATTRS) {
-      const v = edit?.[a.key]?.value ?? null;
-      if (v !== null && v !== undefined && String(v).trim() !== "") {
-        out[a.key] = {
-          value: String(v).trim(),
-          confidence: edit?.[a.key]?.confidence ?? null,
-          confidence_version: edit?.[a.key]?.confidence_version ?? "v3_manual",
-          source: "manual",
-        };
-      }
-    }
-    return out;
-  }
-
-  function ensureEditReadyOrThrow() {
-    const snap = buildAfterSnapshotForHuman();
-    if (Object.keys(snap).length === 0) {
-      throw new Error(
-        "after_snapshot is required for edit_confirm/manual_override."
-      );
-    }
-    return snap;
-  }
-
-
 
   /* =========================================================
      Render
@@ -398,7 +457,9 @@ export default function AtlasReviewPage() {
           {/* ================= 🆕 Learning Writing ================= */}
           {data.beforeParsed && (
             <div className="border rounded-lg p-4 bg-green-50 space-y-2">
-              <div className="text-sm font-semibold">フィールドを広げ解析エリア拡張計画</div>
+              <div className="text-sm font-semibold">
+                フィールドを広げ解析エリア拡張計画
+              </div>
 
               {data.beforeParsed.name && (
                 <div className="text-sm">
@@ -615,28 +676,23 @@ export default function AtlasReviewPage() {
             disabled={isSubmitting}
             onClick={async () => {
               try {
-                if (mode === "approve") {
-                  await submitDecision({
-                    decisionType: "approve",
-                    afterSnapshot: null,
-                    note: note || null,
-                  });
-                  return;
-                }
-
                 if (mode === "reject") {
                   await submitDecision({
-                    decisionType: "reject",
-                    afterSnapshot: null,
+                    decision_type: "reject",
                     note: note || null,
                   });
                   return;
                 }
 
-                // edit_confirm / manual_override
-                const snap = ensureEditReadyOrThrow();
+                // approve / edit_confirm / manual_override は必ず resolve
+                const resolved = await resolveBeforeDecide();
 
-                // 要件：confidence>=0.7 の手動反映時は注意ポップアップ
+                let afterSnapshot: AfterSnapshot | undefined = undefined;
+
+                if (mode === "edit_confirm" || mode === "manual_override") {
+                  afterSnapshot = buildAfterSnapshot(edit); // ← ここだけ
+                }
+
                 if (needsCautionPopup) {
                   const ok = confirm(
                     "confidence 70%以上の手動反映です。業務改善のため管理者へ通知されます。続行しますか？"
@@ -644,11 +700,26 @@ export default function AtlasReviewPage() {
                   if (!ok) return;
                 }
 
-                await submitDecision({
-                  decisionType: mode,
-                  afterSnapshot: snap,
-                  note: note || null,
-                });
+const resolvedForBackend = await resolveBeforeDecide();
+
+if (
+  !resolvedForBackend.brand_entity_id &&
+  !resolvedForBackend.condition_entity_id &&
+  !resolvedForBackend.color_entity_id
+) {
+  alert("確定できるエンティティがありません。入力を確認してください。");
+  return;
+}
+
+await submitDecision({
+  decision_type: mode,
+  after_snapshot:
+    mode === "edit_confirm" || mode === "manual_override"
+      ? buildAfterSnapshot(edit)
+      : undefined,
+  resolvedEntities: resolvedForBackend,
+  note: note || null,
+});
               } catch (e) {
                 alert((e as Error).message);
               }

@@ -10,7 +10,7 @@ class BrandEntity extends Model
 
     protected $fillable = [
         'canonical_name',
-        'normalized_key',
+        'display_name',
         'synonyms_json',
         'confidence',
         'created_from',

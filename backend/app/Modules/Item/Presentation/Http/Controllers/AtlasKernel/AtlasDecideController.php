@@ -29,17 +29,18 @@ final class AtlasDecideController extends Controller
         }
 
         $validated = $request->validate([
-            'decision_type'  => ['required', 'string', 'in:approve,edit_confirm,reject'],
+            'decision_type'  => ['required', 'string', 'in:approve,edit_confirm,manual_override,reject'],
             'note'           => ['nullable', 'string', 'max:2000'],
             'after_snapshot' => ['nullable', 'array'], // edit_confirm のときのみ使う
+            'resolvedEntities' => ['nullable', 'array'], // ✅ entity_id 群（本命）
         ]);
 
         $this->useCase->handle(
-            analysisRequestId: $request_id,
-            decidedUserId: $principal->userId(),   // あなたの AuthPrincipal に合わせて
-            decidedBy: 'human',
-            input: $validated,
-        );
+    analysisRequestId: $request_id,
+    decidedUserId: $principal->userId(),
+    decidedByType: 'human',
+    input: $validated,
+);
 
         return response()->json(['status' => 'ok']);
     }

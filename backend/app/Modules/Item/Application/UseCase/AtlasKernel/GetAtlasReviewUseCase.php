@@ -34,10 +34,10 @@ final class GetAtlasReviewUseCase
             throw new \RuntimeException('analysis_result not found');
         }
 
-        /**
-         * ③ Review Decision（あれば AFTER を上書き）
-         */
-        $decision = $this->decisions->findLatestByAnalysisRequestId($analysisRequestId);
+
+
+$decision = $this->decisions
+    ->findLatestByAnalysisRequestId($analysisRequestId);
 
         /**
          * learning（人間入力そのもの）

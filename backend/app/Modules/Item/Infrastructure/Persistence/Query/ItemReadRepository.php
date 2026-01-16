@@ -105,24 +105,45 @@ final class ItemReadRepository
             }
         }
 
-        return [
-            'id'         => $item->id,
-            'shop_id'    => $item->shop_id,
-            'name'       => $item->name,
-            'price'      => $item->price,
-            'explain'    => $item->explain,
-            'remain'     => $item->remain,
+        // ✅ v3 SoT（最終確定値）
+$finalBrand     = $display['brand']['name']     ?? $item->brand;
+$finalCondition = $display['condition']['name'] ?? $item->condition;
+$finalColor     = $display['color']['name']     ?? $item->color;
 
-            // SoT（raw）
-            'brand'      => $item->brand,
-            'condition'  => $item->condition,
-            'color'      => $item->color,
+// ✅ display は「由来説明」だけにする
+$finalDisplay = [
+    'brand' => [
+        'name'   => $finalBrand,
+        'source' => $display['brand']['source'] ?? 'raw',
+    ],
+    'condition' => [
+        'name'   => $finalCondition,
+        'source' => $display['condition']['source'] ?? 'raw',
+    ],
+    'color' => [
+        'name'   => $finalColor,
+        'source' => $display['color']['source'] ?? 'raw',
+    ],
+];
 
-            // 表示（確定/暫定）
-            'display'    => $display,
+return [
+    'id'        => $item->id,
+    'shop_id'   => $item->shop_id,
+    'name'      => $item->name,
+    'price'     => $item->price,
+    'explain'   => $item->explain,
+    'remain'    => $item->remain,
 
-            'item_image' => $item->item_image,
-        ];
+    // ✅ v3 SoT
+    'brand'     => $finalBrand,
+    'condition' => $finalCondition,
+    'color'     => $finalColor,
+
+    // ✅ display（analysis 由来の meta/confidence は絶対に入れない）
+    'display'   => $finalDisplay,
+
+    'item_image' => $item->item_image,
+];
     }
 
     /**

@@ -10,23 +10,27 @@ use DomainException;
 final class AtlasDecisionGuard
 {
     public function __construct(
-        private ReviewDecisionRepository $decisions
+        private AtlasReviewQuery $reviewQuery
     ) {}
 
-    public function assertDecidable(int $analysisRequestId, string $decisionType): void
-    {
-        // 例：二重決定禁止（最新decisionが既に approve/reject 済なら弾く）
-        $latest = $this->decisions->findLatestByAnalysisRequestId($analysisRequestId);
+    public function assertDecidable(
+        string $shopCode,
+        int $analysisRequestId,
+        string $decisionType
+    ): void {
+        $src = $this->reviewQuery->fetchReviewSource(
+            shopCode: $shopCode,
+            analysisRequestId: $analysisRequestId
+        );
+
+        $latest = $src['latest_decision'] ?? null;
 
         if (!$latest) {
-            return; // 初回はOK
+            return;
         }
 
-        $finalTypes = ['approve', 'system_approve', 'reject'];
-        if (in_array($latest['decision_type'], $finalTypes, true)) {
-            throw new DomainException('Already decided. You cannot decide twice.');
+        if (in_array($latest['decision_type'], ['approve', 'reject'], true)) {
+            throw new DomainException('Already decided.');
         }
-
-        // edit_confirm/manual_override が連続するのを禁止したい等、ここに追加
     }
 }

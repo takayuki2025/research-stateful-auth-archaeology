@@ -30,6 +30,10 @@ return new class () extends Migration {
             $table->string('decision_reason')->nullable();
             $table->text('note')->nullable();
 
+
+
+            $table->json('resolved_entities')->nullable();
+
             /* =========================
              * Snapshots
              * ========================= */

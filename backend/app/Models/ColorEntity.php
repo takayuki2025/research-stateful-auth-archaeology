@@ -10,7 +10,6 @@ class ColorEntity extends Model
 
     protected $fillable = [
         'canonical_name',
-        'display_name',
         'confidence',
         'created_from',
     ];

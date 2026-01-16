@@ -4,6 +4,11 @@ namespace App\Modules\Item\Presentation\Http\Resources;
 
 final class ItemDetailResource
 {
+    /**
+     * v3 FIXED
+     * - 値は Repository を完全に信頼する
+     * - display はメタ情報としてそのまま流す
+     */
     public static function fromReadModel(array $row): array
     {
         return [
@@ -15,13 +20,13 @@ final class ItemDetailResource
             'remain'    => $row['remain'],
             'item_image'=> $row['item_image'],
 
-            // ★ 主役（これが表示される）
-            'display'   => $row['display'] ?? null,
+            // ✅ v3 SoT（最終確定値）
+            'brand'     => $row['brand'],
+            'condition' => $row['condition'],
+            'color'     => $row['color'],
 
-            // ★ UI fallback（安全）
-            'brand'     => $row['display']['brand']['name'] ?? null,
-            'condition' => $row['display']['condition']['name'] ?? null,
-            'color'     => $row['display']['color']['name'] ?? null,
+            // ✅ 表示メタ（由来・source 用）
+            'display'   => $row['display'],
 
             // 付随情報
             'comments'         => $row['comments'] ?? [],

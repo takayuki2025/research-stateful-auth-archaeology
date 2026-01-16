@@ -20,7 +20,7 @@ return new class () extends Migration {
             // alias / synonym（将来用）
             $table->json('synonyms_json')->nullable();
 
-            $table->decimal('confidence', 3, 2)->default(1.00);
+            $table->decimal('confidence', 3, 2)->nullable();
             $table->string('created_from')->default('manual');
             $table->timestamps();
 
