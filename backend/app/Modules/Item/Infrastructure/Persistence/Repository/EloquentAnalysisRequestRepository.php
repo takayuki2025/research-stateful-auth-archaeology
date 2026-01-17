@@ -6,81 +6,153 @@ namespace App\Modules\Item\Infrastructure\Persistence\Repository;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\ValueObject\AnalysisRequestRecord;
 
 final class EloquentAnalysisRequestRepository implements AnalysisRequestRepository
 {
-    public function create(array $attributes): int
-{
-    // v3 固定：必須キーをここでも守る（落とすなら早く落とす）
-    foreach (['item_id', 'analysis_version', 'raw_text', 'payload_hash', 'idempotency_key'] as $k) {
-        if (!array_key_exists($k, $attributes)) {
-            throw new \InvalidArgumentException("analysis_request missing key: {$k}");
-        }
+    /**
+     * Atlas 管理画面用（raw rows）
+     * @return array<int, \stdClass>
+     */
+    public function listByShopCode(string $shopCode): array
+    {
+        return DB::table('analysis_requests as ar')
+            // shop の正しい辿り方
+            ->leftJoin('items as i', 'i.id', '=', 'ar.item_id')
+            ->leftJoin('shops as s', 's.id', '=', 'i.shop_id')
+
+            // ★ 解析前（Human Input）
+            ->leftJoin('item_drafts as d', 'd.id', '=', 'ar.item_draft_id')
+
+            // AI result
+            ->leftJoin('analysis_results as res', function ($join) {
+                $join->on('res.analysis_request_id', '=', 'ar.id')
+                     ->whereIn('res.status', ['active', 'provisional']);
+            })
+
+            // latest review decision
+            ->leftJoin('review_decisions as rd', function ($join) {
+                $join->on('rd.analysis_request_id', '=', 'ar.id')
+                     ->whereRaw('rd.id = (
+                        select rd2.id
+                        from review_decisions rd2
+                        where rd2.analysis_request_id = ar.id
+                        order by rd2.decided_at desc, rd2.id desc
+                        limit 1
+                     )');
+            })
+
+            ->leftJoin('users as u', 'u.id', '=', 'rd.decided_by')
+
+            // Final SoT
+            ->leftJoin('item_entities as ie', function ($join) {
+                $join->on('ie.item_id', '=', 'ar.item_id')
+                     ->where('ie.is_latest', true);
+            })
+            ->leftJoin('brand_entities as be', 'be.id', '=', 'ie.brand_entity_id')
+
+            ->where('s.shop_code', $shopCode)
+            ->orderByDesc('ar.created_at')
+
+            ->select([
+                // ===== Core =====
+                'ar.id as request_id',
+                's.shop_code',
+                'ar.analysis_version',
+                'ar.status as request_status',
+                'ar.created_at as analyzed_at',
+
+                // ===== Trigger =====
+                'ar.triggered_by_type',
+                'ar.trigger_reason',
+                'ar.original_request_id',
+                'ar.replay_index',
+
+                // ===== Error =====
+                'ar.error_code',
+                'ar.error_message',
+
+                // ===== Item =====
+                'i.id as item_id',
+                'i.name as item_name',
+
+                // ===== Before (Human Input) =====
+                'd.brand as before_brand',
+                'd.condition as before_condition',
+                DB::raw('NULL as before_color'),
+                'd.created_at as submitted_at',
+
+                // ===== AI =====
+                'res.brand_name as ai_brand',
+                'res.condition_name as ai_condition',
+                'res.color_name as ai_color',
+                'res.overall_confidence as max_confidence',
+                'res.source as ai_source',
+                'res.confidence_map',
+
+                // ===== Decision =====
+                'rd.decision_type',
+                'rd.decided_by_type',
+                'rd.decided_at',
+                'u.id as user_id',
+                'u.name as user_name',
+
+                // ===== Diff =====
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.brand.name')) as diff_brand_before"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.brand.name')) as diff_brand_after"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.condition.name')) as diff_condition_before"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.condition.name')) as diff_condition_after"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.color.name')) as diff_color_before"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.color.name')) as diff_color_after"),
+
+                // ===== Final =====
+                'be.canonical_name as final_brand',
+                'ie.source as final_source',
+            ])
+            ->get()
+            ->all();
     }
 
-    return DB::table('analysis_requests')->insertGetId([
-        'tenant_id'        => $attributes['tenant_id'] ?? null,
-        'item_id'          => $attributes['item_id'],
-        'item_draft_id'    => $attributes['item_draft_id'] ?? null,
+    /* ===== interface 実装 ===== */
 
-        'analysis_version'   => $attributes['analysis_version'],
-        'requested_version'  => $attributes['requested_version'] ?? null,
-
-        'raw_text'         => $attributes['raw_text'],
-        'payload_hash'     => $attributes['payload_hash'],
-        'idempotency_key'  => $attributes['idempotency_key'],
-
-        'original_request_id' => $attributes['original_request_id'] ?? null,
-        'replay_index'        => $attributes['replay_index'] ?? null,
-
-        'triggered_by_type' => $attributes['triggered_by_type'] ?? 'system',
-        'triggered_by'      => $attributes['triggered_by'] ?? null,
-        'trigger_reason'    => $attributes['trigger_reason'] ?? null,
-
-        'status'           => 'pending',
-        'retry_count'      => 0,
-
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
+    public function create(array $attributes): int
+    {
+        return DB::table('analysis_requests')->insertGetId([
+            'tenant_id'        => $attributes['tenant_id'] ?? null,
+            'item_id'          => $attributes['item_id'],
+            'item_draft_id'    => $attributes['item_draft_id'] ?? null,
+            'analysis_version' => $attributes['analysis_version'],
+            'raw_text'         => $attributes['raw_text'],
+            'payload_hash'     => $attributes['payload_hash'],
+            'idempotency_key'  => $attributes['idempotency_key'],
+            'status'           => 'pending',
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
     }
 
     public function findOrFail(int $requestId): AnalysisRequestRecord
     {
-        $row = DB::table('analysis_requests')
-            ->where('id', $requestId)
-            ->first();
-
-        if (! $row) {
-            throw new ModelNotFoundException(
-                "AnalysisRequest not found: id={$requestId}"
-            );
-        }
+        $row = DB::table('analysis_requests')->where('id', $requestId)->first();
+        if (!$row) throw new ModelNotFoundException();
 
         return new AnalysisRequestRecord(
-    id: (int) $row->id,
-    tenantId: $row->tenant_id,
-    itemId: (int) $row->item_id,
-    itemDraftId: $row->item_draft_id !== null ? (string) $row->item_draft_id : null,
-    analysisVersion: (string) $row->analysis_version,
-    rawText: (string) $row->raw_text,
-    status: (string) $row->status,
-);
+            id: (int) $row->id,
+            tenantId: $row->tenant_id,
+            itemId: (int) $row->item_id,
+            itemDraftId: $row->item_draft_id,
+            analysisVersion: $row->analysis_version,
+            rawText: $row->raw_text,
+            status: $row->status,
+        );
     }
 
     public function markDone(int $requestId): void
     {
         DB::table('analysis_requests')
             ->where('id', $requestId)
-            ->update([
-                'status'      => 'done',
-                'finished_at'=> now(),
-                'updated_at' => now(),
-            ]);
+            ->update(['status' => 'done', 'updated_at' => now()]);
     }
 
     public function markFailed(
@@ -91,11 +163,10 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
         DB::table('analysis_requests')
             ->where('id', $requestId)
             ->update([
-                'status'        => 'failed',
-                'error_code'    => $errorCode,
+                'status' => 'failed',
+                'error_code' => $errorCode,
                 'error_message' => $errorMessage,
-                'finished_at'   => now(),
-                'updated_at'    => now(),
+                'updated_at' => now(),
             ]);
     }
 }

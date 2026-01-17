@@ -41,4 +41,16 @@ final class EloquentReviewDecisionRepository implements ReviewDecisionRepository
             'updated_at'        => now(),
         ]);
     }
+
+    public function updateSnapshots(
+    int $decisionId,
+    array $before,
+    array $after
+): void {
+    ReviewDecision::where('id', $decisionId)->update([
+        'before_snapshot' => $before,
+        'after_snapshot'  => $after,
+        'updated_at'      => now(),
+    ]);
+}
 }

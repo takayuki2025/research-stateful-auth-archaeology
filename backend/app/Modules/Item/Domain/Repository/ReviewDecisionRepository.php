@@ -16,4 +16,6 @@ interface ReviewDecisionRepository
         int $decisionId,
         array $resolved
     ): void;
+
+    public function updateSnapshots(int $decisionId,array $before,array $after): void;
 }

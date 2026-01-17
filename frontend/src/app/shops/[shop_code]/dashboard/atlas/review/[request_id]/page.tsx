@@ -534,11 +534,20 @@ export default function AtlasReviewPage() {
         },
         body: JSON.stringify(body),
       });
+
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || "Decide failed");
+        // ★ ここが重要
+        let msg = "Decide failed";
+        try {
+          const json = await res.json();
+          msg = json?.message ?? msg;
+        } catch {
+          msg = await res.text();
+        }
+        throw new Error(msg);
       }
-      await res.json().catch(() => ({}) as DecideResponse);
+
+      await res.json().catch(() => ({}));
       await mutate(ENDPOINT.review);
       router.push(ENDPOINT.back);
     } finally {
