@@ -30,4 +30,14 @@ final class EloquentReviewDecisionRepository
             'decided_at'        => $data['decided_at'] ?? now(),
         ]);
     }
+
+    public function updateResolvedEntities(
+        int $decisionId,
+        array $resolved
+    ): void {
+        ReviewDecision::where('id', $decisionId)->update([
+            'resolved_entities' => $resolved,
+            'updated_at'        => now(),
+        ]);
+    }
 }

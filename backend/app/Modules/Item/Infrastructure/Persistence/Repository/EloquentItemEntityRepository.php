@@ -7,11 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 final class EloquentItemEntityRepository implements ItemEntityRepository
 {
-    /**
-     * v3固定
-     * - 現在の latest をすべて false にする
-     * - update してよいのは is_latest のみ
-     */
     public function markAllAsNotLatest(int $itemId): void
     {
         DB::table('item_entities')
@@ -23,48 +18,35 @@ final class EloquentItemEntityRepository implements ItemEntityRepository
             ]);
     }
 
-    /**
-     * v3固定
-     * - append-only
-     * - source / generated_version は必須
-     * - confidence は DECIMAL（JSON禁止）
-     */
     public function create(array $attrs): int
     {
         return (int) DB::table('item_entities')->insertGetId([
-            'item_id'             => $attrs['item_id'],
-            'brand_entity_id'     => $attrs['brand_entity_id'] ?? null,
-            'condition_entity_id' => $attrs['condition_entity_id'] ?? null,
-            'color_entity_id'     => $attrs['color_entity_id'] ?? null,
+            'item_id'              => $attrs['item_id'],
+            'review_decision_id'   => $attrs['review_decision_id'],
+            'analysis_request_id'  => $attrs['analysis_request_id'],
 
-            // v3 핵심
-            'source'              => $attrs['source'], // 必須
-            'generated_version'   => $attrs['generated_version'], // 必須
+            'brand_entity_id'      => $attrs['brand_entity_id'] ?? null,
+            'condition_entity_id'  => $attrs['condition_entity_id'] ?? null,
+            'color_entity_id'      => $attrs['color_entity_id'] ?? null,
 
-            // confidence は optional（AI のみ）
-            'confidence'          => $attrs['confidence'] ?? null,
+            'source'               => $attrs['source'],
+            'generated_version'    => $attrs['generated_version'],
 
-            'is_latest'           => (bool)($attrs['is_latest'] ?? true),
-            'generated_at'        => $attrs['generated_at'] ?? now(),
+            'confidence'           => $attrs['confidence'] ?? null,
 
-            'created_at'          => now(),
-            'updated_at'          => now(),
+            'is_latest'            => (bool)($attrs['is_latest'] ?? true),
+            'generated_at'         => $attrs['generated_at'] ?? now(),
+
+            'created_at'           => now(),
+            'updated_at'           => now(),
         ]);
     }
 
-    /**
-     * v3固定（冪等）
-     * - すでに human_confirmed が latest なら何もしない
-     */
-    public function existsLatestHumanConfirmed(
-        int $itemId,
-        string $generatedVersion
-    ): bool {
+    public function existsByDecisionId(int $reviewDecisionId): bool
+    {
         return DB::table('item_entities')
-            ->where('item_id', $itemId)
-            ->where('source', 'human_confirmed')
-            ->where('generated_version', $generatedVersion)
-            ->where('is_latest', true)
+            ->where('review_decision_id', $reviewDecisionId)
             ->exists();
     }
+
 }

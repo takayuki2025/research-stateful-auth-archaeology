@@ -217,6 +217,36 @@ function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
   return out;
 }
 
+
+/**
+ * buildAfterSnapshotFromAI
+ * - approve 用
+ * - 解析結果（after）をそのまま after_snapshot に変換
+ */
+function buildAfterSnapshotFromAI(after: Snapshot | null): AfterSnapshot {
+  if (!after) {
+    throw new Error("解析結果が存在しないため approve できません。");
+  }
+
+  const out: AfterSnapshot = {};
+
+  (["brand", "condition", "color"] as const).forEach((key) => {
+    const v = after[key];
+    if (v?.value && v.value.trim() !== "") {
+      out[key] = {
+        value: v.value.trim(),
+        source: "ai",
+        confidence: v.confidence ?? null,
+      };
+    }
+  });
+
+  if (Object.keys(out).length === 0) {
+    throw new Error("after_snapshot が空です（解析結果がありません）。");
+  }
+
+  return out;
+}
 /* =========================================================
    Page
 ========================================================= */
@@ -695,13 +725,18 @@ const afterParsedPayload = {
                   return;
                 }
 
-                // approve / edit_confirm / manual_override は必ず resolve
-                // const resolved = await resolveBeforeDecide();
+                let afterSnapshot: AfterSnapshot;
 
-                let afterSnapshot: AfterSnapshot | undefined = undefined;
-
-                if (mode === "edit_confirm" || mode === "manual_override") {
-                  afterSnapshot = buildAfterSnapshot(edit); // ← ここだけ
+                // ✅ v3 FIXED：approve でも after_snapshot 必須
+                if (mode === "approve") {
+                  afterSnapshot = buildAfterSnapshotFromAI(after);
+                } else if (
+                  mode === "edit_confirm" ||
+                  mode === "manual_override"
+                ) {
+                  afterSnapshot = buildAfterSnapshot(edit);
+                } else {
+                  throw new Error("未対応の mode です");
                 }
 
                 if (needsCautionPopup) {
@@ -711,42 +746,42 @@ const afterParsedPayload = {
                   if (!ok) return;
                 }
 
-let resolvedForBackend: ResolvedEntitiesForBackend | undefined = undefined;
+                let resolvedForBackend: ResolvedEntitiesForBackend | undefined =
+                  undefined;
 
-if (mode === "approve" || mode === "edit_confirm") {
-  resolvedForBackend = await resolveBeforeDecide();
+                if (mode === "approve" || mode === "edit_confirm") {
+                  resolvedForBackend = await resolveBeforeDecide();
 
-  if (
-    !resolvedForBackend.brand_entity_id &&
-    !resolvedForBackend.condition_entity_id &&
-    !resolvedForBackend.color_entity_id
-  ) {
-    alert("確定できるエンティティがありません。入力を確認してください。");
-    return;
-  }
-}
+                  if (
+                    !resolvedForBackend.brand_entity_id &&
+                    !resolvedForBackend.condition_entity_id &&
+                    !resolvedForBackend.color_entity_id
+                  ) {
+                    alert(
+                      "確定できるエンティティがありません。入力を確認してください。"
+                    );
+                    return;
+                  }
+                }
 
-await submitDecision({
-  decision_type: mode,
+                await submitDecision({
+                  decision_type: mode,
 
-  resolvedEntities:
-    mode === "manual_override" || mode === "reject"
-      ? {
-          brand_entity_id: null,
-          condition_entity_id: null,
-          color_entity_id: null,
-        }
-      : resolvedForBackend,
+                  resolvedEntities:
+                    mode === "manual_override" || mode === "reject"
+                      ? {
+                          brand_entity_id: null,
+                          condition_entity_id: null,
+                          color_entity_id: null,
+                        }
+                      : resolvedForBackend,
 
-  after_snapshot:
-    mode === "edit_confirm" || mode === "manual_override"
-      ? buildAfterSnapshot(edit)
-      : undefined,
+                  after_snapshot: afterSnapshot,
 
-  beforeParsed: beforeParsedPayload,
-  afterParsed: afterParsedPayload,
-  note: note || null,
-});
+                  beforeParsed: beforeParsedPayload,
+                  afterParsed: afterParsedPayload,
+                  note: note || null,
+                });
               } catch (e) {
                 alert((e as Error).message);
               }

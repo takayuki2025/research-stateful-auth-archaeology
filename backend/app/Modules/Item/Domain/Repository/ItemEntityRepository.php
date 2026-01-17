@@ -8,8 +8,6 @@ interface ItemEntityRepository
 
     public function create(array $attrs): int;
 
-    public function existsLatestHumanConfirmed(
-        int $itemId,
-        string $generatedVersion
-    ): bool;
+    public function existsByDecisionId(int $reviewDecisionId): bool;
+
 }

@@ -58,52 +58,51 @@ final class ItemReadRepository
         // ① entity を確定（human_confirmed優先）
         $entity = $this->pickBestEntityRow($itemId);
 
-        // ② display を構築
-        $display = null;
+        // ① analysis を1回だけ取得
+$analysis = DB::table('analysis_results')
+    ->where('item_id', $itemId)
+    ->where('status', 'active')
+    ->orderByDesc('id')
+    ->first();
 
-        if ($entity !== null) {
-            // ★重要：entity が取れた時点で analysis_results は使わない
-            $display = [
-                'brand' => [
-                    'name'   => $entity->brand_name ?? null,
-                    'source' => (string) ($entity->source ?? 'unknown'),
-                ],
-                'condition' => [
-                    'name'   => $entity->condition_name ?? null,
-                    'source' => (string) ($entity->source ?? 'unknown'),
-                ],
-                'color' => [
-                    'name'   => $entity->color_name ?? null,
-                    'source' => (string) ($entity->source ?? 'unknown'),
-                ],
-            ];
-        } else {
-            // entity が無い時だけ analysis_results を暫定表示に使う
-            $analysis = DB::table('analysis_results')
-                ->where('item_id', $itemId)
-                ->where('status', 'active')
-                ->orderByDesc('id')
-                ->first();
+// ② display 初期化（必須）
+$display = [
+    'brand' => ['name' => null, 'source' => 'raw'],
+    'condition' => ['name' => null, 'source' => 'raw'],
+    'color' => ['name' => null, 'source' => 'raw'],
+];
 
-            if ($analysis) {
-                $display = [
-                    'brand' => [
-                        'name'   => $analysis->brand_name ?? null,
-                        'source' => 'ai_provisional',
-                    ],
-                    'condition' => [
-                        'name'   => $analysis->condition_name ?? null,
-                        'source' => 'ai_provisional',
-                    ],
-                    'color' => [
-                        'name'   => $analysis->color_name ?? null,
-                        'source' => 'ai_provisional',
-                    ],
-                    'confidence_map'     => $analysis->confidence_map ?? null,
-                    'overall_confidence' => $analysis->overall_confidence ?? null,
-                ];
-            }
-        }
+// ③ entity があればまず入れる
+if ($entity !== null) {
+    $display['brand'] = [
+        'name' => $entity->brand_name,
+        'source' => $entity->source,
+    ];
+    $display['condition'] = [
+        'name' => $entity->condition_name,
+        'source' => $entity->source,
+    ];
+    $display['color'] = [
+        'name' => $entity->color_name,
+        'source' => $entity->source,
+    ];
+}
+
+// ④ 欠損だけ ai_provisional で補完
+if ($analysis) {
+    if ($display['brand']['name'] === null && $analysis->brand_name) {
+        $display['brand'] = ['name' => $analysis->brand_name, 'source' => 'ai_provisional'];
+    }
+    if ($display['condition']['name'] === null && $analysis->condition_name) {
+        $display['condition'] = ['name' => $analysis->condition_name, 'source' => 'ai_provisional'];
+    }
+    if ($display['color']['name'] === null && $analysis->color_name) {
+        $display['color'] = ['name' => $analysis->color_name, 'source' => 'ai_provisional'];
+    }
+}
+
+
+
 
         // ✅ v3 SoT（最終確定値）
 $finalBrand     = $display['brand']['name']     ?? $item->brand;

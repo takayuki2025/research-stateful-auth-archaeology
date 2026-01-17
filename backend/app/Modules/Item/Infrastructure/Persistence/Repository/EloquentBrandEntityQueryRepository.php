@@ -34,7 +34,7 @@ final class EloquentBrandEntityQueryRepository implements BrandEntityQueryReposi
         throw new LogicException("Canonical brand not found for id={$entityId}");
     }
 
-    public function resolveCanonicalByName(string $input): int
+    public function resolveCanonicalByName(string $input): ?int
     {
         $normalized = $this->normalize($input);
 
@@ -45,8 +45,9 @@ final class EloquentBrandEntityQueryRepository implements BrandEntityQueryReposi
             ->first();
 
         if (!$row) {
-            throw new LogicException("Brand entity not found for name={$input}");
-        }
+        // ★ 例外を投げてはいけない
+        return null;
+    }
 
         // primary
         if ($row->is_primary) {

@@ -14,25 +14,24 @@ final class EloquentColorEntityQueryRepository implements ColorEntityQueryReposi
 {
     $normalized = $this->normalize($input);
 
-    $row = DB::table('condition_entities') // color_entities でも同様
+    $row = DB::table('color_entities')
         ->where('normalized_key', $normalized)
+        ->orWhere('canonical_name', $input)
+        ->orWhere('display_name', $input)
         ->first();
 
     if (!$row) {
         return null;
     }
 
-    // canonical
-    if ($row->is_primary) {
+    if ((int)$row->is_primary === 1) {
         return (int)$row->id;
     }
 
-    // merged
-    if ($row->merged_to_id) {
+    if ($row->merged_to_id !== null) {
         return (int)$row->merged_to_id;
     }
 
-    // 念のため
     return null;
 }
 

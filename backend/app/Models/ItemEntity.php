@@ -11,13 +11,19 @@ class ItemEntity extends Model
 
     protected $fillable = [
         'item_id',
+        'analysis_request_id',
+        'review_decision_id',
+        'replaced_item_entity_id',
+
         'brand_entity_id',
         'condition_entity_id',
         'color_entity_id',
+
         'confidence',
         'is_latest',
         'source',
         'generated_version',
+        'decision_type',
         'generated_at',
     ];
 
@@ -28,31 +34,30 @@ class ItemEntity extends Model
     ];
 
     /* =============================
-       既存（そのまま）
+       Relations
     ============================= */
 
-    public function brandEntity(): BelongsTo
-    {
-        return $this->belongsTo(
-            BrandEntity::class,
-            'brand_entity_id'
-        );
-    }
-
-    /* =============================
-       🔥 追加（これが必須）
-    ============================= */
-
-    /** 商品本体 */
     public function item(): BelongsTo
     {
+        return $this->belongsTo(Item::class, 'item_id');
+    }
+
+    public function reviewDecision(): BelongsTo
+    {
         return $this->belongsTo(
-            Item::class,
-            'item_id'
+            ReviewDecision::class,
+            'review_decision_id'
         );
     }
 
-    /** 正規化ブランド */
+    public function replacedFrom(): BelongsTo
+    {
+        return $this->belongsTo(
+            self::class,
+            'replaced_item_entity_id'
+        );
+    }
+
     public function brand(): BelongsTo
     {
         return $this->belongsTo(BrandEntity::class, 'brand_entity_id');

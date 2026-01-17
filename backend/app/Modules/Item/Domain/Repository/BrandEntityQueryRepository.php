@@ -14,5 +14,5 @@ interface BrandEntityQueryRepository
     /**
      * input name → canonical entity
      */
-    public function resolveCanonicalByName(string $input): int;
+    public function resolveCanonicalByName(string $input): ?int;
 }

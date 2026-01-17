@@ -243,10 +243,10 @@ export default function ItemDetailPage() {
     router.push(`/purchase/${resolvedItem.id}`);
   };
 
-const source = resolvedItem.display?.brand?.source;
+const displayBrand = resolvedItem.display?.brand;
 
 const badge =
-  source === "human_confirmed" ? (
+  displayBrand?.is_latest && displayBrand?.source === "human_confirmed" ? (
     <span
       style={{
         color: "#22c55e", // 濃いめの緑（確定済み）
@@ -263,7 +263,7 @@ const badge =
       <br />
       開発計画中:画像解析など）
     </span>
-  ) : source === "ai_provisional" ? (
+  ) : displayBrand?.source === "ai_provisional" ? (
     <span
       style={{
         color: "#a3e635", // 黄緑色 (Tailwindのlime-400相当)

@@ -6,6 +6,7 @@ namespace App\Modules\Item\Application\UseCase\AtlasKernel;
 
 use Illuminate\Support\Facades\DB;
 use LogicException;
+
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
 use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\ItemEntityRepository;
@@ -28,30 +29,54 @@ final class ApplyConfirmedDecisionUseCase
     {
         DB::transaction(function () use ($analysisRequestId) {
 
-            /** 1) 最新 decision */
-            $decision = $this->decisions
-                ->findLatestByAnalysisRequestId($analysisRequestId);
+            /*
+|--------------------------------------------------------------------------
+| 1) latest decision
+|--------------------------------------------------------------------------
+*/
+$decision = $this->decisions
+    ->findLatestByAnalysisRequestId($analysisRequestId);
 
-            if (!$decision) {
-                throw new LogicException('review_decision not found');
-            }
+if (!$decision) {
+    throw new LogicException('review_decision not found');
+}
 
-            /** 2) 採用系のみ */
-            if (!in_array(
-                $decision->decision_type,
-                ['approve', 'edit_confirm', 'manual_override'],
-                true
-            )) {
-                return;
-            }
+/*
+|--------------------------------------------------------------------------
+| 2) decision_type branch（★最優先）
+|--------------------------------------------------------------------------
+*/
+if ($decision->decision_type === 'reject') {
+    // ★ reject は SoT に一切触れない
+    return;
+}
 
-            /** 3) resolved_entities */
-            $resolved = $decision->resolved_entities;
-            if (!is_array($resolved)) {
-                throw new LogicException('resolved_entities must be array');
-            }
+if (!in_array(
+    $decision->decision_type,
+    ['approve', 'edit_confirm', 'manual_override'],
+    true
+)) {
+    throw new LogicException(
+        'Unsupported decision_type: ' . $decision->decision_type
+    );
+}
 
-            /** 4) canonical 化（brand / condition / color 共通） */
+/*
+|--------------------------------------------------------------------------
+| 3) resolved_entities（reject を除外した後で検証）
+|--------------------------------------------------------------------------
+*/
+$resolved = $decision->resolved_entities;
+
+if (!is_array($resolved)) {
+    throw new LogicException('resolved_entities must be array');
+}
+
+            /*
+            |--------------------------------------------------------------------------
+            | 4) canonical resolve（entity_id → canonical_id）
+            |--------------------------------------------------------------------------
+            */
             $resolved['brand_entity_id'] = $this->canonicalId(
                 'brand',
                 $resolved['brand_entity_id'] ?? null
@@ -63,56 +88,77 @@ final class ApplyConfirmedDecisionUseCase
             );
 
             $resolved['color_entity_id'] = $this->canonicalId(
-    'color',
-    $resolved['color_entity_id'] ?? null
-);
-
-// 🔽 fallback：approve/edit_confirm 時のみ
-if (
-    $resolved['color_entity_id'] === null &&
-    in_array($decision->decision_type, ['approve', 'edit_confirm'], true)
-) {
-    $afterSnapshot = $decision->after_snapshot;
-
-    if (is_array($afterSnapshot) && isset($afterSnapshot['color']['value'])) {
-        $resolved['color_entity_id'] =
-            $this->colorQuery->resolveCanonicalByName(
-                $afterSnapshot['color']['value']
+                'color',
+                $resolved['color_entity_id'] ?? null
             );
-    }
-}
 
-            /** 5) request → item */
+            /*
+            |--------------------------------------------------------------------------
+            | 4.5) color fallback（approve / edit_confirm のみ）
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $resolved['color_entity_id'] === null &&
+                in_array($decision->decision_type, ['approve', 'edit_confirm'], true)
+            ) {
+                $after = $decision->after_snapshot;
+
+                if (is_array($after) && isset($after['color']['value'])) {
+                    $resolved['color_entity_id'] = $this->colorQuery->resolveCanonicalByName(
+                        (string)$after['color']['value']
+                    );
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 5) request → item
+            |--------------------------------------------------------------------------
+            */
             $request = $this->requests->findOrFail($analysisRequestId);
             $itemId  = $request->itemId();
 
-            /** 6) 冪等（既に v3_confirmed があれば終了） */
-            if ($this->itemEntities->existsLatestHumanConfirmed(
-                $itemId,
-                'v3_confirmed'
-            )) {
+            /*
+            |--------------------------------------------------------------------------
+            | 6) idempotency（★decision 単位）
+            |--------------------------------------------------------------------------
+            | 同じ decision を二回適用しない。
+            | edit_confirm / manual_override は「別 decision」なので何度でも反映される。
+            */
+            if ($this->itemEntities->existsByDecisionId((int)$decision->id)) {
                 return;
             }
 
-            /** 7) latest 無効化 */
+            /*
+            |--------------------------------------------------------------------------
+            | 7) latest 無効化（item の最新版を差し替える）
+            |--------------------------------------------------------------------------
+            */
             $this->itemEntities->markAllAsNotLatest($itemId);
 
-            /** 8) human_confirmed 作成（SoT） */
+            /*
+            |--------------------------------------------------------------------------
+            | 8) human_confirmed 作成（SoT）
+            |--------------------------------------------------------------------------
+            | review_decision_id を保存して「どの decision が SoT を作ったか」を追跡する。
+            */
             $this->itemEntities->create([
                 'item_id'             => $itemId,
-                'brand_entity_id'     => $resolved['brand_entity_id'],
-                'condition_entity_id' => $resolved['condition_entity_id'],
-                'color_entity_id'     => $resolved['color_entity_id'],
-                'source'              => 'human_confirmed',
-                'is_latest'           => true,
-                'generated_version'   => 'v3_confirmed',
-                'generated_at'        => now(),
+                'brand_entity_id'      => $resolved['brand_entity_id'],
+                'condition_entity_id'  => $resolved['condition_entity_id'],
+                'color_entity_id'      => $resolved['color_entity_id'],
+                'source'               => 'human_confirmed',
+                'is_latest'            => true,
+                'generated_version'    => 'v3_confirmed',
+                'generated_at'         => now(),
+                'review_decision_id'   => (int)$decision->id,   // ★追加（decision 単位冪等のキー）
+                'analysis_request_id'  => $analysisRequestId,    // ★任意：追跡を強化するなら推奨
             ]);
         });
     }
 
     /**
-     * 種別ごとの canonical 解決（共通化）
+     * 種別ごとの canonical 解決
      */
     private function canonicalId(string $type, ?int $entityId): ?int
     {

@@ -11,4 +11,9 @@ interface ReviewDecisionRepository
     ): ?ReviewDecision;
 
     public function appendDecision(array $data): void;
+
+    public function updateResolvedEntities(
+        int $decisionId,
+        array $resolved
+    ): void;
 }
