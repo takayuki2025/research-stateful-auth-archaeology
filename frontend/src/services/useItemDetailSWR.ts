@@ -12,6 +12,12 @@ export type ItemDetailResponse = {
   favorites_count: number;
 };
 
+export type ItemDisplayAttribute = {
+  name: string | null;
+  source?: "ai_provisional" | "human_confirmed";
+  is_latest?: boolean;
+};
+
 export const useItemDetailSWR = (itemId: number | null) => {
   const { apiClient, isLoading, isAuthenticated } = useAuth();
 

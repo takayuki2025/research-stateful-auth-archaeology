@@ -6,6 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/AuthProvider";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
+import type {
+  ItemDetailResponse,
+  ItemDisplayAttribute,
+} from "@/services/useItemDetailSWR";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
 import styles from "./W-ItemDetailView.module.css";
@@ -119,6 +123,8 @@ export default function ItemDetailPage() {
   // ✅ ここから下は「必ず item が存在する」ので確定変数に寄せる
   const resolvedItem = item;
 
+
+  
   /* =========================
      ここから下は item が必ず存在
   ========================= */

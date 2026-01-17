@@ -32,6 +32,7 @@ final class PublicCatalogItemDto
             'publishedAt' => $this->publishedAt->format('Y-m-d H:i:s'),
             'item_origin' => $this->itemOrigin,
             'displayType' => $this->displayType,
+            'display' => $this->display,
         ];
     }
 }

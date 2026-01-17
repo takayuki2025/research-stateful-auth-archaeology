@@ -49,101 +49,73 @@ final class ItemReadRepository
      * 4) items（raw）
      */
     public function findWithDisplayEntities(int $itemId): ?array
-    {
-        $item = Item::find($itemId);
-        if (! $item) {
-            return null;
-        }
+{
+    $item = Item::find($itemId);
+    if (! $item) {
+        return null;
+    }
 
-        // ① entity を確定（human_confirmed優先）
-        $entity = $this->pickBestEntityRow($itemId);
+    // ① entity を確定
+    $entity = $this->pickBestEntityRow($itemId);
 
-        // ① analysis を1回だけ取得
-$analysis = DB::table('analysis_results')
-    ->where('item_id', $itemId)
-    ->where('status', 'active')
-    ->orderByDesc('id')
-    ->first();
+    $display = null;
 
-// ② display 初期化（必須）
-$display = [
-    'brand' => ['name' => null, 'source' => 'raw'],
-    'condition' => ['name' => null, 'source' => 'raw'],
-    'color' => ['name' => null, 'source' => 'raw'],
-];
+    if ($entity !== null) {
+        $display = [
+            'brand' => [
+                'name' => $entity->brand_name,
+                'source' => $entity->source,
+                'is_latest' => true,
+            ],
+            'condition' => [
+                'name' => $entity->condition_name,
+                'source' => $entity->source,
+                'is_latest' => true,
+            ],
+            'color' => [
+                'name' => $entity->color_name,
+                'source' => $entity->source,
+                'is_latest' => true,
+            ],
+        ];
+    }
 
-// ③ entity があればまず入れる
-if ($entity !== null) {
-    $display['brand'] = [
-        'name' => $entity->brand_name,
-        'source' => $entity->source,
+    $finalBrand     = $display['brand']['name']     ?? $item->brand;
+    $finalCondition = $display['condition']['name'] ?? $item->condition;
+    $finalColor     = $display['color']['name']     ?? $item->color;
+
+    $finalDisplay = [
+        'brand' => [
+            'name'   => $finalBrand,
+            'source' => $display['brand']['source'] ?? 'raw',
+        ],
+        'condition' => [
+            'name'   => $finalCondition,
+            'source' => $display['condition']['source'] ?? 'raw',
+        ],
+        'color' => [
+            'name'   => $finalColor,
+            'source' => $display['color']['source'] ?? 'raw',
+        ],
     ];
-    $display['condition'] = [
-        'name' => $entity->condition_name,
-        'source' => $entity->source,
-    ];
-    $display['color'] = [
-        'name' => $entity->color_name,
-        'source' => $entity->source,
+
+    return [
+        'id'        => $item->id,
+        'shop_id'   => $item->shop_id,
+        'name'      => $item->name,
+        'price'     => $item->price,
+        'explain'   => $item->explain,
+        'remain'    => $item->remain,
+
+        'brand'     => $finalBrand,
+        'condition' => $finalCondition,
+        'color'     => $finalColor,
+
+        'display'   => $finalDisplay,
+
+        'item_image' => $item->item_image,
     ];
 }
-
-// ④ 欠損だけ ai_provisional で補完
-if ($analysis) {
-    if ($display['brand']['name'] === null && $analysis->brand_name) {
-        $display['brand'] = ['name' => $analysis->brand_name, 'source' => 'ai_provisional'];
-    }
-    if ($display['condition']['name'] === null && $analysis->condition_name) {
-        $display['condition'] = ['name' => $analysis->condition_name, 'source' => 'ai_provisional'];
-    }
-    if ($display['color']['name'] === null && $analysis->color_name) {
-        $display['color'] = ['name' => $analysis->color_name, 'source' => 'ai_provisional'];
-    }
-}
-
-
-
-
-        // ✅ v3 SoT（最終確定値）
-$finalBrand     = $display['brand']['name']     ?? $item->brand;
-$finalCondition = $display['condition']['name'] ?? $item->condition;
-$finalColor     = $display['color']['name']     ?? $item->color;
-
-// ✅ display は「由来説明」だけにする
-$finalDisplay = [
-    'brand' => [
-        'name'   => $finalBrand,
-        'source' => $display['brand']['source'] ?? 'raw',
-    ],
-    'condition' => [
-        'name'   => $finalCondition,
-        'source' => $display['condition']['source'] ?? 'raw',
-    ],
-    'color' => [
-        'name'   => $finalColor,
-        'source' => $display['color']['source'] ?? 'raw',
-    ],
-];
-
-return [
-    'id'        => $item->id,
-    'shop_id'   => $item->shop_id,
-    'name'      => $item->name,
-    'price'     => $item->price,
-    'explain'   => $item->explain,
-    'remain'    => $item->remain,
-
-    // ✅ v3 SoT
-    'brand'     => $finalBrand,
-    'condition' => $finalCondition,
-    'color'     => $finalColor,
-
-    // ✅ display（analysis 由来の meta/confidence は絶対に入れない）
-    'display'   => $finalDisplay,
-
-    'item_image' => $item->item_image,
-];
-    }
 
     /**
      * v3固定：entity選択（最重要）

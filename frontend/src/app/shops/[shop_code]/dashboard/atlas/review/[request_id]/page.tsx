@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useResolveEntities } from "@/ui/atlas/hooks/useResolveEntities";
@@ -10,7 +10,6 @@ import type {
   AtlasAttributes,
   AfterSnapshot,
 } from "@/ui/atlas/types";
-import { useEffect } from "react";
 
 /* =========================================================
    Types
@@ -35,7 +34,6 @@ export type ReviewSourceResponse = {
   input_snapshot?: Record<string, unknown> | null;
 
   /* ========= v3 core ========= */
-
   tokens?: AtlasTokens | null;
   attributes?: AtlasAttributes | null;
   confidence_map?: ConfidenceMap | null;
@@ -44,7 +42,6 @@ export type ReviewSourceResponse = {
   after: Snapshot | null;
 
   /* ========= decision ========= */
-
   latest_decision?: {
     decision_type: string;
     decided_at: string;
@@ -54,7 +51,6 @@ export type ReviewSourceResponse = {
   } | null;
 
   /* ========= raw ========= */
-
   beforeParsed?: {
     name?: string | null;
     description?: string | null;
@@ -95,6 +91,11 @@ type ResolvedEntitiesForBackend = {
   brand_entity_id?: number | null;
   condition_entity_id?: number | null;
   color_entity_id?: number | null;
+};
+
+type EntityOption = {
+  id: number;
+  canonical_name: string;
 };
 
 /* =========================================================
@@ -171,22 +172,21 @@ function labelForDiff(s: ReturnType<typeof diffState>) {
  * - before / beforeParsed には絶対に使わない
  */
 function normalizeSnapshot(
-  attributes: AtlasAttributes | null | undefined,
+  _attributes: AtlasAttributes | null | undefined,
   tokens: AtlasTokens | null | undefined,
   confidenceMap: ConfidenceMap | null | undefined
 ): Snapshot | null {
   if (!tokens) return null;
 
   const out: Snapshot = {};
-
   (["brand", "color", "condition"] as const).forEach((key) => {
     const token = tokens[key]?.[0] ?? null;
-
     if (token) {
       out[key] = {
         value: token,
         confidence: confidenceMap?.[key] ?? null,
         source: "ai",
+        confidence_version: "v3_ai",
       };
     }
   });
@@ -194,7 +194,24 @@ function normalizeSnapshot(
   return Object.keys(out).length ? out : null;
 }
 
+function snapshotFromAI(after: Snapshot | null): Snapshot {
+  const base: Snapshot = {};
+  if (!after) return base;
 
+  (["brand", "color", "condition"] as const).forEach((k) => {
+    const v = after[k]?.value ?? null;
+    if (v && v.trim() !== "") {
+      base[k] = {
+        value: v,
+        source: "ai",
+        confidence: after[k]?.confidence ?? null,
+        confidence_version: after[k]?.confidence_version ?? "v3_ai",
+      };
+    }
+  });
+
+  return base;
+}
 
 function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
   const out: AfterSnapshot = {};
@@ -217,72 +234,45 @@ function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
   return out;
 }
 
-
 /**
- * buildAfterSnapshotFromAI
- * - approve 用
- * - 解析結果（after）をそのまま after_snapshot に変換
+ * v3 FIXED:
+ * - edit_confirm: canonical entity 選択 → resolvedEntities(entity_id) を送る
+ * - manual_override: 自由入力 → resolvedEntities は null 固定、after_snapshot を送る
+ * - approve: resolveBeforeDecide()（after(AI)から推定）→ resolvedEntities を送る。after_snapshotは送らない
+ * - reject: resolvedEntities/after_snapshot は送らない（noteのみ）
  */
-function buildAfterSnapshotFromAI(after: Snapshot | null): AfterSnapshot {
-  if (!after) {
-    throw new Error("解析結果が存在しないため approve できません。");
-  }
 
-  const out: AfterSnapshot = {};
+/* =========================================================
+   Entity options hook
+========================================================= */
 
-  (["brand", "condition", "color"] as const).forEach((key) => {
-    const v = after[key];
-    if (v?.value && v.value.trim() !== "") {
-      out[key] = {
-        value: v.value.trim(),
-        source: "ai",
-        confidence: v.confidence ?? null,
-      };
-    }
-  });
-
-  if (Object.keys(out).length === 0) {
-    throw new Error("after_snapshot が空です（解析結果がありません）。");
-  }
-
-  return out;
+function useEntityOptions(
+  kind: "brands" | "conditions" | "colors",
+  enabled: boolean
+) {
+  const url = enabled ? `/api/entities/${kind}` : null;
+  return useSWR<EntityOption[]>(url, fetcher);
 }
+
+function findIdByCanonicalName(
+  options: EntityOption[],
+  name: string | null | undefined
+): number | null {
+  if (!name) return null;
+  const hit = options.find((o) => o.canonical_name === name);
+  return hit?.id ?? null;
+}
+
 /* =========================================================
    Page
 ========================================================= */
 
 export default function AtlasReviewPage() {
   const router = useRouter();
-  const params = useParams();
-
-  const shop_code = params.shop_code as string;
-  const request_id = params.request_id as string;
-
-  const { resolve } = useResolveEntities(shop_code, request_id);
-
-  const [resolvedEntities, setResolvedEntities] = useState<{
-    brand_entity_id?: number | null;
-    condition_entity_id?: number | null;
-    color_entity_id?: number | null;
-  }>({});
-
-async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
-  const resolved = await resolve({
-    brand: after?.brand?.value ?? null,
-    condition: after?.condition?.value ?? null,
-    color: after?.color?.value ?? null,
-  });
-
-  const resolvedForBackend: ResolvedEntitiesForBackend = {
-    brand_entity_id: resolved.brand_entity_id ?? null,
-    condition_entity_id: resolved.condition_entity_id ?? null,
-    color_entity_id: resolved.color_entity_id ?? null,
+  const { shop_code, request_id } = useParams() as {
+    shop_code: string;
+    request_id: string;
   };
-
-  return resolvedForBackend;
-}
-
-
 
   // ---- endpoints（必要ならここだけ変更）----
   const ENDPOINT = {
@@ -296,6 +286,8 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
     fetcher
   );
 
+  const { resolve } = useResolveEntities(shop_code, request_id);
+
   // UI State
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -306,8 +298,29 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
     "approve" | "edit_confirm" | "manual_override" | "reject"
   >("approve");
 
+  // edit_confirm 用：選択された canonical entity id（backendへ送る）
+  const [selectedIds, setSelectedIds] = useState<ResolvedEntitiesForBackend>({
+    brand_entity_id: null,
+    condition_entity_id: null,
+    color_entity_id: null,
+  });
+
+  const editConfirmEnabled = mode === "edit_confirm";
+
+  const { data: brandOptions = [] } = useEntityOptions(
+    "brands",
+    editConfirmEnabled
+  );
+  const { data: conditionOptions = [] } = useEntityOptions(
+    "conditions",
+    editConfirmEnabled
+  );
+  const { data: colorOptions = [] } = useEntityOptions(
+    "colors",
+    editConfirmEnabled
+  );
+
   const before = useMemo(() => {
-    // v3: before は value-object 形式のときのみ SoT と認める
     const rawBefore = data?.before as any;
 
     const isValueObject =
@@ -377,11 +390,63 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
     return base;
   }, [data?.beforeParsed, after]);
 
+  // approve/reject では edit を持たない
+  // edit_confirm/manual_override では after(AI) を初期値としてミラーする（beforeParsedは禁止）
   useEffect(() => {
-    if (Object.keys(edit).length === 0 && Object.keys(initialEdit).length > 0) {
-      setEdit(initialEdit);
+    if (!after) return;
+
+    if (mode === "manual_override") {
+      setEdit(snapshotFromAI(after));
+      // manual_override は自由入力なので selectedIds は使わない
+      setSelectedIds({
+        brand_entity_id: null,
+        condition_entity_id: null,
+        color_entity_id: null,
+      });
+      return;
     }
-  }, [initialEdit, edit]);
+
+    if (mode === "edit_confirm") {
+      setEdit(snapshotFromAI(after));
+      // options が来るまで id は確定できないので、ここでは何もしない
+      return;
+    }
+
+    // approve/reject
+    setEdit({});
+    setSelectedIds({
+      brand_entity_id: null,
+      condition_entity_id: null,
+      color_entity_id: null,
+    });
+  }, [mode, after]);
+
+  // edit_confirm 初期選択：after(AI) の canonical_name に一致する option があれば自動選択
+  useEffect(() => {
+    if (mode !== "edit_confirm") return;
+    if (!after) return;
+    if (
+      !brandOptions.length &&
+      !conditionOptions.length &&
+      !colorOptions.length
+    )
+      return;
+
+    const b = after.brand?.value ?? null;
+    const c = after.condition?.value ?? null;
+    const co = after.color?.value ?? null;
+
+    const nextSelected: ResolvedEntitiesForBackend = {
+      brand_entity_id: findIdByCanonicalName(brandOptions, b),
+      condition_entity_id: findIdByCanonicalName(conditionOptions, c),
+      color_entity_id: findIdByCanonicalName(colorOptions, co),
+    };
+
+    setSelectedIds(nextSelected);
+
+    // 表示用ミラーも after(AI) に統一（念のため）
+    setEdit(snapshotFromAI(after));
+  }, [mode, after, brandOptions, conditionOptions, colorOptions]);
 
   const rows = useMemo(() => {
     return ATTRS.map((a) => {
@@ -392,13 +457,9 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
       const state = diffState(b, ai);
       const badge = labelForDiff(state);
 
-      // 表示上の “After” は mode によって変える：
-      // approve/reject なら analyzer(after)
-      // edit_confirm/manual_override なら edit(人手)
       const shownAfter =
         mode === "edit_confirm" || mode === "manual_override" ? e : ai;
 
-      // 最大confidenceは Policyに渡す想定 → UIとしても危険域表示に使う
       const conf = shownAfter?.confidence ?? ai?.confidence ?? null;
 
       return {
@@ -424,24 +485,42 @@ async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
   }, [rows]);
 
   const needsCautionPopup = useMemo(() => {
-    // 要件：confidence >= 0.7 の手動入力反映時に注意ポップアップ
-    // edit_confirm/manual_override のときにだけ効く
     if (!(mode === "edit_confirm" || mode === "manual_override")) return false;
     if (maxConfidence === null) return false;
     return maxConfidence >= 0.7;
   }, [mode, maxConfidence]);
 
-const beforeParsedPayload = {
-  brand: before?.brand?.value ?? null,
-  color: before?.color?.value ?? null,
-  condition: before?.condition?.value ?? null,
-};
+  const beforeParsedPayload = useMemo(
+    () => ({
+      brand: before?.brand?.value ?? null,
+      color: before?.color?.value ?? null,
+      condition: before?.condition?.value ?? null,
+    }),
+    [before]
+  );
 
-const afterParsedPayload = {
-  brand: after?.brand?.value ?? null,
-  color: after?.color?.value ?? null,
-  condition: after?.condition?.value ?? null,
-};
+  const afterParsedPayload = useMemo(
+    () => ({
+      brand: after?.brand?.value ?? null,
+      color: after?.color?.value ?? null,
+      condition: after?.condition?.value ?? null,
+    }),
+    [after]
+  );
+
+  async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
+    const resolved = await resolve({
+      brand: after?.brand?.value ?? null,
+      condition: after?.condition?.value ?? null,
+      color: after?.color?.value ?? null,
+    });
+
+    return {
+      brand_entity_id: resolved.brand_entity_id ?? null,
+      condition_entity_id: resolved.condition_entity_id ?? null,
+      color_entity_id: resolved.color_entity_id ?? null,
+    };
+  }
 
   async function submitDecision(body: DecideRequestBody) {
     setIsSubmitting(true);
@@ -461,17 +540,13 @@ const afterParsedPayload = {
       }
       await res.json().catch(() => ({}) as DecideResponse);
       await mutate(ENDPOINT.review);
-      // router.refresh();
       router.push(ENDPOINT.back);
-      // router.refresh();
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  /* =========================================================
-     Render
-  ========================================================= */
+  /* ================= Render ================= */
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error)
@@ -634,7 +709,66 @@ const afterParsedPayload = {
             </div>
 
             <div className="col-span-4 space-y-2">
-              {mode === "edit_confirm" || mode === "manual_override" ? (
+              {mode === "edit_confirm" ? (
+                (() => {
+                  const key = r.key as AttrKey;
+
+                  const options =
+                    key === "brand"
+                      ? brandOptions
+                      : key === "condition"
+                        ? conditionOptions
+                        : colorOptions;
+
+                  const selectedId =
+                    key === "brand"
+                      ? selectedIds.brand_entity_id
+                      : key === "condition"
+                        ? selectedIds.condition_entity_id
+                        : selectedIds.color_entity_id;
+
+                  return (
+                    <select
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={selectedId ?? ""}
+                      onChange={(e) => {
+                        const id = e.target.value
+                          ? Number(e.target.value)
+                          : null;
+
+                        setSelectedIds((prev) => {
+                          if (key === "brand")
+                            return { ...prev, brand_entity_id: id };
+                          if (key === "condition")
+                            return { ...prev, condition_entity_id: id };
+                          return { ...prev, color_entity_id: id };
+                        });
+
+                        // 表示用ミラー（after_snapshot.value のために canonical_name を同期）
+                        const opt = options.find((o) => o.id === id);
+
+                        setEdit((prev) => ({
+                          ...prev,
+                          [key]: {
+                            ...(prev[key] ?? {}),
+                            value: opt?.canonical_name ?? "",
+                            source: "manual",
+                            confidence_version: "v3_edit_confirm",
+                            confidence: null,
+                          },
+                        }));
+                      }}
+                    >
+                      <option value="">未選択</option>
+                      {options.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.canonical_name}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()
+              ) : mode === "manual_override" ? (
                 <div className="space-y-1">
                   <input
                     className="w-full border rounded px-3 py-2 text-sm"
@@ -647,7 +781,6 @@ const afterParsedPayload = {
                         [r.key]: {
                           ...(prev[r.key] ?? {}),
                           value: v,
-                          // 手動入力時は confidence を null でもOK。将来は human_confidence などに拡張可
                           confidence: prev[r.key]?.confidence ?? null,
                           confidence_version:
                             prev[r.key]?.confidence_version ?? "v3_manual",
@@ -721,22 +854,10 @@ const afterParsedPayload = {
                   await submitDecision({
                     decision_type: "reject",
                     note: note || null,
+                    beforeParsed: beforeParsedPayload,
+                    afterParsed: afterParsedPayload,
                   });
                   return;
-                }
-
-                let afterSnapshot: AfterSnapshot;
-
-                // ✅ v3 FIXED：approve でも after_snapshot 必須
-                if (mode === "approve") {
-                  afterSnapshot = buildAfterSnapshotFromAI(after);
-                } else if (
-                  mode === "edit_confirm" ||
-                  mode === "manual_override"
-                ) {
-                  afterSnapshot = buildAfterSnapshot(edit);
-                } else {
-                  throw new Error("未対応の mode です");
                 }
 
                 if (needsCautionPopup) {
@@ -749,9 +870,9 @@ const afterParsedPayload = {
                 let resolvedForBackend: ResolvedEntitiesForBackend | undefined =
                   undefined;
 
-                if (mode === "approve" || mode === "edit_confirm") {
+                if (mode === "approve") {
                   resolvedForBackend = await resolveBeforeDecide();
-
+                  // approve は resolvedEntities 必須（固定）
                   if (
                     !resolvedForBackend.brand_entity_id &&
                     !resolvedForBackend.condition_entity_id &&
@@ -762,26 +883,61 @@ const afterParsedPayload = {
                     );
                     return;
                   }
+
+                  await submitDecision({
+                    decision_type: "approve",
+                    resolvedEntities: resolvedForBackend,
+                    // approve は after_snapshot を送らない（固定）
+                    beforeParsed: beforeParsedPayload,
+                    afterParsed: afterParsedPayload,
+                    note: note || null,
+                  });
+                  return;
                 }
 
-                await submitDecision({
-                  decision_type: mode,
+                if (mode === "edit_confirm") {
+                  // edit_confirm は「選択された entity_id」をそのまま backend に送る
+                  resolvedForBackend = selectedIds;
 
-                  resolvedEntities:
-                    mode === "manual_override" || mode === "reject"
-                      ? {
-                          brand_entity_id: null,
-                          condition_entity_id: null,
-                          color_entity_id: null,
-                        }
-                      : resolvedForBackend,
+                  if (
+                    !resolvedForBackend.brand_entity_id &&
+                    !resolvedForBackend.condition_entity_id &&
+                    !resolvedForBackend.color_entity_id
+                  ) {
+                    alert("Edit Confirm は最低1つは選択してください。");
+                    return;
+                  }
 
-                  after_snapshot: afterSnapshot,
+                  await submitDecision({
+                    decision_type: "edit_confirm",
+                    resolvedEntities: resolvedForBackend,
+                    // 表示・監査用に canonical_name を after_snapshot に同期（固定）
+                    after_snapshot: buildAfterSnapshot(edit),
+                    beforeParsed: beforeParsedPayload,
+                    afterParsed: afterParsedPayload,
+                    note: note || null,
+                  });
+                  return;
+                }
 
-                  beforeParsed: beforeParsedPayload,
-                  afterParsed: afterParsedPayload,
-                  note: note || null,
-                });
+                if (mode === "manual_override") {
+                  // manual_override は自由入力 → resolvedEntities は null 固定
+                  await submitDecision({
+                    decision_type: "manual_override",
+                    resolvedEntities: {
+                      brand_entity_id: null,
+                      condition_entity_id: null,
+                      color_entity_id: null,
+                    },
+                    after_snapshot: buildAfterSnapshot(edit),
+                    beforeParsed: beforeParsedPayload,
+                    afterParsed: afterParsedPayload,
+                    note: note || null,
+                  });
+                  return;
+                }
+
+                throw new Error("未対応の mode です");
               } catch (e) {
                 alert((e as Error).message);
               }
