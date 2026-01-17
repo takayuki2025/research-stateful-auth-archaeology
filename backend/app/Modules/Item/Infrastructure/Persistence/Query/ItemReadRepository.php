@@ -4,11 +4,13 @@ namespace App\Modules\Item\Infrastructure\Persistence\Query;
 
 use App\Models\Item;
 use Illuminate\Support\Facades\DB;
+use App\Modules\Item\Infrastructure\Persistence\Query\AnalysisResultReadRepository;
 
 final class ItemReadRepository
 {
     public function __construct(
-        private readonly ItemEntityTagReadRepository $tagRepo
+        private readonly ItemEntityTagReadRepository $tagRepo,
+        private readonly AnalysisResultReadRepository $analysisRepo,
     ) {
     }
 
@@ -55,49 +57,65 @@ final class ItemReadRepository
         return null;
     }
 
-    // ① entity を確定
+    // ① human / entity（最優先）
     $entity = $this->pickBestEntityRow($itemId);
-
-    $display = null;
 
     if ($entity !== null) {
         $display = [
             'brand' => [
-                'name' => $entity->brand_name,
-                'source' => $entity->source,
-                'is_latest' => true,
+                'name'      => $entity->brand_name,
+                'source'    => $entity->source,
+                'is_latest' => true, // entity は latest 管理下
             ],
             'condition' => [
-                'name' => $entity->condition_name,
-                'source' => $entity->source,
+                'name'      => $entity->condition_name,
+                'source'    => $entity->source,
                 'is_latest' => true,
             ],
             'color' => [
-                'name' => $entity->color_name,
-                'source' => $entity->source,
+                'name'      => $entity->color_name,
+                'source'    => $entity->source,
                 'is_latest' => true,
             ],
         ];
     }
-
-    $finalBrand     = $display['brand']['name']     ?? $item->brand;
-    $finalCondition = $display['condition']['name'] ?? $item->condition;
-    $finalColor     = $display['color']['name']     ?? $item->color;
-
-    $finalDisplay = [
-        'brand' => [
-            'name'   => $finalBrand,
-            'source' => $display['brand']['source'] ?? 'raw',
-        ],
-        'condition' => [
-            'name'   => $finalCondition,
-            'source' => $display['condition']['source'] ?? 'raw',
-        ],
-        'color' => [
-            'name'   => $finalColor,
-            'source' => $display['color']['source'] ?? 'raw',
-        ],
-    ];
+    // ② AI provisional（entity が無い場合のみ）
+    elseif ($analysis = $this->analysisRepo->findLatestActiveByItemId($itemId)) {
+        $display = [
+            'brand' => [
+                ...($analysis['brand'] ?? ['name' => null]),
+                'is_latest' => false, // ★ analysis_results なので false
+            ],
+            'condition' => [
+                ...($analysis['condition'] ?? ['name' => null]),
+                'is_latest' => false,
+            ],
+            'color' => [
+                ...($analysis['color'] ?? ['name' => null]),
+                'is_latest' => false,
+            ],
+        ];
+    }
+    // ③ raw fallback
+    else {
+        $display = [
+            'brand' => [
+                'name'      => $item->brand,
+                'source'    => 'raw',
+                'is_latest' => false,
+            ],
+            'condition' => [
+                'name'      => $item->condition,
+                'source'    => 'raw',
+                'is_latest' => false,
+            ],
+            'color' => [
+                'name'      => $item->color,
+                'source'    => 'raw',
+                'is_latest' => false,
+            ],
+        ];
+    }
 
     return [
         'id'        => $item->id,
@@ -107,11 +125,11 @@ final class ItemReadRepository
         'explain'   => $item->explain,
         'remain'    => $item->remain,
 
-        'brand'     => $finalBrand,
-        'condition' => $finalCondition,
-        'color'     => $finalColor,
+        'brand'     => $display['brand']['name'],
+        'condition' => $display['condition']['name'],
+        'color'     => $display['color']['name'],
 
-        'display'   => $finalDisplay,
+        'display'   => $display,
 
         'item_image' => $item->item_image,
     ];

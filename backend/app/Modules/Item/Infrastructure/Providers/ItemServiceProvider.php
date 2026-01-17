@@ -22,8 +22,8 @@ use App\Modules\Item\Infrastructure\Persistence\Repository\{
     EloquentConditionEntityRepository,
 };
 
-use App\Modules\Item\Domain\Repository\CanonicalEntityRepository;
-use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentCanonicalEntityRepository;
+// use App\Modules\Item\Domain\Repository\CanonicalEntityRepository;
+// use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentCanonicalEntityRepository;
 use App\Modules\Item\Domain\Repository\LearningCandidateRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentLearningCandidateRepository;
 use App\Modules\Item\Domain\Repository\BrandEntityQueryRepository;
@@ -67,10 +67,10 @@ final class ItemServiceProvider extends ServiceProvider
             EloquentConditionEntityRepository::class
         );
 
-        $this->app->bind(
-    CanonicalEntityRepository::class,
-    EloquentCanonicalEntityRepository::class
-);
+//         $this->app->bind(
+//     CanonicalEntityRepository::class,
+//     EloquentCanonicalEntityRepository::class
+// );
 
 $this->app->bind(
             LearningCandidateRepository::class,

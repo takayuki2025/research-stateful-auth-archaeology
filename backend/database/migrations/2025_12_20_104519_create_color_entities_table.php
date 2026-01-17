@@ -29,6 +29,7 @@ return new class () extends Migration {
     // 学習・由来
     $table->decimal('confidence', 3, 2)->nullable();
     $table->string('created_from')->default('manual');
+    $table->string('source', 16)->default('ai');
 
     $table->timestamps();
 

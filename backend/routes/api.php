@@ -448,17 +448,42 @@ Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function (
 });
 
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EntityController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EntityController;
 
-Route::prefix('entities')->group(function () {
-    Route::get('brands', [EntityController::class, 'brands']);
-    Route::get('conditions', [EntityController::class, 'conditions']);
-    Route::get('colors', [EntityController::class, 'colors']);
-});
+// Route::prefix('entities')->group(function () {
+//     Route::get('brands', [EntityController::class, 'brands']);
+//     Route::get('conditions', [EntityController::class, 'conditions']);
+//     Route::get('colors', [EntityController::class, 'colors']);
+// });
 
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\CanonicalEntityController;
+// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\CanonicalEntityController;
 
-Route::get('/entities/{type}', [
-    CanonicalEntityController::class,
-    'index',
-]);
+// Route::get('/entities/{type}', [
+//     CanonicalEntityController::class,
+//     'index',
+// ]);
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EditConfirmDBController;
+
+Route::middleware(['auth:sanctum'])
+    ->prefix('shops/{shop_code}/atlas/requests/{request_id}')
+    ->group(function () {
+        Route::post(
+            'decide',
+            [EditConfirmDBController::class, 'decide']
+        );
+    });
+
+
+
+use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EditConfirmSelectController;
+
+Route::middleware(['auth:sanctum'])
+    ->prefix('entities')
+    ->group(function () {
+        Route::get('brands',     [EditConfirmSelectController::class, 'brands']);
+        Route::get('conditions', [EditConfirmSelectController::class, 'conditions']);
+        Route::get('colors',     [EditConfirmSelectController::class, 'colors']);
+    });

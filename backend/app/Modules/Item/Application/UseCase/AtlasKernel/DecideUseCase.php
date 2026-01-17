@@ -41,8 +41,10 @@ final class DecideUseCase
             throw new DomainException('decision_type is required');
         }
 
-        $after  = $input['after_snapshot'] ?? null;
-        $before = $input['beforeParsed'] ?? [];
+        // v3: UI から来る payload
+        $after  = $input['after_snapshot'] ?? null;     // AfterSnapshot (json)
+        $before = $input['beforeParsed'] ?? [];         // {brand,color,condition} string map
+        $note   = $input['note'] ?? null;
 
         $resolved = [
             'brand_entity_id'     => null,
@@ -57,71 +59,96 @@ final class DecideUseCase
             $decidedByType,
             $after,
             $before,
+            $note,
+            $input,
             &$resolved
         ) {
-
             /** 0) request existence */
             $this->requests->findOrFail($analysisRequestId);
 
-            /** 1) ★必ず decision を先に append（ここが最重要） */
+            /** 1) append decision first（最重要・append-only） */
             $this->decisions->appendDecision([
                 'analysis_request_id' => $analysisRequestId,
                 'decision_type'       => $decisionType,
-                'resolved_entities'   => null, // 一旦 null
+                'resolved_entities'   => null, // いったん null
+                'before_snapshot'     => $this->buildBeforeSnapshotFromBeforeParsed($before),
                 'after_snapshot'      => is_array($after) ? $after : null,
-                'note'                => null,
+                'note'                => is_string($note) && $note !== '' ? $note : null,
                 'decided_by_type'     => $decidedByType,
                 'decided_by'          => $decidedUserId,
                 'decided_at'          => now(),
             ]);
 
-            /** 2) decisionId 確定 */
-            $decision = $this->decisions
-                ->findLatestByAnalysisRequestId($analysisRequestId);
-
+            /** 2) decisionId 確定（latest） */
+            $decision = $this->decisions->findLatestByAnalysisRequestId($analysisRequestId);
             if (!$decision) {
                 throw new DomainException('review_decision creation failed');
             }
+            $decisionId = (int)$decision->id;
 
-            $decisionId = $decision->id;
-
-            /** ----------------------------------------------------------------
-             * approve / edit_confirm
-             * ---------------------------------------------------------------- */
-            if (in_array($decisionType, ['approve', 'edit_confirm'], true)) {
+            /* =========================================================
+               approve（AI after_snapshot を backend resolve）
+               - UI は resolvedEntities を送らない
+               - after_snapshot は必須
+            ========================================================= */
+            if ($decisionType === 'approve') {
 
                 if (!is_array($after)) {
-                    throw new DomainException('after_snapshot is required');
+                    // throw new DomainException('after_snapshot is required');
                 }
 
+                // brand/condition は「必ず resolve 成功」させる（失敗は DomainException）
                 foreach ([
                     'brand'     => $this->brandQuery,
                     'condition' => $this->conditionQuery,
                 ] as $key => $repo) {
 
                     $value = $after[$key]['value'] ?? null;
-                    if (!$value) continue;
+                    if (!$value) {
+                        continue;
+                    }
 
-                    $id = $repo->resolveCanonicalByName($value);
+                    $id = $repo->resolveCanonicalByName((string)$value);
                     if ($id === null) {
-                        throw new DomainException(
-                            ucfirst($key) . ' must be selected from existing canonical.'
-                        );
+                        throw new DomainException(ucfirst($key) . ' must be resolved from AI result');
                     }
                     $resolved[$key . '_entity_id'] = $id;
                 }
 
-                if (!empty($after['color']['value'])) {
-                    $resolved['color_entity_id'] =
-                        $this->colorQuery->resolveCanonicalByName(
-                            $after['color']['value']
-                        );
+                // color は null 許容
+                $colorValue = $after['color']['value'] ?? null;
+                if (is_string($colorValue) && trim($colorValue) !== '') {
+                    $resolved['color_entity_id'] = $this->colorQuery->resolveCanonicalByName($colorValue);
                 }
             }
 
-            /** ----------------------------------------------------------------
-             * manual_override（既存 canonical は resolve、新規だけ作成）
-             * ---------------------------------------------------------------- */
+            /* =========================================================
+               edit_confirm（★絶対に resolve しない）
+               - UI が選んだ entity_id をそのまま採用
+               - after_snapshot は監査用に必須（UI は canonical_name も同期する）
+            ========================================================= */
+            if ($decisionType === 'edit_confirm') {
+
+                $inputResolved = $input['resolvedEntities'] ?? null;
+                if (!is_array($inputResolved)) {
+                    throw new DomainException('resolvedEntities is required for edit_confirm');
+                }
+
+                if (!is_array($after)) {
+                    throw new DomainException('after_snapshot is required for edit_confirm');
+                }
+
+                $resolved = [
+                    'brand_entity_id'     => $inputResolved['brand_entity_id'] ?? null,
+                    'condition_entity_id' => $inputResolved['condition_entity_id'] ?? null,
+                    'color_entity_id'     => $inputResolved['color_entity_id'] ?? null,
+                ];
+            }
+
+            /* =========================================================
+               manual_override（既存 canonical は resolve、新規だけ作成）
+               - after_snapshot 必須
+            ========================================================= */
             if ($decisionType === 'manual_override') {
 
                 if (!is_array($after)) {
@@ -131,7 +158,9 @@ final class DecideUseCase
                 foreach (['brand', 'condition', 'color'] as $key) {
 
                     $human = $after[$key]['value'] ?? null;
-                    if (!$human) continue;
+                    if (!is_string($human) || trim($human) === '') {
+                        continue;
+                    }
 
                     $existing = match ($key) {
                         'brand'     => $this->brandQuery->resolveCanonicalByName($human),
@@ -150,19 +179,23 @@ final class DecideUseCase
                 }
             }
 
+            /* =========================================================
+               reject（何も resolve しない／SoT 反映もしない）
+            ========================================================= */
+            if ($decisionType === 'reject') {
+                return;
+            }
+
             if ($this->hasNoResolvedEntity($resolved)) {
                 Log::warning('[DecideUseCase] no resolved entity', [
-                    'decision_id' => $decisionId,
+                    'decision_id'  => $decisionId,
                     'decisionType' => $decisionType,
                 ]);
                 return; // decision は残す
             }
 
             /** 3) resolved_entities 更新（後書き） */
-            $this->decisions->updateResolvedEntities(
-                $decisionId,
-                $resolved
-            );
+            $this->decisions->updateResolvedEntities($decisionId, $resolved);
 
             /** 4) learning_candidates */
             foreach (['brand', 'condition', 'color'] as $key) {
@@ -174,7 +207,8 @@ final class DecideUseCase
 
                 $entityId = $resolved[$key . '_entity_id'] ?? null;
 
-                if (!$proposed || !$entityId) continue;
+                if (!is_string($proposed) || trim($proposed) === '') continue;
+                if (!is_int($entityId) && !is_numeric($entityId)) continue;
 
                 $this->learningCandidates->append([
                     'analysis_request_id' => $analysisRequestId,
@@ -183,17 +217,15 @@ final class DecideUseCase
                     'proposed_name'       => $proposed,
                     'normalized_key'      => mb_strtolower(trim($proposed), 'UTF-8'),
                     'decision_type'       => $decisionType,
-                    'entity_id'           => $entityId,
+                    'entity_id'           => (int)$entityId,
                     'source'              => 'human_review',
                     'confidence'          => $decisionType === 'manual_override' ? 1.0 : null,
                     'status'              => 'pending',
                 ]);
             }
 
-            /** 5) SoT 反映（reject は何もしない） */
-            if (in_array($decisionType, ['approve', 'edit_confirm', 'manual_override'], true)) {
-                $this->applyConfirmed->handle($analysisRequestId);
-            }
+            /** 5) SoT 反映（reject は上で return 済み） */
+            $this->applyConfirmed->handle($analysisRequestId);
         });
     }
 
@@ -203,5 +235,27 @@ final class DecideUseCase
             if ($id !== null) return false;
         }
         return true;
+    }
+
+    /**
+     * beforeParsed (string map) を before_snapshot (json) にして保存する
+     * - 監査/学習の「入力側」を ledger に固定するため
+     */
+    private function buildBeforeSnapshotFromBeforeParsed(array $beforeParsed): ?array
+    {
+        $out = [];
+
+        foreach (['brand', 'condition', 'color'] as $k) {
+            $v = $beforeParsed[$k] ?? null;
+            if (is_string($v) && trim($v) !== '') {
+                $out[$k] = [
+                    'value' => $v,
+                    'source' => 'manual',
+                    'confidence' => null,
+                ];
+            }
+        }
+
+        return empty($out) ? null : $out;
     }
 }

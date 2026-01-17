@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Modules\Item\Infrastructure\Providers\ItemServiceProvider::class,
         App\Modules\Shipment\Infrastructure\Providers\ShipmentServiceProvider::class,
         App\Modules\Review\Infrastructure\ReviewServiceProvider::class,
+        App\Modules\AtlasKernel\Infrastructure\Providers\AtlasServiceProvider::class,
     ])
 
     /*

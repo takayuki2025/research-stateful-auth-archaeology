@@ -59,4 +59,17 @@ final class EloquentConditionEntityQueryRepository implements ConditionEntityQue
         $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
         return mb_strtolower($s, 'UTF-8');
     }
+
+    public function listCanonicalOptions(): array
+{
+    return DB::table('condition_entities')
+        ->where('is_primary', true)
+        ->orderBy('canonical_name')
+        ->get(['id', 'canonical_name'])
+        ->map(fn ($r) => [
+            'id' => (int) $r->id,
+            'canonical_name' => (string) $r->canonical_name,
+        ])
+        ->toArray();
+}
 }

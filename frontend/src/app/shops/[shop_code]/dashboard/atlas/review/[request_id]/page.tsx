@@ -636,22 +636,22 @@ export default function AtlasReviewPage() {
         <div className="text-sm font-semibold">操作モード</div>
         <div className="flex flex-wrap gap-2">
           <ModePill
-            label="Approve（採用）"
+            label="Approve（解析結果採用）"
             active={mode === "approve"}
             onClick={() => setMode("approve")}
           />
           <ModePill
-            label="Edit Confirm（修正して採用）"
+            label="Edit Confirm（選択して採用）"
             active={mode === "edit_confirm"}
             onClick={() => setMode("edit_confirm")}
           />
           <ModePill
-            label="Manual Override（手動上書き）"
+            label="Manual Override（新規手動追加）"
             active={mode === "manual_override"}
             onClick={() => setMode("manual_override")}
           />
           <ModePill
-            label="Reject（棄却）"
+            label="Reject（解析結果棄却：解析前入力内容（新規作成なし））"
             active={mode === "reject"}
             onClick={() => setMode("reject")}
           />

@@ -30,6 +30,7 @@ return new class () extends Migration {
 
             $table->decimal('confidence', 3, 2)->nullable();
             $table->string('created_from')->default('manual');
+            $table->string('source', 16)->default('ai');
             $table->timestamps();
 
             // 制約
