@@ -29,4 +29,6 @@ interface PaymentMethodVault
     public function createSetupIntent(string $providerCustomerId): SetupIntentResult;
 
     public function retrievePaymentMethodCard(string $providerPaymentMethodId): PaymentMethodCardSnapshot;
+
+    public function detachPaymentMethod(string $providerPaymentMethodId): void;
 }

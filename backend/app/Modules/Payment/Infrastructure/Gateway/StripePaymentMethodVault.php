@@ -60,4 +60,10 @@ final class StripePaymentMethodVault implements PaymentMethodVault
             expYear: isset($card?->exp_year) ? (int)$card->exp_year : null,
         );
     }
+
+    public function detachPaymentMethod(string $providerPaymentMethodId): void
+{
+    // すでにdetachedでもStripe側はエラーを返す場合があるので、上位で握る設計でOK
+    $this->stripe->paymentMethods->detach($providerPaymentMethodId, []);
+}
 }

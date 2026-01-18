@@ -92,4 +92,46 @@ final class StripePaymentGateway implements PaymentGatewayPort
 
         throw new \InvalidArgumentException('Unsupported payment method');
     }
+
+    public function createOneClickIntent(
+    string $providerCustomerId,
+    string $providerPaymentMethodId,
+    int $amount,
+    string $currency,
+    array $context
+): array {
+    // ✅ metadata（R3救済で使う payment_id も入れる）
+    $metadata = [
+        'order_id'   => (string)($context['order_id'] ?? ''),
+        'payment_id' => (string)($context['payment_id'] ?? ''),
+        'user_id'    => (string)($context['user_id'] ?? ''),
+        'shop_id'    => (string)($context['shop_id'] ?? ''),
+    ];
+
+    foreach ($metadata as $k => $v) {
+        if ($v === '') unset($metadata[$k]);
+    }
+
+    $pi = $this->stripe->paymentIntents->create([
+        'amount' => $amount,
+        'currency' => strtolower($currency),
+
+        'customer' => $providerCustomerId,
+        'payment_method' => $providerPaymentMethodId,
+        'payment_method_types' => ['card'],
+
+        // ✅ OneClick（即confirm）: 3DSが必要なら requires_action + client_secret が返る
+        'confirm' => true,
+
+        'metadata' => $metadata,
+    ]);
+
+    return [
+        'provider_payment_id' => $pi->id,
+        'client_secret' => $pi->client_secret,
+        'requires_action' => ($pi->status === 'requires_action'),
+        'status' => $pi->status,
+    ];
+}
+
 }

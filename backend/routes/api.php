@@ -449,3 +449,23 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::post('setup-intent', CreateSetupIntentController::class);
     });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Wallet\SetDefaultPaymentMethodController;
+use App\Modules\Payment\Presentation\Http\Controllers\Wallet\DetachPaymentMethodController;
+
+Route::middleware('auth:sanctum')
+    ->prefix('wallet')
+    ->group(function () {
+        Route::post('payment-methods/{id}/default', SetDefaultPaymentMethodController::class);
+        Route::delete('payment-methods/{id}', DetachPaymentMethodController::class);
+    });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Wallet\OneClickCheckoutController;
+
+Route::middleware('auth:sanctum')
+    ->prefix('wallet')
+    ->group(function () {
+        Route::post('one-click-checkout', OneClickCheckoutController::class);
+    });

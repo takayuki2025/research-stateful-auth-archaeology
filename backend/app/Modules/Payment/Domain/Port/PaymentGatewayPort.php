@@ -6,18 +6,25 @@ use App\Modules\Payment\Domain\Enum\PaymentMethod;
 
 interface PaymentGatewayPort
 {
+    public function createIntent(
+        PaymentMethod $method,
+        int $amount,
+        string $currency,
+        array $context
+    ): array;
+
     /**
-     * Create PaymentIntent (and possibly confirm for konbini)
+     * ✅ v1-4: OneClick（保存カードで決済）
      *
      * Return keys:
      * - provider_payment_id (string)
      * - client_secret (string|null)
      * - requires_action (bool)
      * - status (string|null)
-     * - instructions (array|null)
      */
-    public function createIntent(
-        PaymentMethod $method,
+    public function createOneClickIntent(
+        string $providerCustomerId,
+        string $providerPaymentMethodId,
         int $amount,
         string $currency,
         array $context

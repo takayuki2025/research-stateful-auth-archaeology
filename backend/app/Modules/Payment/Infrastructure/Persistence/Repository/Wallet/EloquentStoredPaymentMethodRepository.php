@@ -90,4 +90,91 @@ final class EloquentStoredPaymentMethodRepository implements StoredPaymentMethod
             'updated_at' => now(),
         ]);
 }
+
+public function findRowById(int $id): ?array
+{
+    $row = DB::table('stored_payment_methods')->where('id', $id)->first();
+    if (! $row) {
+        return null;
+    }
+
+    return [
+        'id' => (int)$row->id,
+        'wallet_id' => (int)$row->wallet_id,
+        'provider' => (string)$row->provider,
+        'provider_payment_method_id' => (string)$row->provider_payment_method_id,
+        'is_default' => (bool)$row->is_default,
+        'status' => (string)$row->status,
+        'source' => (string)($row->source ?? 'card'),
+    ];
+}
+
+public function setDefault(int $walletId, int $methodId): void
+{
+    // wallet内のdefaultを全解除（activeのみ）
+    DB::table('stored_payment_methods')
+        ->where('wallet_id', $walletId)
+        ->where('status', 'active')
+        ->update([
+            'is_default' => 0,
+            'updated_at' => now(),
+        ]);
+
+    // 指定IDをdefaultに
+    DB::table('stored_payment_methods')
+        ->where('wallet_id', $walletId)
+        ->where('id', $methodId)
+        ->where('status', 'active')
+        ->update([
+            'is_default' => 1,
+            'updated_at' => now(),
+        ]);
+}
+
+public function markDetached(int $walletId, int $methodId): void
+{
+    DB::table('stored_payment_methods')
+        ->where('wallet_id', $walletId)
+        ->where('id', $methodId)
+        ->update([
+            'status' => 'detached',
+            'is_default' => 0,
+            'updated_at' => now(),
+        ]);
+}
+
+public function findNextActiveId(int $walletId, int $excludeId): ?int
+{
+    $row = DB::table('stored_payment_methods')
+        ->where('wallet_id', $walletId)
+        ->where('status', 'active')
+        ->where('id', '<>', $excludeId)
+        ->orderByDesc('id')
+        ->first();
+
+    return $row ? (int)$row->id : null;
+}
+
+public function findDefaultActiveRow(int $walletId): ?array
+{
+    $row = DB::table('stored_payment_methods')
+        ->where('wallet_id', $walletId)
+        ->where('status', 'active')
+        ->where('is_default', 1)
+        ->first();
+
+    if (! $row) {
+        return null;
+    }
+
+    return [
+        'id' => (int)$row->id,
+        'wallet_id' => (int)$row->wallet_id,
+        'provider' => (string)$row->provider,
+        'provider_payment_method_id' => (string)$row->provider_payment_method_id,
+        'is_default' => (bool)$row->is_default,
+        'status' => (string)$row->status,
+        'source' => (string)($row->source ?? 'card'),
+    ];
+}
 }
