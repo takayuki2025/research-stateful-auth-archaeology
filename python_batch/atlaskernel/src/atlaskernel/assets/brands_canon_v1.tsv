@@ -1,0 +1,234 @@
+Apple	apple	アップル,あっぷる,APPLE,Apple Inc.
+Microsoft	microsoft	マイクロソフト,MS,MSFT
+Google	google	グーグル,Alphabet
+Amazon	amazon	アマゾン,Amazon.co.jp
+Meta	meta	Facebook,フェイスブック,Meta Platforms
+
+Dell	dell	デル,DELL
+HP	hp	ヒューレットパッカード,Hewlett-Packard
+Lenovo	lenovo	レノボ
+ASUS	asus	エイスース,アスース
+Acer	acer	エイサー
+MSI	msi	エムエスアイ
+Razer	razer	レイザー
+LG	lg	エルジー
+Samsung	samsung	サムスン
+Huawei	huawei	ファーウェイ
+Xiaomi	xiaomi	シャオミ
+Google Pixel	pixel	Pixel,ピクセル
+
+Intel	intel	インテル
+AMD	amd	エーエムディー
+NVIDIA	nvidia	エヌビディア
+Qualcomm	qualcomm	クアルコム
+
+Sony	sony	ソニー
+Panasonic	panasonic	パナソニック
+Sharp	sharp	シャープ
+Toshiba	toshiba	東芝
+Dynabook	dynabook	ダイナブック
+Hitachi	hitachi	日立
+Mitsubishi Electric	mitsubishi electric	三菱電機
+Fujitsu	fujitsu	富士通
+NEC	nec	日本電気
+VAIO	vaio	バイオ
+Pioneer	pioneer	パイオニア
+Yamaha	yamaha	ヤマハ
+Denon	denon	デノン
+Marantz	marantz	マランツ
+Onkyo	onkyo	オンキヨー
+JVC	jvc	ジェイブイシー,ビクター,Victor
+Kenwood	kenwood	ケンウッド
+Epson	epson	エプソン,セイコーエプソン
+Canon	canon	キヤノン
+Nikon	nikon	ニコン
+Ricoh	ricoh	リコー
+Olympus	olympus	オリンパス,OM SYSTEM
+OM SYSTEM	om system	OM-1
+Brother	brother	ブラザー
+Konica Minolta	konica minolta	コニカミノルタ
+
+Dyson	dyson	ダイソン
+Philips	philips	フィリップス
+Braun	braun	ブラウン（家電）
+Bosch	bosch	ボッシュ
+Siemens	siemens	ジーメンス
+Miele	miele	ミーレ
+Electrolux	electrolux	エレクトロラックス
+Haier	haier	ハイアール
+Hisense	hisense	ハイセンス
+TCL	tcl	TCL
+
+Daikin	daikin	ダイキン
+Fujitsu General	fujitsu general	富士通ゼネラル
+Iris Ohyama	iris ohyama	アイリスオーヤマ
+Zojirushi	zojirushi	象印
+Tiger	tiger	タイガー魔法瓶
+Thermos	thermos	サーモス
+T-fal	t-fal	ティファール
+KitchenAid	kitchenaid	キッチンエイド
+Le Creuset	le creuset	ルクルーゼ
+Staub	staub	ストウブ
+WMF	wmf	ヴェーエムエフ
+OXO	oxo	オクソー
+HARIO	hario	ハリオ
+Kalita	kalita	カリタ
+DeLonghi	delonghi	デロンギ
+Nespresso	nespresso	ネスプレッソ
+
+MUJI	muji	無印良品
+UNIQLO	uniqlo	ユニクロ
+GU	gu	ジーユー
+ZARA	zara	ザラ
+H&M	h&m	エイチアンドエム
+Nike	nike	ナイキ
+Adidas	adidas	アディダス
+PUMA	puma	プーマ
+Reebok	reebok	リーボック
+New Balance	new balance	ニューバランス
+ASICS	asics	アシックス
+On	on	オン（シューズ）,On Running
+Converse	converse	コンバース
+Vans	vans	ヴァンズ
+The North Face	the north face	ノースフェイス
+Patagonia	patagonia	パタゴニア
+Arc'teryx	arcteryx	アークテリクス
+Columbia	columbia	コロンビア
+Moncler	moncler	モンクレール
+
+Louis Vuitton	louis vuitton	ルイヴィトン,LV
+Gucci	gucci	グッチ
+Prada	prada	プラダ
+Chanel	chanel	シャネル
+Hermès	hermes	エルメス
+Dior	dior	ディオール
+Saint Laurent	saint laurent	YSL,サンローラン
+Balenciaga	balenciaga	バレンシアガ
+Burberry	burberry	バーバリー
+Coach	coach	コーチ
+Michael Kors	michael kors	マイケルコース
+Kate Spade	kate spade	ケイトスペード
+TUMI	tumi	トゥミ
+Samsonite	samsonite	サムソナイト
+PORTER	porter	ポーター,吉田カバン,Yoshida & Co.
+Anello	anello	アネロ
+
+Tiffany & Co.	tiffany	ティファニー
+Cartier	cartier	カルティエ
+Bvlgari	bvlgari	ブルガリ
+Van Cleef & Arpels	van cleef	ヴァンクリーフ,ヴァンクリ
+Swarovski	swarovski	スワロフスキー
+Pandora	pandora	パンドラ
+MIKIMOTO	mikimoto	ミキモト
+TASAKI	tasaki	タサキ
+Harry Winston	harry winston	ハリーウィンストン
+
+Rolex	rolex	ロレックス
+Omega	omega	オメガ
+Seiko	seiko	セイコー
+Grand Seiko	grand seiko	グランドセイコー
+Citizen	citizen	シチズン
+Casio	casio	カシオ,G-SHOCK,G-Shock
+TAG Heuer	tag heuer	タグホイヤー
+IWC	iwc	IWC Schaffhausen
+Breitling	breitling	ブライトリング
+Panerai	panerai	パネライ
+Hublot	hublot	ウブロ
+Patek Philippe	patek philippe	パテックフィリップ
+Audemars Piguet	audemars piguet	オーデマピゲ
+Jaeger-LeCoultre	jaeger-lecoultre	JLC,ジャガールクルト
+Longines	longines	ロンジン
+Tissot	tissot	ティソ
+Swatch	swatch	スウォッチ
+
+Nintendo	nintendo	任天堂
+PlayStation	playstation	PS,ソニーPlayStation
+Xbox	xbox	Microsoft Xbox
+SEGA	sega	セガ
+Square Enix	square enix	スクウェアエニックス
+Capcom	capcom	カプコン
+Bandai Namco	bandai namco	バンダイナムコ
+Konami	konami	コナミ
+Ubisoft	ubisoft	ユービーアイソフト
+Electronic Arts	ea	EA
+Activision	activision	アクティビジョン
+Take-Two	take-two	テイクツー
+
+LEGO	lego	レゴ
+Takara Tomy	takara tomy	タカラトミー
+Bandai	bandai	バンダイ
+Hasbro	hasbro	ハズブロ
+Mattel	mattel	マテル
+Fisher-Price	fisher-price	フィッシャープライス
+Playmobil	playmobil	プレイモービル
+
+IKEA	ikea	イケア
+NITORI	nitori	ニトリ
+Herman Miller	herman miller	ハーマンミラー
+Vitra	vitra	ヴィトラ
+HAY	hay	HAY（インテリア）
+BoConcept	boconcept	ボーコンセプト
+Karimoku	karimoku	カリモク
+Cassina	cassina	カッシーナ
+
+3M	3m	スリーエム
+P&G	p&g	プロクターアンドギャンブル,Procter & Gamble
+Unilever	unilever	ユニリーバ
+Kao	kao	花王
+Lion	lion	ライオン
+Shiseido	shiseido	資生堂
+KOSÉ	kose	コーセー
+
+Kodansha	kodansha	講談社
+Shueisha	shueisha	集英社
+Shogakukan	shogakukan	小学館
+KADOKAWA	kadokawa	角川,カドカワ
+Gakken	gakken	学研
+Bungeishunju	bungeishunju	文藝春秋,文春
+Hakusensha	hakusensha	白泉社
+Akita Shoten	akita shoten	秋田書店
+Tokuma Shoten	tokuma shoten	徳間書店
+
+Fujifilm	fujifilm	富士フイルム,フジフイルム,FUJIFILM
+Leica	leica	ライカ
+Sigma	sigma	シグマ
+Tamron	tamron	タムロン
+GoPro	gopro	ゴープロ
+DJI	dji	ディージェーアイ
+
+Coleman	coleman	コールマン
+Snow Peak	snow peak	スノーピーク
+Montbell	montbell	モンベル
+Marmot	marmot	マーモット
+Gregory	gregory	グレゴリー
+Osprey	osprey	オスプレー
+Helinox	helinox	ヘリノックス
+
+SK-II	sk-ii	SK2,エスケーツー
+Kanebo	kanebo	カネボウ
+POLA	pola	ポーラ
+Estée Lauder	estee lauder	エスティローダー,Estee Lauder
+Clinique	clinique	クリニーク
+
+Francfranc	francfranc	フランフラン
+ACTUS	actus	アクタス
+
+Pigeon	pigeon	ピジョン
+Combi	combi	コンビ
+Aprica	aprica	アップリカ
+Richell	richell	リッチェル
+Pampers	pampers	パンパース
+Merries	merries	メリーズ
+
+Under Armour	under armour	アンダーアーマー
+Mizuno	mizuno	ミズノ
+Yonex	yonex	ヨネックス
+Wilson	wilson	ウィルソン
+Callaway	callaway	キャロウェイ
+Titleist	titleist	タイトリスト
+TaylorMade	taylormade	テーラーメイド
+Specialized	specialized	スペシャライズド
+Trek	trek	トレック
+Giant	giant	ジャイアント
+
+ Starbucks    スターバックス

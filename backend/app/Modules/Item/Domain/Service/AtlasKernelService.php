@@ -15,11 +15,6 @@ final class AtlasKernelService
         $this->assetPath = config('atlaskernel.assets_path');
     }
 
-    /**
-     * v3 固定：
-     * - return は「下流全体の唯一の SoT」
-     * - integration / extraction 等は内部処理に限定
-     */
     public function requestAnalysis(
         int $itemId,
         string $rawText,
@@ -34,29 +29,54 @@ final class AtlasKernelService
         // ======================================================
         // Dict load
         // ======================================================
-        $brandDict     = $this->loadDict('brands_v1.txt');
-        $brandAlias    = $this->loadAlias('brand_alias.txt');
-        $conditionDict = $this->loadDict('conditions_v1.txt');
-        $colorDict     = $this->loadDict('colors_v1.txt');
+        // Brand は v3 で "block dict（canonical+aliases）" に統一する
+        // brands_v1.txt は空行区切りブロック前提（あなたが作成した形式）
+        $brandDict         = $this->loadDict('brands_v1.txt');                 // extraction用（フラット）
+        $brandAliasMap     = $this->loadGroupedAliasMap('brands_v1.txt');      // canonicalize用（alias→canonical）
+
+        $conditionDict     = $this->loadDict('conditions_v1.txt');
+        $colorDict         = $this->loadDict('colors_v1.txt');
+
+        $conditionAliasMap = $this->loadGroupedAliasMap('conditions_v1.txt');
+        $colorAliasMap     = $this->loadGroupedAliasMap('colors_v1.txt');
 
         // ======================================================
-        // Extraction
+        // Extraction（raw token を得る）
         // ======================================================
-        [$condition, $text, $confCondition] = $this->extractOne($text, $conditionDict);
-        [$color, $text, $confColor]         = $this->extractOne($text, $colorDict);
-        [$brands, $text]                    = $this->extractMany($text, $brandDict);
+        [$conditionRaw, $text, $confCondition] = $this->extractOne($text, $conditionDict);
+        [$colorRaw, $text, $confColor]         = $this->extractOne($text, $colorDict);
+        [$brandsRaw, $text]                    = $this->extractMany($text, $brandDict);
 
-        $brands = $this->applyAliasToList($brands, $brandAlias);
-        $brandName = $brands[0] ?? null;
+        // ======================================================
+        // ✅ Canonicalize
+        // - tokens: raw（監査）
+        // - name: canonical（表示/保存/判断）
+        // ======================================================
+
+        // condition/color
+        $condition = $conditionRaw ? ($conditionAliasMap[$conditionRaw] ?? $conditionRaw) : null;
+        $color     = $colorRaw ? ($colorAliasMap[$colorRaw] ?? $colorRaw) : null;
+
+        // brand: raw list -> canonical list
+        $brandsCanonical = [];
+        foreach ($brandsRaw as $b) {
+            $bn = $this->normalize((string)$b);
+            if ($bn === '') continue;
+            $brandsCanonical[] = $brandAliasMap[$bn] ?? $bn;
+        }
+        $brandsCanonical = array_values(array_unique($brandsCanonical));
+        $brandName = $brandsCanonical[0] ?? null;
 
         // ======================================================
         // Provisional tags（削除禁止）
+        // ※ display_name は canonical を推奨（UI品質UP）
         // ======================================================
         $tags = [];
 
-        foreach ($brands as $b) {
+        foreach ($brandsCanonical as $b) {
             $tags['brand'][] = [
-                'display_name' => $b,
+                'display_name' => $b,         // ★ canonical
+                'raw_token'    => null,       // brandは複数なので省略（必要なら拡張可）
                 'entity_id'    => null,
                 'confidence'   => 0.9,
             ];
@@ -64,7 +84,8 @@ final class AtlasKernelService
 
         if ($condition) {
             $tags['condition'][] = [
-                'display_name' => $condition,
+                'display_name' => $condition,    // ★ canonical（新品 等）
+                'raw_token'    => $conditionRaw, // ★監査
                 'entity_id'    => null,
                 'confidence'   => $confCondition,
             ];
@@ -72,14 +93,15 @@ final class AtlasKernelService
 
         if ($color) {
             $tags['color'][] = [
-                'display_name' => $color,
+                'display_name' => $color,     // ★ canonical（ブルー 等）
+                'raw_token'    => $colorRaw,  // ★監査
                 'entity_id'    => null,
                 'confidence'   => $confColor,
             ];
         }
 
         // ======================================================
-        // Confidence
+        // Confidence（そのまま）
         // ======================================================
         $confidenceMap = [
             'brand'     => $brandName ? 0.9 : 0.0,
@@ -98,26 +120,26 @@ final class AtlasKernelService
         // ======================================================
         return [
             'brand' => [
-                'name'       => $brandName,
+                'name'       => $brandName,               // ★ canonical（Apple 等）
                 'confidence' => $confidenceMap['brand'],
             ],
             'condition' => [
-                'name'       => $condition,
+                'name'       => $condition,               // ★ canonical（新品 等）
                 'confidence' => $confidenceMap['condition'],
             ],
             'color' => [
-                'name'       => $color,
+                'name'       => $color,                   // ★ canonical（ブルー 等）
                 'confidence' => $confidenceMap['color'],
             ],
 
-            // Review / Learning 用
+            // Review / Learning 用（raw token を保存）
             'tokens' => [
-                'brand'     => $brands,
-                'condition' => $condition ? [$condition] : [],
-                'color'     => $color ? [$color] : [],
+                'brand'     => $brandsRaw,                        // ★ raw tokens（例：あっぷる）
+                'condition' => $conditionRaw ? [$conditionRaw] : [], // ★ raw token（シンピン）
+                'color'     => $colorRaw ? [$colorRaw] : [],         // ★ raw token（アオ）
             ],
 
-            // provisional tags（Entity / UI 即時反映用）
+            // provisional tags
             'tags' => $tags,
 
             'confidence_map'     => $confidenceMap,
@@ -150,6 +172,47 @@ final class AtlasKernelService
         )));
     }
 
+    /**
+     * grouped dict（canonical + aliases）から alias->canonical を生成
+     * 前提：ファイルは「空行でブロック区切り」
+     */
+    private function loadGroupedAliasMap(string $file): array
+    {
+        $map = [];
+        $path = "{$this->assetPath}/{$file}";
+        if (!file_exists($path)) {
+            logger()->warning('[AtlasKernel] grouped dict not found', ['file' => $file]);
+            return $map;
+        }
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES); // ★空行も保持
+        $currentCanonical = null;
+
+        foreach ($lines ?: [] as $line) {
+            $raw = (string)$line;
+            $trimmed = trim($raw);
+
+            if ($trimmed === '') {
+                $currentCanonical = null;
+                continue;
+            }
+
+            $v = $this->normalize($trimmed);
+            if ($v === '') continue;
+
+            if ($currentCanonical === null) {
+                $currentCanonical = $v;
+                $map[$currentCanonical] = $currentCanonical;
+                continue;
+            }
+
+            $map[$v] = $currentCanonical;
+        }
+
+        return $map;
+    }
+
+    // 既存互換：ブランドCSV alias（今後使わないが残してOK）
     private function loadAlias(string $file): array
     {
         $map = [];

@@ -166,27 +166,35 @@ function labelForDiff(s: ReturnType<typeof diffState>) {
   }
 }
 
-/**
- * normalizeSnapshot
- * - AFTER（解析・正規化結果）専用
- * - before / beforeParsed には絶対に使わない
- */
 function normalizeSnapshot(
-  _attributes: AtlasAttributes | null | undefined,
+  attributes: AtlasAttributes | null | undefined,
   tokens: AtlasTokens | null | undefined,
-  confidenceMap: ConfidenceMap | null | undefined
+  confidenceMap: ConfidenceMap | null | undefined,
 ): Snapshot | null {
-  if (!tokens) return null;
-
   const out: Snapshot = {};
-  (["brand", "color", "condition"] as const).forEach((key) => {
-    const token = tokens[key]?.[0] ?? null;
-    if (token) {
+
+  (["brand", "color", "condition"] as const).forEach((key: AttrKey) => {
+    // ① canonical（attributes優先）
+    const canonical = attributes?.[key]?.value ?? null;
+
+    if (canonical && String(canonical).trim() !== "") {
       out[key] = {
-        value: token,
+        value: String(canonical),
         confidence: confidenceMap?.[key] ?? null,
         source: "ai",
-        confidence_version: "v3_ai",
+        confidence_version: "v3_ai_canonical",
+      };
+      return;
+    }
+
+    // ② fallback：raw token
+    const token = tokens?.[key]?.[0] ?? null;
+    if (token && String(token).trim() !== "") {
+      out[key] = {
+        value: String(token),
+        confidence: confidenceMap?.[key] ?? null,
+        source: "ai",
+        confidence_version: "v3_ai_token",
       };
     }
   });
@@ -232,6 +240,15 @@ function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
   }
 
   return out;
+}
+
+
+
+function rawTokenFor(key: AttrKey, tokens?: AtlasTokens | null): string | null {
+  const t = tokens?.[key]?.[0] ?? null;
+  if (!t) return null;
+  const s = String(t).trim();
+  return s ? s : null;
 }
 
 /**
@@ -636,7 +653,7 @@ export default function AtlasReviewPage() {
           className="text-blue-600 underline text-sm"
           onClick={() => router.push(ENDPOINT.back)}
         >
-          ← 一覧へ戻る
+          ← 解析一覧へ戻る
         </button>
       </div>
 
@@ -655,12 +672,12 @@ export default function AtlasReviewPage() {
             onClick={() => setMode("edit_confirm")}
           />
           <ModePill
-            label="Manual Override（新規手動追加）"
+            label="Manual Override（新規追加）"
             active={mode === "manual_override"}
             onClick={() => setMode("manual_override")}
           />
           <ModePill
-            label="Reject（解析結果棄却：解析前入力内容（新規作成なし））"
+            label="Reject（解析結果棄却：解析前入力採用（新規作成なし））"
             active={mode === "reject"}
             onClick={() => setMode("reject")}
           />
@@ -799,8 +816,13 @@ export default function AtlasReviewPage() {
                     }}
                   />
                   <div className="text-xs text-gray-500">
-                    解析候補:{" "}
+                    解析（canonical）:{" "}
                     <span className="font-medium">{r.ai?.value ?? "-"}</span>
+                    <span className="mx-2">·</span>
+                    raw token:{" "}
+                    <span className="font-medium">
+                      {rawTokenFor(r.key as AttrKey, data.tokens) ?? "-"}
+                    </span>
                     <span className="mx-2">·</span>
                     conf {fmtConfidence(r.ai?.confidence)}
                   </div>
@@ -871,7 +893,7 @@ export default function AtlasReviewPage() {
 
                 if (needsCautionPopup) {
                   const ok = confirm(
-                    "confidence 70%以上の手動反映です。業務改善のため管理者へ通知されます。続行しますか？"
+                    "confidence 70%以上の手動反映です。業務改善のため管理者へ通知されます。続行しますか？",
                   );
                   if (!ok) return;
                 }
@@ -888,7 +910,7 @@ export default function AtlasReviewPage() {
                     !resolvedForBackend.color_entity_id
                   ) {
                     alert(
-                      "確定できるエンティティがありません。入力を確認してください。"
+                      "確定できるエンティティがありません。入力を確認してください。",
                     );
                     return;
                   }

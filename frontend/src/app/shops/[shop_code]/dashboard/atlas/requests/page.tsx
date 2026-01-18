@@ -532,7 +532,7 @@ function RowHeader({ r }: { r: AtlasRequestRow }) {
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <div className="text-base font-semibold text-gray-900">
-            {safe(r.item?.name)}{" "}
+            商品名：{safe(r.item?.name)}{" "}
             <span className="text-gray-500">（Item#{safe(r.item?.id)}）</span>
           </div>
 
@@ -549,7 +549,7 @@ function RowHeader({ r }: { r: AtlasRequestRow }) {
         </div>
 
         <div className="mt-1 text-xs text-gray-500">
-          Shop:{" "}
+          Shop名:{" "}
           <span className="font-semibold text-gray-700">{r.shop_code}</span> /
           Analyzer:{" "}
           <span className="font-semibold text-gray-700">
@@ -571,14 +571,14 @@ function RowHeader({ r }: { r: AtlasRequestRow }) {
             href={`/shops/${r.shop_code}/dashboard/atlas/history/${r.request_id}`}
             className="text-sm font-semibold text-gray-900 underline"
           >
-            History
+            管理者判断履歴
           </Link>
         ) : (
           <Link
             href={`/shops/${r.shop_code}/dashboard/atlas/review/${r.request_id}`}
             className="text-sm font-semibold text-blue-600 underline"
           >
-            Review
+            管理者判断へ
           </Link>
         )}
       </div>
@@ -628,7 +628,7 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
   return (
     <div className="space-y-4">
       <SectionTitle
-        title="Timeline"
+        title="Timeline（時系列）"
         subtitle="Review Queue + Audit Timeline（最優先）"
       />
 
@@ -644,29 +644,33 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl border bg-gray-50 p-3">
-                  <div className="text-sm font-semibold">Submitted</div>
+                  <div className="text-sm font-semibold">
+                    Submitted（入力内容）
+                  </div>
                   <div className="mt-2">
                     <Line
-                      label="Brand"
+                      label="Modalities"
                       value={bBrand.text}
                       hint={bBrand.hint}
                     />
-                    <Line
-                      label="Condition"
+                    {/* <Line
+                      label="Condition（今回はNULL）"
                       value={bCond.text}
                       hint={bCond.hint}
                     />
                     <Line
-                      label="Color"
+                      label="Color（今回はNULL）"
                       value={bColor.text}
                       hint={bColor.hint}
-                    />
+                    /> */}
                     <Line label="at" value={fmtDT(r.submitted_at)} />
                   </div>
                 </div>
 
                 <div className="rounded-xl border bg-gray-50 p-3">
-                  <div className="text-sm font-semibold">Analyzed (AI)</div>
+                  <div className="text-sm font-semibold">
+                    Analyzed (AI)（Atlaskernel解析結果）
+                  </div>
                   <div className="mt-2">
                     <Line label="Brand" value={safe(r.ai.brand)} />
                     <Line label="Condition" value={safe(r.ai.condition)} />
@@ -694,7 +698,9 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
                 </div>
 
                 <div className="rounded-xl border bg-gray-50 p-3">
-                  <div className="text-sm font-semibold">Decided / Final</div>
+                  <div className="text-sm font-semibold">
+                    Decided / Final（管理者による確定結果）
+                  </div>
                   <div className="mt-2">
                     <Line label="Decision" value={safe(r.decision?.type)} />
                     <Line label="By" value={safe(r.decision?.by)} />
@@ -781,7 +787,7 @@ function DiffView({ rows }: { rows: AtlasRequestRow[] }) {
   return (
     <div className="space-y-4">
       <SectionTitle
-        title="Diff"
+        title="Diff（入力→解析→判断）"
         subtitle="Before/After を強調（教育・監査・品質）"
       />
       {diffRows.length === 0 && (
@@ -900,7 +906,7 @@ function ConfidenceView({ rows }: { rows: AtlasRequestRow[] }) {
   return (
     <div className="space-y-4">
       <SectionTitle
-        title="Confidence"
+        title="Confidence（解析結果一致率）"
         subtitle="confidence_map を可視化（研究・改善の基盤）"
       />
       {withMap.length === 0 && (
@@ -1146,7 +1152,7 @@ export default function AtlasRequestsPage() {
             href={`/shops/${shop_code}/dashboard`}
             className="text-sm font-semibold text-gray-900 underline"
           >
-            Dashboard
+            ダッシュボードへ戻る
           </Link>
         </div>
       </div>
@@ -1157,13 +1163,13 @@ export default function AtlasRequestsPage() {
           <span className="text-xs font-semibold text-gray-700">Filter</span>
           {(
             [
-              ["review", "Review"],
-              ["high_risk_review", "High-risk Review"],
-              ["human", "Human"],
-              ["auto", "Auto"],
-              ["rejected", "Rejected"],
-              ["failed", "Failed"],
-              ["all", "All"],
+              ["review", "解析履歴(判断待ち)"],
+              ["human", "管理者判断履歴"],
+              ["all", "全て"],
+              ["rejected", "解析結果却下履歴"],
+              ["auto", "自動化履歴"],
+              ["high_risk_review", "解析（高リスク）"],
+              ["failed", "失敗履歴"],
             ] as Array<[FilterKey, string]>
           ).map(([k, label]) => (
             <button
@@ -1174,7 +1180,7 @@ export default function AtlasRequestsPage() {
                 "px-2 py-1 rounded text-xs font-semibold ring-1",
                 filter === k
                   ? "bg-gray-900 text-white ring-gray-900"
-                  : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50"
+                  : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50",
               )}
             >
               {label}
