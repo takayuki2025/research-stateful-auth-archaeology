@@ -469,3 +469,12 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::post('one-click-checkout', OneClickCheckoutController::class);
     });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerSummaryController;
+use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerEntriesController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/ledger/summary', GetLedgerSummaryController::class);
+    Route::get('/ledger/entries', GetLedgerEntriesController::class);
+});

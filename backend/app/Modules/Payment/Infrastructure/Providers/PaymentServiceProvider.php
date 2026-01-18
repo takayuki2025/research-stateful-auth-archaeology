@@ -14,6 +14,8 @@ use App\Modules\Payment\Domain\Ledger\Repository\LedgerEntryRepository;
 use App\Modules\Payment\Domain\Ledger\Service\LedgerPoster;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerPostingRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerEntryRepository;
+use App\Modules\Payment\Domain\Ledger\Repository\LedgerQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerQueryRepository;
 
 
 
@@ -29,5 +31,6 @@ final class PaymentServiceProvider extends ServiceProvider
     $this->app->bind(LedgerPostingRepository::class, EloquentLedgerPostingRepository::class);
     $this->app->bind(LedgerEntryRepository::class, EloquentLedgerEntryRepository::class);
     $this->app->singleton(LedgerPoster::class, fn () => new LedgerPoster());
+    $this->app->bind(LedgerQueryRepository::class, EloquentLedgerQueryRepository::class);
 }
 }
