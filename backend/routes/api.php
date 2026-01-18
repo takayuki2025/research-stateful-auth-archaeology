@@ -257,14 +257,14 @@ Route::get('/me/shipments/{id}', [CustomerShipmentController::class, 'show'])
 |--------------------------------------------------------------------------
 */
 use App\Http\Controllers\{
-    ItemEntityReviewController,
+    // ItemEntityReviewController,
     ItemEntityAuditController,
     EntityKpiController
 };
 
-Route::get('/entity-reviews', [ItemEntityReviewController::class, 'index']);
+// Route::get('/entity-reviews', [ItemEntityReviewController::class, 'index']);
 // Route::post('/entity-reviews/{id}/approve', [ItemEntityReviewController::class, 'approve']);
-Route::post('/entity-reviews/{id}/reject', [ItemEntityReviewController::class, 'reject']);
+// Route::post('/entity-reviews/{id}/reject', [ItemEntityReviewController::class, 'reject']);
 Route::get('/item-entities/{id}/audits', [ItemEntityAuditController::class, 'index']);
 Route::get('/entity-kpis', EntityKpiController::class);
 
@@ -338,30 +338,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
-
-// Route::prefix('shops/{shopCode}/atlas')->group(function () {
-//     Route::get(
-//         'requests/{requestId}/history',
-//         [AtlasDecisionHistoryController::class, 'history']
-//     );
-
-//     Route::post(
-//         'requests/{requestId}/replay',
-//         [AtlasDecisionHistoryController::class, 'replay']
-//     );
-// });
-
-
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
-
-
-
-// Route::post(
-//     '/shops/{shopCode}/atlas/requests/{requestId}/decide',
-//     [AtlasDecisionController::class, 'decide']
-// );
-
 
 
 
@@ -370,9 +346,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 // v3 Controllers
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionController;
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryController;
-use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecisionHistoryListController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
 
 Route::middleware(['auth:sanctum'])
@@ -387,17 +360,6 @@ Route::middleware(['auth:sanctum'])
     'requests/{request_id}/review',
     [AtlasReviewController::class, 'show']
 )->whereNumber('request_id');
-
-        // 3) Decide（approve/reject/edit_confirm/manual_override）
-        // Route::post('requests/{request_id}/decide', [AtlasDecisionController::class, 'decide'])
-        //     ->whereNumber('request_id');
-
-        // // 4) 履歴（1件のrequestのdecision履歴）
-        // Route::get('requests/{request_id}/history', [AtlasDecisionHistoryController::class, 'history'])
-        //     ->whereNumber('request_id');
-
-        // 5) 履歴一覧（dashboard/atlas/history が叩く：あなたのURLに合わせる）
-        Route::get('decision-histories', [AtlasDecisionHistoryListController::class, 'index']);
 
         // 6) Replay（非同期再解析）
         Route::post('requests/{request_id}/replay', [AtlasReplayController::class, 'replay'])
@@ -429,12 +391,7 @@ Route::prefix('shops/{shop_code}/atlas')->group(function () {
     // );
 });
 
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ResolveAtlasEntitiesController;
 
-// Route::post(
-//     '/shops/{shop_code}/atlas/requests/{request_id}/resolve',
-//     ResolveAtlasEntitiesController::class
-// );
 
 
 
@@ -448,20 +405,6 @@ Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function (
 });
 
 
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EntityController;
-
-// Route::prefix('entities')->group(function () {
-//     Route::get('brands', [EntityController::class, 'brands']);
-//     Route::get('conditions', [EntityController::class, 'conditions']);
-//     Route::get('colors', [EntityController::class, 'colors']);
-// });
-
-// use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\CanonicalEntityController;
-
-// Route::get('/entities/{type}', [
-//     CanonicalEntityController::class,
-//     'index',
-// ]);
 
 
 
@@ -486,4 +429,14 @@ Route::middleware(['auth:sanctum'])
         Route::get('brands',     [EditConfirmSelectController::class, 'brands']);
         Route::get('conditions', [EditConfirmSelectController::class, 'conditions']);
         Route::get('colors',     [EditConfirmSelectController::class, 'colors']);
+    });
+
+
+// トラストレジャーペイメントシステム
+use App\Modules\Payment\Presentation\Http\Controllers\Wallet\ListPaymentMethodsController;
+
+Route::middleware('auth:sanctum')
+    ->prefix('wallet')
+    ->group(function () {
+        Route::get('payment-methods', ListPaymentMethodsController::class);
     });

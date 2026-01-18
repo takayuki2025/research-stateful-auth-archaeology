@@ -69,7 +69,8 @@
     65 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
     66 => 'App\\Modules\\Review\\Infrastructure\\ReviewServiceProvider',
     67 => 'App\\Modules\\AtlasKernel\\Infrastructure\\Providers\\AtlasServiceProvider',
-    68 => 'App\\Providers\\AppServiceProvider',
+    68 => 'App\\Modules\\Payment\\Infrastructure\\Providers\\PaymentServiceProvider',
+    69 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -127,7 +128,8 @@
     51 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
     52 => 'App\\Modules\\Review\\Infrastructure\\ReviewServiceProvider',
     53 => 'App\\Modules\\AtlasKernel\\Infrastructure\\Providers\\AtlasServiceProvider',
-    54 => 'App\\Providers\\AppServiceProvider',
+    54 => 'App\\Modules\\Payment\\Infrastructure\\Providers\\PaymentServiceProvider',
+    55 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (
