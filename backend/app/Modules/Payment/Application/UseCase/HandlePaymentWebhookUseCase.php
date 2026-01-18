@@ -17,6 +17,8 @@ use App\Modules\Payment\Application\UseCase\Ledger\PostLedgerFromPaymentEventUse
 use App\Modules\Payment\Application\Dto\Ledger\PostLedgerFromPaymentEventInput;
 use App\Modules\Payment\Domain\Ledger\PostingType;
 use App\Modules\Payment\Application\UseCase\Ledger\PostFeeFromStripeChargeUseCase;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerPort;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerCommand;
 
 final class HandlePaymentWebhookUseCase
 {
@@ -26,10 +28,11 @@ final class HandlePaymentWebhookUseCase
         private OrderRepository $orders,
         private ShopLedgerRepository $ledgers,
         private StripeEventMapper $mapper,
-        private PostLedgerFromPaymentEventUseCase $postLedger,
+        private PostLedgerPort $port,
         private PostFeeFromStripeChargeUseCase $postFee,
     ) {
     }
+
 
     public function handle(HandlePaymentWebhookInput $input): void
     {
@@ -218,22 +221,23 @@ if ($payment && (str_starts_with($input->eventType, 'charge.'))) {
 // ✅ 次に v2 posting（冪等キーは refund_id:refund）
 $sourceId = $refundId . ':' . PostingType::REFUND;
 
-$this->postLedger->handle(new PostLedgerFromPaymentEventInput(
-    sourceProvider: 'stripe',
-    sourceEventId: $sourceId,
-    shopId: $payment->shopId(),
-    orderId: $payment->orderId(),
-    paymentId: $payment->id(),
-    postingType: PostingType::REFUND,
-    amount: abs($payment->amount()),
-    currency: $payment->currency(),
-    occurredAt: $domainEvent->occurredAt,
-    meta: [
-        'provider_payment_id' => $domainEvent->providerPaymentId,
-        'provider_refund_id' => $refundId,
-        'webhook_event_type' => $input->eventType,
-        'webhook_event_id' => $input->eventId,
-    ],
+$this->port->post(new PostLedgerCommand(
+  source_provider: 'stripe',
+  source_event_id: $sourceId,                 // ✅ refund_id:refund
+  shop_id: $payment->shopId(),
+  order_id: $payment->orderId(),
+  payment_id: $payment->id(),
+  posting_type: PostingType::REFUND,
+  amount: abs($payment->amount()),            // ✅ 正の額
+  currency: $payment->currency(),
+  occurred_at: $domainEvent->occurredAt->format('Y-m-d H:i:s'),
+  meta: [
+    'provider_payment_id' => $domainEvent->providerPaymentId,
+    'provider_refund_id' => $refundId,
+    'webhook_event_type' => $input->eventType,
+    'webhook_event_id' => $input->eventId,
+  ],
+  replay: false,
 ));
 
 return;
@@ -242,7 +246,9 @@ return;
                 // -----------------------------------------
                 // 4-5) SUCCEEDED / FAILED / REQUIRES_ACTION
                 // -----------------------------------------
-
+                if ($input->eventType !== 'payment_intent.succeeded') {
+                    return;
+                }
                 // すでに succeeded なら冪等で何もしない
                 if ($payment->status() === PaymentStatus::SUCCEEDED) {
                     return;
@@ -303,21 +309,22 @@ $this->ledgers->recordSale(
 );
 
 // ✅ v2 posting（冪等キーは pi_xxx:sale）
-$this->postLedger->handle(new PostLedgerFromPaymentEventInput(
-    sourceProvider: 'stripe',
-    sourceEventId: $domainEvent->providerPaymentId . ':' . PostingType::SALE, // ←重要
-    shopId: $payment->shopId(),
-    orderId: $payment->orderId(),
-    paymentId: $payment->id(),
-    postingType: PostingType::SALE,
-    amount: $payment->amount(),
-    currency: $payment->currency(),
-    occurredAt: $domainEvent->occurredAt,
-    meta: [
-        'provider_payment_id' => $domainEvent->providerPaymentId,
-        'webhook_event_type' => $input->eventType,
-        'webhook_event_id' => $input->eventId,
-    ],
+$this->port->post(new PostLedgerCommand(
+  source_provider: 'stripe',
+  source_event_id: $domainEvent->providerPaymentId . ':' . PostingType::SALE,
+  shop_id: $payment->shopId(),
+  order_id: $payment->orderId(),
+  payment_id: $payment->id(),
+  posting_type: PostingType::SALE,
+  amount: $payment->amount(),
+  currency: $payment->currency(),
+  occurred_at: $domainEvent->occurredAt->format('Y-m-d H:i:s'),
+  meta: [
+    'provider_payment_id' => $domainEvent->providerPaymentId,
+    'webhook_event_type' => $input->eventType,
+    'webhook_event_id' => $input->eventId,
+  ],
+  replay: false,
 ));
 
 

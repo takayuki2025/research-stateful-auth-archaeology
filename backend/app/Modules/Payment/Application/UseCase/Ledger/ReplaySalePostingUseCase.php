@@ -6,12 +6,16 @@ use App\Modules\Payment\Application\Dto\Ledger\ReplaySalePostingInput;
 use App\Modules\Payment\Application\Dto\Ledger\PostLedgerFromPaymentEventInput;
 use App\Modules\Payment\Domain\Ledger\PostingType;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerPort;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerCommand;
+
 
 final class ReplaySalePostingUseCase
 {
     public function __construct(
         private PaymentRepository $payments,
-        private PostLedgerFromPaymentEventUseCase $postLedger,
+        private PostLedgerPort $port,
+        // private PostLedgerFromPaymentEventUseCase $postLedger,
     ) {
     }
 
@@ -28,20 +32,20 @@ final class ReplaySalePostingUseCase
 
         $sourceEventId = $payment->providerPaymentId() . ':' . PostingType::SALE;
 
-        $this->postLedger->handle(new PostLedgerFromPaymentEventInput(
-            sourceProvider: 'stripe',
-            sourceEventId: $sourceEventId,
-            shopId: $payment->shopId(),
-            orderId: $payment->orderId(),
-            paymentId: $payment->id(),
-            postingType: PostingType::SALE,
-            amount: $payment->amount(),
-            currency: $payment->currency(),
-            occurredAt: new \DateTimeImmutable(), // リプレイ時刻（v2-4最小）
-            meta: [
-                'replay' => true,
-                'provider_payment_id' => $payment->providerPaymentId(),
-            ],
-        ));
+        $cmd = new PostLedgerCommand(
+    source_provider: 'stripe',
+    source_event_id: $payment->providerPaymentId() . ':' . PostingType::SALE,
+    shop_id: $payment->shopId(),
+    order_id: $payment->orderId(),
+    payment_id: $payment->id(),
+    posting_type: PostingType::SALE,
+    amount: $payment->amount(),
+    currency: $payment->currency(),
+    occurred_at: (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+    meta: ['provider_payment_id' => $payment->providerPaymentId()],
+    replay: true,
+);
+
+$this->port->post($cmd);
     }
 }

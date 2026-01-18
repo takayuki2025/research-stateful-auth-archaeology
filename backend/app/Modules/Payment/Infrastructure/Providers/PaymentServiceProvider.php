@@ -20,6 +20,8 @@ use App\Modules\Payment\Domain\Port\FeeQueryPort;
 use App\Modules\Payment\Infrastructure\Gateway\StripeFeeQuery;
 use App\Modules\Payment\Domain\Ledger\Repository\LedgerReconciliationQueryRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerReconciliationQueryRepository;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerPort;
+use App\Modules\Payment\Infrastructure\Ledger\LocalPostLedgerPort;
 
 final class PaymentServiceProvider extends ServiceProvider
 {
@@ -36,5 +38,6 @@ final class PaymentServiceProvider extends ServiceProvider
     $this->app->bind(LedgerQueryRepository::class, EloquentLedgerQueryRepository::class);
     $this->app->bind(FeeQueryPort::class, StripeFeeQuery::class);
     $this->app->bind(LedgerReconciliationQueryRepository::class, EloquentLedgerReconciliationQueryRepository::class);
+    $this->app->bind(PostLedgerPort::class, LocalPostLedgerPort::class);
 }
 }

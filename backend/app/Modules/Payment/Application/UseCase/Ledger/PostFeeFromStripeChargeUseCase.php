@@ -5,12 +5,15 @@ namespace App\Modules\Payment\Application\UseCase\Ledger;
 use App\Modules\Payment\Application\Dto\Ledger\PostLedgerFromPaymentEventInput;
 use App\Modules\Payment\Domain\Ledger\PostingType;
 use App\Modules\Payment\Domain\Port\FeeQueryPort;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerPort;
+use App\Modules\Payment\Domain\Ledger\Port\PostLedgerCommand;
+
 
 final class PostFeeFromStripeChargeUseCase
 {
     public function __construct(
         private FeeQueryPort $fees,
-        private PostLedgerFromPaymentEventUseCase $postLedger,
+        private PostLedgerPort $port,
     ) {
     }
 
@@ -31,19 +34,20 @@ final class PostFeeFromStripeChargeUseCase
         // ✅ 冪等キー：balance_transaction_id:fee
         $sourceEventId = $balanceTransactionId . ':' . PostingType::FEE;
 
-        $this->postLedger->handle(new PostLedgerFromPaymentEventInput(
-            sourceProvider: 'stripe',
-            sourceEventId: $sourceEventId,
-            shopId: $shopId,
-            orderId: $orderId,
-            paymentId: $paymentId,
-            postingType: PostingType::FEE,
-            amount: $fee->feeAmount,
-            currency: $fee->currency,
-            occurredAt: $occurredAt,
-            meta: $meta + [
-                'balance_transaction_id' => $balanceTransactionId,
-            ],
-        ));
+        $cmd = new PostLedgerCommand(
+    source_provider: 'stripe',
+    source_event_id: $balanceTransactionId . ':' . PostingType::FEE,
+    shop_id: $shopId,
+    order_id: $orderId,
+    payment_id: $paymentId,
+    posting_type: PostingType::FEE,
+    amount: $fee->feeAmount,
+    currency: $fee->currency,
+    occurred_at: $occurredAt->format('Y-m-d H:i:s'),
+    meta: $meta + ['balance_transaction_id' => $balanceTransactionId],
+    replay: false,
+);
+
+$this->port->post($cmd);
     }
 }
