@@ -13,6 +13,9 @@ use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Shop\Domain\Repository\ShopLedgerRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use App\Modules\Payment\Application\UseCase\Ledger\PostLedgerFromPaymentEventUseCase;
+use App\Modules\Payment\Application\Dto\Ledger\PostLedgerFromPaymentEventInput;
+use App\Modules\Payment\Domain\Ledger\PostingType;
 
 final class HandlePaymentWebhookUseCase
 {
@@ -22,6 +25,7 @@ final class HandlePaymentWebhookUseCase
         private OrderRepository $orders,
         private ShopLedgerRepository $ledgers,
         private StripeEventMapper $mapper,
+        private PostLedgerFromPaymentEventUseCase $postLedger,
     ) {
     }
 
@@ -171,18 +175,39 @@ final class HandlePaymentWebhookUseCase
                     }
 
                     $this->ledgers->recordRefund(
-                        shopId: $payment->shopId(),
-                        amount: $payment->amount(),
-                        currency: $payment->currency(),
-                        orderId: $payment->orderId(),
-                        paymentId: $payment->id(),
-                        provider: 'stripe',
-                        providerRefundId: $refundId,
-                        reason: $meta['reason'] ?? null,
-                        occurredAt: $domainEvent->occurredAt,
-                    );
+    shopId: $payment->shopId(),
+    amount: $payment->amount(),
+    currency: $payment->currency(),
+    orderId: $payment->orderId(),
+    paymentId: $payment->id(),
+    provider: 'stripe',
+    providerRefundId: $refundId,
+    reason: $meta['reason'] ?? null,
+    occurredAt: $domainEvent->occurredAt,
+);
 
-                    return;
+// ✅ 次に v2 posting（冪等キーは refund_id:refund）
+$sourceId = $refundId . ':' . PostingType::REFUND;
+
+$this->postLedger->handle(new PostLedgerFromPaymentEventInput(
+    sourceProvider: 'stripe',
+    sourceEventId: $sourceId,
+    shopId: $payment->shopId(),
+    orderId: $payment->orderId(),
+    paymentId: $payment->id(),
+    postingType: PostingType::REFUND,
+    amount: abs($payment->amount()),
+    currency: $payment->currency(),
+    occurredAt: $domainEvent->occurredAt,
+    meta: [
+        'provider_payment_id' => $domainEvent->providerPaymentId,
+        'provider_refund_id' => $refundId,
+        'webhook_event_type' => $input->eventType,
+        'webhook_event_id' => $input->eventId,
+    ],
+));
+
+return;
                 }
 
                 // -----------------------------------------
@@ -239,17 +264,34 @@ final class HandlePaymentWebhookUseCase
                         shopId: $paidOrder->shopId(),
                     );
 
-                    // ✅ Ledger 記録（冪等は repository 側で担保される前提）
-                    $this->ledgers->recordSale(
-                        shopId: $payment->shopId(),
-                        amount: $payment->amount(),
-                        currency: $payment->currency(),
-                        orderId: $payment->orderId(),
-                        paymentId: $payment->id(),
-                        occurredAt: $domainEvent->occurredAt,
-                    );
+$this->ledgers->recordSale(
+    shopId: $payment->shopId(),
+    amount: $payment->amount(),
+    currency: $payment->currency(),
+    orderId: $payment->orderId(),
+    paymentId: $payment->id(),
+    occurredAt: $domainEvent->occurredAt,
+);
 
-                    return;
+// ✅ v2 posting（冪等キーは pi_xxx:sale）
+$this->postLedger->handle(new PostLedgerFromPaymentEventInput(
+    sourceProvider: 'stripe',
+    sourceEventId: $domainEvent->providerPaymentId . ':' . PostingType::SALE, // ←重要
+    shopId: $payment->shopId(),
+    orderId: $payment->orderId(),
+    paymentId: $payment->id(),
+    postingType: PostingType::SALE,
+    amount: $payment->amount(),
+    currency: $payment->currency(),
+    occurredAt: $domainEvent->occurredAt,
+    meta: [
+        'provider_payment_id' => $domainEvent->providerPaymentId,
+        'webhook_event_type' => $input->eventType,
+        'webhook_event_id' => $input->eventId,
+    ],
+));
+
+return;
                 }
 
                 // ここに来るのは基本的に無いが、念のため何もしない
