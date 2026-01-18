@@ -9,6 +9,10 @@ final class StoredPaymentMethod
         private int $walletId,
         private string $provider,
         private string $providerPaymentMethodId,
+
+        // ✅ 追加
+        private string $source,
+
         private ?string $brand,
         private ?string $last4,
         private ?int $expMonth,
@@ -24,6 +28,7 @@ final class StoredPaymentMethod
         int $walletId,
         string $provider,
         string $providerPaymentMethodId,
+        string $source,
         ?string $brand,
         ?string $last4,
         ?int $expMonth,
@@ -34,6 +39,7 @@ final class StoredPaymentMethod
     ): self {
         return new self(
             $id, $walletId, $provider, $providerPaymentMethodId,
+            $source,
             $brand, $last4, $expMonth, $expYear,
             $isDefault, $status, $meta
         );
@@ -43,6 +49,10 @@ final class StoredPaymentMethod
     public function walletId(): int { return $this->walletId; }
     public function provider(): string { return $this->provider; }
     public function providerPaymentMethodId(): string { return $this->providerPaymentMethodId; }
+
+    // ✅ 追加
+    public function source(): string { return $this->source; }
+
     public function brand(): ?string { return $this->brand; }
     public function last4(): ?string { return $this->last4; }
     public function expMonth(): ?int { return $this->expMonth; }

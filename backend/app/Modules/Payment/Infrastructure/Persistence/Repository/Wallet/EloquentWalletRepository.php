@@ -53,4 +53,36 @@ final class EloquentWalletRepository implements WalletRepository
             meta: $wallet->meta(),
         );
     }
+
+    public function findByProviderCustomerId(string $providerCustomerId, string $provider = 'stripe'): ?CustomerWallet
+{
+    $row = DB::table('customer_wallets')
+        ->where('provider', $provider)
+        ->where('provider_customer_id', $providerCustomerId)
+        ->first();
+
+    if (! $row) {
+        return null;
+    }
+
+    return CustomerWallet::reconstitute(
+        id: (int)$row->id,
+        userId: (int)$row->user_id,
+        shopId: $row->shop_id !== null ? (int)$row->shop_id : null,
+        provider: (string)$row->provider,
+        providerCustomerId: $row->provider_customer_id ?: null,
+        status: (string)$row->status,
+        meta: $row->meta ? json_decode($row->meta, true) : null,
+    );
+}
+
+public function setProviderCustomerId(int $walletId, string $providerCustomerId): void
+{
+    DB::table('customer_wallets')
+        ->where('id', $walletId)
+        ->update([
+            'provider_customer_id' => $providerCustomerId,
+            'updated_at' => now(),
+        ]);
+}
 }

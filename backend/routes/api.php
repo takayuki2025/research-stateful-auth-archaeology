@@ -440,3 +440,12 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::get('payment-methods', ListPaymentMethodsController::class);
     });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Wallet\CreateSetupIntentController;
+
+Route::middleware('auth:sanctum')
+    ->prefix('wallet')
+    ->group(function () {
+        Route::post('setup-intent', CreateSetupIntentController::class);
+    });
