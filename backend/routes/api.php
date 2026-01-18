@@ -478,3 +478,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ledger/summary', GetLedgerSummaryController::class);
     Route::get('/ledger/entries', GetLedgerEntriesController::class);
 });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerReconciliationController;
+use App\Modules\Payment\Presentation\Http\Controllers\Ledger\ReplaySalePostingController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/ledger/reconciliation', GetLedgerReconciliationController::class);
+    Route::post('/ledger/replay/sale', ReplaySalePostingController::class);
+});
