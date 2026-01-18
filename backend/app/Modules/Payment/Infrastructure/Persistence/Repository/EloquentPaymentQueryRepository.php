@@ -14,33 +14,44 @@ final class EloquentPaymentQueryRepository implements PaymentQueryRepository
         string $eventType,
         string $payloadHash
     ): bool {
+        // ✅ 1) processed_webhook_events にロックを取る（冪等の正：R5）
         try {
-            DB::table('payment_webhook_events')->insert([
-                'provider'      => $provider,
-                'event_id'      => $eventId,
-                'event_type'    => $eventType,
-                'payload_hash'  => $payloadHash,
-                'status'        => 'processing',
-                'created_at'    => now(),
-                'updated_at'    => now(),
+            DB::table('processed_webhook_events')->insert([
+                'provider'     => $provider,
+                'event_id'     => $eventId,
+                'event_type'   => $eventType,
+                'payload_hash' => $payloadHash,
+                'status'       => 'reserved',
+                'created_at'   => now(),
+                'updated_at'   => now(),
             ]);
-
-            return true;
-
         } catch (QueryException $e) {
-
-            // ✅ ここが重要：UNIQUE違反だけ「既処理扱い」にする
-            // MySQL: 23000 / 1062, PostgreSQL: 23505
             $sqlState = $e->errorInfo[0] ?? null;
             $driverCode = $e->errorInfo[1] ?? null;
 
             if ($sqlState === '23000' || $sqlState === '23505' || $driverCode === 1062) {
-                return false; // duplicate
+                return false; // duplicate = already reserved/processed
             }
-
-            // ❌ それ以外は「既処理」ではない。異常として投げる（safeReserveが飲む）
             throw $e;
         }
+
+        // ✅ 2) payment_webhook_events は観測ログ（最小：今のUNIQUEを維持しつつinsert）
+        // ここがUNIQUEで落ちても冪等ロックは取れているので、例外は握り潰して良い
+        try {
+            DB::table('payment_webhook_events')->insert([
+                'provider'     => $provider,
+                'event_id'     => $eventId,
+                'event_type'   => $eventType,
+                'payload_hash' => $payloadHash,
+                'status'       => 'processing',
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        } catch (\Throwable) {
+            // swallow
+        }
+
+        return true;
     }
 
     public function complete(
@@ -51,6 +62,20 @@ final class EloquentPaymentQueryRepository implements PaymentQueryRepository
         ?int $orderId = null,
         ?string $errorMessage = null,
     ): void {
+        // ✅ processed_webhook_events を確定
+        DB::table('processed_webhook_events')
+            ->where('provider', $provider)
+            ->where('event_id', $eventId)
+            ->update([
+                'status'        => $status,
+                'payment_id'    => $paymentId,
+                'order_id'      => $orderId,
+                'error_message' => $errorMessage,
+                'processed_at'  => now(),
+                'updated_at'    => now(),
+            ]);
+
+        // ✅ payment_webhook_events はログ更新（存在しない場合があるので update のみ）
         DB::table('payment_webhook_events')
             ->where('provider', $provider)
             ->where('event_id', $eventId)

@@ -14,6 +14,7 @@ final class Order
      */
     private function __construct(
         private ?int $id,
+        private string $orderNumber, // ✅ 追加
         private int $shopId,
         private int $userId,
         private OrderStatus $status,
@@ -25,6 +26,9 @@ final class Order
         private ?\DateTimeImmutable $addressSnapshotAt = null,
         private ?\DateTimeImmutable $paidAt = null,
     ) {
+        if ($this->orderNumber === '') {
+            throw new DomainException('orderNumber is required');
+        }
         if ($this->totalAmount < 0) {
             throw new DomainException('totalAmount must be >= 0');
         }
@@ -41,6 +45,7 @@ final class Order
      ========================================================= */
 
     public static function create(
+        string $orderNumber,
         int $shopId,
         int $userId,
         int $totalAmount,
@@ -50,6 +55,7 @@ final class Order
     ): self {
         return new self(
             id: null,
+            orderNumber: $orderNumber,
             shopId: $shopId,
             userId: $userId,
             status: OrderStatus::PENDING_PAYMENT,
@@ -62,6 +68,7 @@ final class Order
 
     public static function reconstitute(
         int $id,
+        string $orderNumber,
         int $shopId,
         int $userId,
         OrderStatus $status,
@@ -74,17 +81,18 @@ final class Order
         ?\DateTimeImmutable $paidAt = null,
     ): self {
         return new self(
-            $id,
-            $shopId,
-            $userId,
-            $status,
-            $totalAmount,
-            $currency,
-            $items,
-            $meta,
-            $shippingAddress,
-            $addressSnapshotAt,
-            $paidAt
+            id: $id,
+            orderNumber: $orderNumber,
+            shopId: $shopId,
+            userId: $userId,
+            status: $status,
+            totalAmount: $totalAmount,
+            currency: $currency,
+            items: $items,
+            meta: $meta,
+            shippingAddress: $shippingAddress,
+            addressSnapshotAt: $addressSnapshotAt,
+            paidAt: $paidAt
         );
     }
 
@@ -95,6 +103,11 @@ final class Order
     public function id(): ?int
     {
         return $this->id;
+    }
+
+    public function orderNumber(): string
+    {
+        return $this->orderNumber;
     }
 
     public function shopId(): int
@@ -137,17 +150,11 @@ final class Order
      | Address（購入者配送先・スナップショット）
      ========================================================= */
 
-    /**
-     * Repository 用（nullable）
-     */
     public function shippingAddress(): ?Address
     {
         return $this->shippingAddress;
     }
 
-    /**
-     * 配送先が確定しているかの検証
-     */
     public function assertAddressConfirmed(): void
     {
         if ($this->shippingAddress === null) {
@@ -155,17 +162,10 @@ final class Order
         }
     }
 
-    /**
-     * 購入者の配送先をスナップショットとして確定
-     */
-    public function confirmAddress(
-        Address $address,
-        \DateTimeImmutable $now
-    ): void {
+    public function confirmAddress(Address $address, \DateTimeImmutable $now): void
+    {
         if ($this->status !== OrderStatus::PENDING_PAYMENT) {
-            throw new DomainException(
-                'Address can only be fixed before payment'
-            );
+            throw new DomainException('Address can only be fixed before payment');
         }
 
         $this->shippingAddress = $address;
@@ -181,11 +181,7 @@ final class Order
      | Payment
      ========================================================= */
 
-    /**
-     * 決済完了（Stripe / コンビニ Webhook 共通）
-     * - ここでのみ Order の状態が変わる
-     */
-    public function markPaid(): self
+    public function markPaid(\DateTimeImmutable $paidAt): self
     {
         $this->assertAddressConfirmed();
 
@@ -201,6 +197,7 @@ final class Order
 
         return self::reconstitute(
             id: $this->id ?? 0,
+            orderNumber: $this->orderNumber,
             shopId: $this->shopId,
             userId: $this->userId,
             status: OrderStatus::PAID,
@@ -210,7 +207,7 @@ final class Order
             meta: $this->meta,
             shippingAddress: $this->shippingAddress,
             addressSnapshotAt: $this->addressSnapshotAt,
-            paidAt: new \DateTimeImmutable(),
+            paidAt: $paidAt,
         );
     }
 

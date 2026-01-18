@@ -5,7 +5,6 @@ namespace App\Modules\Payment\Infrastructure\Gateway;
 use App\Modules\Payment\Domain\Enum\PaymentMethod;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
 use Stripe\StripeClient;
-use Stripe\Webhook;
 
 final class StripePaymentGateway implements PaymentGatewayPort
 {
@@ -25,45 +24,43 @@ final class StripePaymentGateway implements PaymentGatewayPort
         string $currency,
         array $context
     ): array {
+        $metadata = [
+            'order_id'   => (string) ($context['order_id'] ?? ''),
+            'payment_id' => (string) ($context['payment_id'] ?? ''), // ✅ CARDも必ず入れる（R3）
+            'user_id'    => (string) ($context['user_id'] ?? ''),
+            'shop_id'    => (string) ($context['shop_id'] ?? ''),
+        ];
 
-        /* =========================
-           CARD
-        ========================= */
+        // 空文字が入るのが気になるならここで unsetしても良いが、救済目的なら残してOK
+        // unset empty values
+        foreach ($metadata as $k => $v) {
+            if ($v === '') unset($metadata[$k]);
+        }
+
         if ($method === PaymentMethod::CARD) {
-    $pi = $this->stripe->paymentIntents->create([
-        'amount'   => $amount,
-        'currency' => strtolower($currency),
+            $pi = $this->stripe->paymentIntents->create([
+                'amount'   => $amount,
+                'currency' => strtolower($currency),
+                'payment_method_types' => ['card'],
+                'metadata' => $metadata,
+            ]);
 
-        // ★ automatic_payment_methods を使わない
-        'payment_method_types' => ['card'],
+            return [
+                'provider_payment_id' => $pi->id,
+                'client_secret'       => $pi->client_secret,
+                'requires_action'     => $pi->status === 'requires_action',
+                'status'              => $pi->status,
+            ];
+        }
 
-        'metadata' => [
-            'order_id' => (string) $context['order_id'],
-            'user_id'  => (string) $context['user_id'],
-            'shop_id'  => (string) $context['shop_id'],
-        ],
-    ]);
-
-    return [
-        'provider_payment_id' => $pi->id,
-        'client_secret'       => $pi->client_secret,
-        'requires_action'     => $pi->status === 'requires_action',
-        'status'              => $pi->status,
-    ];
-}
-
-        /* =========================
-           KONBINI
-        ========================= */
         if ($method === PaymentMethod::KONBINI) {
-
             $payerName  = $context['payer_name'] ?? '購入者';
             $payerEmail = $context['payer_email'] ?? 'no-reply@example.com';
 
             $pi = $this->stripe->paymentIntents->create([
-                'amount' => $amount,
+                'amount'   => $amount,
                 'currency' => 'jpy',
-                'confirm' => true,
+                'confirm'  => true,
 
                 'payment_method_types' => ['konbini'],
                 'payment_method_data' => [
@@ -74,13 +71,7 @@ final class StripePaymentGateway implements PaymentGatewayPort
                     ],
                 ],
 
-                // ★ 同じく metadata を必ず入れる
-                'metadata' => [
-                    'order_id'   => (string) $context['order_id'],
-                    'payment_id' => (string) $context['payment_id'],
-                    'user_id'    => (string) $context['user_id'],
-                    'shop_id'    => (string) $context['shop_id'],
-                ],
+                'metadata' => $metadata,
             ]);
 
             $details = $pi->next_action->konbini_display_details ?? null;
@@ -100,47 +91,5 @@ final class StripePaymentGateway implements PaymentGatewayPort
         }
 
         throw new \InvalidArgumentException('Unsupported payment method');
-    }
-
-    public function handleWebhook(string $payload, string $signature): array
-    {
-        $event = Webhook::constructEvent(
-            $payload,
-            $signature,
-            config('services.stripe.webhook_secret')
-        );
-
-        if (!str_starts_with($event->type, 'payment_intent.')) {
-            return [
-                'ignored' => true,
-                'provider_event_id' => $event->id,
-                'event_type' => $event->type,
-            ];
-        }
-
-        $pi = $event->data->object;
-
-        return [
-            'ignored' => false,
-            'provider_event_id' => $event->id,
-            'event_type' => $event->type,
-            'provider_payment_id' => $pi->id,
-            'status' => $pi->status,
-            'metadata' => (array) ($pi->metadata ?? []),
-        ];
-    }
-
-    public function createPaymentIntent(
-        PaymentMethod $method,
-        array $payload
-    ): array {
-        $pi = $this->stripe->paymentIntents->create($payload);
-
-        return [
-            'provider_payment_id' => $pi->id,
-            'client_secret' => $pi->client_secret,
-            'requires_action' => $pi->status === 'requires_action',
-            'status' => $pi->status,
-        ];
     }
 }

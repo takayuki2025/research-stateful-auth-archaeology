@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Event;
 final class HandlePaymentWebhookUseCase
 {
     public function __construct(
-        private PaymentQueryRepository $webhookEvents,
+        private PaymentQueryRepository $webhookEvents, // reserve/complete の正（processed正統）
         private PaymentRepository $payments,
         private OrderRepository $orders,
         private ShopLedgerRepository $ledgers,
@@ -27,53 +27,95 @@ final class HandlePaymentWebhookUseCase
 
     public function handle(HandlePaymentWebhookInput $input): void
     {
-        // ① Webhook 冪等（reserve できない=すでに処理済み or 異常）は何もしない
+        // =========================
+        // 0) 冪等ロック（reserve）
+        // =========================
+        // reserve できない = 既処理 or 競合（または異常） => 何もしない
         $reserved = $this->safeReserve($input);
         if ($reserved !== true) {
             return;
         }
 
-        $paymentId = null;
-        $orderId   = null;
+        // =========================
+        // 1) complete を1回だけ呼ぶための最終状態
+        // =========================
+        $finalStatus = 'ok';              // ok | ignored | error
+        $finalPaymentId = null;           // ?int
+        $finalOrderId = null;             // ?int
+        $finalErrorMessage = null;        // ?string
+
+        // afterCommit dispatch 用
         $orderPaidEvent = null;
 
         try {
+            // =========================
+            // 2) Domain Event へマップ
+            // =========================
             $domainEvent = $this->mapper->map($input);
 
+            // payload metadata から拾う（Paymentが無い救済・監査紐付けのため）
+            $orderIdFromMeta = $this->extractOrderIdFromPayloadMeta($input);
+            $paymentIdFromMeta = $this->extractPaymentIdFromPayloadMeta($input);
+
+            // =========================
+            // 3) IGNORED は「監査ログだけ残して終了」
+            // =========================
+            // - Payment/Order/Ledger は絶対に触らない
+            // - complete は ignored で確定（監査的にブレない）
             if ($domainEvent->type === DomainPaymentEventType::IGNORED) {
-                // 処理対象外でも complete は残す（観測性）
-                $this->safeComplete($input, 'ignored', null, null, null);
-                return;
+                $finalStatus = 'ignored';
+                // 監査上の関連づけ（取れるなら）
+                $finalPaymentId = is_int($paymentIdFromMeta) ? $paymentIdFromMeta : null;
+                $finalOrderId = is_int($orderIdFromMeta) ? $orderIdFromMeta : null;
+                return; // finally で1回だけ complete
             }
 
-            // ★ここで "order_id" はメタから拾う（Payment が無いケースのため）
-            $orderIdFromMeta = $this->extractOrderIdFromPayloadMeta($input);
-
+            // =========================
+            // 4) 本処理（transaction）
+            // =========================
             DB::transaction(function () use (
+                $input,
                 $domainEvent,
                 $orderIdFromMeta,
-                &$paymentId,
-                &$orderId,
+                $paymentIdFromMeta,
+                &$finalPaymentId,
+                &$finalOrderId,
                 &$orderPaidEvent
             ) {
-                // ----------------------------
-                // ② Payment を探す（PI ID で）
-                // ----------------------------
+                // -----------------------------------------
+                // 4-1) Payment 探索順（R3固定）
+                //  (1) provider_payment_id -> Payment
+                //  (2) metadata.payment_id -> Payment
+                //  (3) 無ければ order_id 救済（SUCCEEDEDのみ）
+                // -----------------------------------------
                 $payment = $this->payments->findByProviderPaymentId($domainEvent->providerPaymentId);
 
-                // ✅ Payment がまだ無い場合の救済（今回の本命）
-                // - Stripe は succeeded 済み
-                // - Payment insert より webhook が先に来ることがある
-                // - この場合でも Order を paid に進める
+                if (! $payment && is_int($paymentIdFromMeta)) {
+                    $payment = $this->payments->findById($paymentIdFromMeta);
+                }
+
+                // Payment が取れた場合は監査紐付けを確定
+                if ($payment) {
+                    $finalPaymentId = $payment->id();
+                    $finalOrderId = $payment->orderId();
+                } else {
+                    // Payment が無い場合でも、メタから取れるなら監査紐付け
+                    $finalPaymentId = is_int($paymentIdFromMeta) ? $paymentIdFromMeta : null;
+                    $finalOrderId = is_int($orderIdFromMeta) ? $orderIdFromMeta : null;
+                }
+
+                // -----------------------------------------
+                // 4-2) Payment が無い救済ルート
+                // -----------------------------------------
                 if (! $payment) {
 
-                    // SUCCEEDED 以外なら何もしない（payment 未作成で失敗・要対応は拾えない）
+                    // SUCCEEDED 以外は何もしない（監査ログは complete で残る）
                     if ($domainEvent->type !== DomainPaymentEventType::SUCCEEDED) {
                         return;
                     }
 
+                    // order_id が取れないなら何もしない
                     if (!is_int($orderIdFromMeta)) {
-                        // order_id が取れない＝どの注文か分からないので触らない
                         return;
                     }
 
@@ -82,40 +124,39 @@ final class HandlePaymentWebhookUseCase
                         return;
                     }
 
-                    $orderId = $order->id();
+                    $finalOrderId = $order->id();
 
-                    // すでに paid なら何もしない
+                    // すでに paid なら何もしない（冪等）
                     if ($order->isPaid()) {
                         return;
                     }
 
-                    // ✅ Order を paid にする（Payment が無いので ledger/payment 更新はここではしない）
-                    $paidOrder = $order->markPaid();
+                    // ✅ Order を paid に進める（時刻は Stripe occurredAt を正）
+                    $paidOrder = $order->markPaid($domainEvent->occurredAt);
                     $this->orders->save($paidOrder);
 
+                    // ✅ OrderPaid event（afterCommitでdispatch）
                     $orderPaidEvent = new OrderPaid(
                         orderId: $paidOrder->id(),
                         shopId: $paidOrder->shopId(),
                     );
 
+                    // ✅ Ledger は “Payment不在” では原則記録しない（v2以降の整合性のため）
+                    //    → 後で Payment/PI と紐づけ可能になった時に補正する方が安全
                     return;
                 }
 
-                // ここから先は Payment が存在する通常ルート
-                $paymentId = $payment->id();
-                $orderId   = $payment->orderId();
-
-                // ----------------------------
-                // ③ Stripe metadata と Payment.orderId の一致確認（安全装置）
-                // ----------------------------
+                // -----------------------------------------
+                // 4-3) 安全装置：metadata.order_id と Payment.orderId の一致
+                // -----------------------------------------
                 if (is_int($orderIdFromMeta) && $orderIdFromMeta !== $payment->orderId()) {
-                    // 別注文の Webhook が紐づく可能性 → 絶対に触らない
+                    // 別注文への誤紐付け可能性 => 触らない（監査ログだけ残す）
                     return;
                 }
 
-                // ----------------------------
-                // ④ Refund
-                // ----------------------------
+                // -----------------------------------------
+                // 4-4) Refund
+                // -----------------------------------------
                 if ($domainEvent->type === DomainPaymentEventType::REFUND_SUCCEEDED) {
 
                     $meta = $domainEvent->instructions ?? [];
@@ -144,9 +185,9 @@ final class HandlePaymentWebhookUseCase
                     return;
                 }
 
-                // ----------------------------
-                // ⑤ 通常フロー（Payment → Order）
-                // ----------------------------
+                // -----------------------------------------
+                // 4-5) SUCCEEDED / FAILED / REQUIRES_ACTION
+                // -----------------------------------------
 
                 // すでに succeeded なら冪等で何もしない
                 if ($payment->status() === PaymentStatus::SUCCEEDED) {
@@ -169,33 +210,36 @@ final class HandlePaymentWebhookUseCase
 
                 if ($domainEvent->type === DomainPaymentEventType::SUCCEEDED) {
 
-                    // ✅ Order を取得
                     $order = $this->orders->findById($payment->orderId());
                     if (! $order) {
-                        return;
-                    }
-
-                    // ✅ Order がすでに paid なら何もしない（最重要）
-                    if ($order->isPaid()) {
-                        // ただし Payment 側が succeeded でないなら整合のため更新してよい
+                        // Paymentだけ succeeded にしておく（Orderは復旧時に別途）
                         $this->payments->save($payment->markSucceeded());
                         return;
                     }
 
-                    // ✅ Payment を SUCCEEDED
+                    $finalOrderId = $order->id();
+
+                    // Order がすでに paid なら、Payment を succeeded に揃えて終わり（冪等）
+                    if ($order->isPaid()) {
+                        $this->payments->save($payment->markSucceeded());
+                        return;
+                    }
+
+                    // ✅ Payment succeeded
                     $payment = $payment->markSucceeded();
                     $this->payments->save($payment);
 
-                    // ✅ Order を paid
-                    $paidOrder = $order->markPaid();
+                    // ✅ Order paid（occurredAt を正）
+                    $paidOrder = $order->markPaid($domainEvent->occurredAt);
                     $this->orders->save($paidOrder);
 
+                    // ✅ OrderPaid event
                     $orderPaidEvent = new OrderPaid(
                         orderId: $paidOrder->id(),
                         shopId: $paidOrder->shopId(),
                     );
 
-                    // ✅ Ledger 記録（冪等は repository 側で担保されている前提）
+                    // ✅ Ledger 記録（冪等は repository 側で担保される前提）
                     $this->ledgers->recordSale(
                         shopId: $payment->shopId(),
                         amount: $payment->amount(),
@@ -211,31 +255,46 @@ final class HandlePaymentWebhookUseCase
                 // ここに来るのは基本的に無いが、念のため何もしない
             });
 
-            // ✅ afterCommit で 1回だけ dispatch（OrderPaidEvent があれば）
+            // 正常終了
+            $finalStatus = 'ok';
+
+        } catch (\Throwable $e) {
+            // 例外は Stripe には返さないが、監査ログには error として残す
+            $finalStatus = 'error';
+            $finalErrorMessage = $e->getMessage();
+
+            // Controller が swallow する前提でも、ここで throw しておく（監視のため）
+            throw $e;
+
+        } finally {
+            // =========================
+            // 5) complete（必ず1回だけ）
+            // =========================
+            $this->safeComplete(
+                $input,
+                $finalStatus,
+                $finalPaymentId,
+                $finalOrderId,
+                $finalErrorMessage
+            );
+
+            // =========================
+            // 6) afterCommit dispatch
+            // =========================
             if ($orderPaidEvent) {
                 DB::afterCommit(fn () => Event::dispatch($orderPaidEvent));
             }
-
-        } catch (\Throwable $e) {
-            // 例外は Stripe には返さないが、complete には error として残す
-            $this->safeComplete($input, 'error', $paymentId, $orderId, $e->getMessage());
-            throw $e; // Controller 側で swallow する設計ならここは throw してOK
-        } finally {
-            // 正常系（ignored / ok / error）は上の分岐で可能な限り complete 済みだが、
-            // 万一ここまで来ていれば ok で閉じる
-            $this->safeComplete($input, 'ok', $paymentId, $orderId, null);
         }
     }
 
     /**
-     * Stripe payload 内の metadata.order_id を拾う（Payment 不在ケース救済のため）
+     * Stripe payload 内の metadata.order_id を拾う（Payment 不在救済/監査紐付け）
      */
     private function extractOrderIdFromPayloadMeta(HandlePaymentWebhookInput $input): ?int
     {
         $payload = $input->payload;
         $object  = $payload['data']['object'] ?? [];
 
-        // PaymentIntent 系
         if (isset($object['metadata']) && is_array($object['metadata'])) {
             $oid = $object['metadata']['order_id'] ?? null;
             if (is_numeric($oid)) {
@@ -243,8 +302,23 @@ final class HandlePaymentWebhookUseCase
             }
         }
 
-        // charge.* などで metadata が別に入る場合（拡張余地）
-        // 必要ならここで追加
+        return null;
+    }
+
+    /**
+     * Stripe payload 内の metadata.payment_id を拾う（Payment 不在救済の第一候補）
+     */
+    private function extractPaymentIdFromPayloadMeta(HandlePaymentWebhookInput $input): ?int
+    {
+        $payload = $input->payload;
+        $object  = $payload['data']['object'] ?? [];
+
+        if (isset($object['metadata']) && is_array($object['metadata'])) {
+            $pid = $object['metadata']['payment_id'] ?? null;
+            if (is_numeric($pid)) {
+                return (int) $pid;
+            }
+        }
 
         return null;
     }

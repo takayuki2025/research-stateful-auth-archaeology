@@ -7,7 +7,7 @@ use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Order\Domain\ValueObject\Address;
 use App\Modules\Order\Application\Dto\OrderItemSnapshot;
-use App\Modules\Order\Infrastructure\Persistence\Models\OrderModel;
+use App\Models\Order as OrderModel;
 
 final class EloquentOrderRepository implements OrderRepository
 {
@@ -45,7 +45,7 @@ final class EloquentOrderRepository implements OrderRepository
         $model = $order->id()
             ? OrderModel::findOrFail($order->id())
             : new OrderModel();
-
+        $model->order_number = $order->orderNumber();
         $model->shop_id = $order->shopId();
         $model->user_id = $order->userId();
         $model->status = $order->status()->value;
@@ -71,6 +71,7 @@ final class EloquentOrderRepository implements OrderRepository
             $model->address_confirmed_at = null;
         }
 
+        $model->paid_at = $order->paidAt();
 
         $model->save();
 
@@ -117,8 +118,11 @@ final class EloquentOrderRepository implements OrderRepository
             $confirmedAt = $model->address_confirmed_at?->toDateTimeImmutable();
         }
 
+        $paidAt = $model->paid_at?->toDateTimeImmutable();
+
         return Order::reconstitute(
             id: $model->id,
+            orderNumber: $model->order_number,
             shopId: $model->shop_id,
             userId: $model->user_id,
             status: OrderStatus::from($model->status),
@@ -127,7 +131,8 @@ final class EloquentOrderRepository implements OrderRepository
             items: $items,
             meta: $model->meta,
             shippingAddress: $address,
-            addressSnapshotAt: $confirmedAt
+            addressSnapshotAt: $confirmedAt,
+            paidAt: $paidAt,
         );
     }
 }

@@ -18,7 +18,6 @@ final class StripeWebhookController extends Controller
 
     public function __invoke(Request $request): Response
     {
-
         $payload = $request->getContent();
         $sig     = $request->header('Stripe-Signature');
         $secret  = config('services.stripe.webhook_secret');
@@ -32,16 +31,19 @@ final class StripeWebhookController extends Controller
             return response('Invalid signature', 400);
         }
 
+        // ✅ JSTに変換して渡す（ここが重要）
+        $occurredAt = (new \DateTimeImmutable('@' . $event->created))
+            ->setTimezone(new \DateTimeZone(config('app.timezone')));
+
         $input = new HandlePaymentWebhookInput(
             provider: 'stripe',
             eventId: $event->id,
             eventType: $event->type,
             payload: $event->toArray(),
             payloadHash: hash('sha256', $payload),
-            occurredAt: new \DateTimeImmutable('@' . $event->created),
+            occurredAt: $occurredAt, // ✅ ここが直しポイント
         );
 
-        // ★最後の砦：UseCase 内で何が起きても 200 を返す
         try {
             $this->useCase->handle($input);
         } catch (\Throwable $e) {
@@ -50,7 +52,6 @@ final class StripeWebhookController extends Controller
                 'event_type' => $input->eventType,
                 'message'    => $e->getMessage(),
             ]);
-            // throw しない
         }
 
         return response()->json(['ok' => true], 200);

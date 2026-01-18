@@ -16,6 +16,17 @@ final class EloquentShopLedgerRepository implements ShopLedgerRepository
         int $paymentId,
         \DateTimeImmutable $occurredAt,
     ): void {
+
+        $exists = EloquentShopLedger::query()
+        ->where('type', LedgerType::SALE->value)
+        ->where('order_id', $orderId)
+        ->where('payment_id', $paymentId)
+        ->exists();
+
+    if ($exists) {
+        return;
+    }
+
         EloquentShopLedger::create([
             'shop_id'     => $shopId,
             'type'        => LedgerType::SALE->value,
