@@ -6,4 +6,5 @@ final class PostingType
 {
     public const SALE = 'sale';
     public const REFUND = 'refund';
+    public const FEE = 'fee';
 }

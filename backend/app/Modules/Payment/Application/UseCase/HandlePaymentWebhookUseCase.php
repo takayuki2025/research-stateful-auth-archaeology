@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Event;
 use App\Modules\Payment\Application\UseCase\Ledger\PostLedgerFromPaymentEventUseCase;
 use App\Modules\Payment\Application\Dto\Ledger\PostLedgerFromPaymentEventInput;
 use App\Modules\Payment\Domain\Ledger\PostingType;
+use App\Modules\Payment\Application\UseCase\Ledger\PostFeeFromStripeChargeUseCase;
 
 final class HandlePaymentWebhookUseCase
 {
@@ -26,6 +27,7 @@ final class HandlePaymentWebhookUseCase
         private ShopLedgerRepository $ledgers,
         private StripeEventMapper $mapper,
         private PostLedgerFromPaymentEventUseCase $postLedger,
+        private PostFeeFromStripeChargeUseCase $postFee,
     ) {
     }
 
@@ -67,12 +69,17 @@ final class HandlePaymentWebhookUseCase
             // - Payment/Order/Ledger は絶対に触らない
             // - complete は ignored で確定（監査的にブレない）
             if ($domainEvent->type === DomainPaymentEventType::IGNORED) {
-                $finalStatus = 'ignored';
-                // 監査上の関連づけ（取れるなら）
-                $finalPaymentId = is_int($paymentIdFromMeta) ? $paymentIdFromMeta : null;
-                $finalOrderId = is_int($orderIdFromMeta) ? $orderIdFromMeta : null;
-                return; // finally で1回だけ complete
-            }
+
+    // ✅ 例外：charge.updated 等で balance_transaction が入ることがあるので fee だけ起こす
+    if (str_starts_with($input->eventType, 'charge.')) {
+        $this->handleFeeOnlyIfPossible($input, $domainEvent, $paymentIdFromMeta, $orderIdFromMeta);
+    }
+
+    $finalStatus = 'ignored';
+    $finalPaymentId = is_int($paymentIdFromMeta) ? $paymentIdFromMeta : null;
+    $finalOrderId = is_int($orderIdFromMeta) ? $orderIdFromMeta : null;
+    return;
+}
 
             // =========================
             // 4) 本処理（transaction）
@@ -108,6 +115,28 @@ final class HandlePaymentWebhookUseCase
                     $finalOrderId = is_int($orderIdFromMeta) ? $orderIdFromMeta : null;
                 }
 
+// ✅ fee は charge.* で起こす（Paymentの状態に依存させない）
+if ($payment && (str_starts_with($input->eventType, 'charge.'))) {
+    $charge = $input->payload['data']['object'] ?? [];
+
+    $balanceTxnId = $charge['balance_transaction'] ?? null;
+
+    if (is_string($balanceTxnId) && $balanceTxnId !== '') {
+        $this->postFee->handle(
+            balanceTransactionId: $balanceTxnId,
+            shopId: $payment->shopId(),
+            orderId: $payment->orderId(),
+            paymentId: $payment->id(),
+            occurredAt: $domainEvent->occurredAt,
+            meta: [
+                'provider_payment_id' => $domainEvent->providerPaymentId,
+                'charge_id' => $charge['id'] ?? null,
+                'webhook_event_type' => $input->eventType,
+                'webhook_event_id' => $input->eventId,
+            ],
+        );
+    }
+}
                 // -----------------------------------------
                 // 4-2) Payment が無い救済ルート
                 // -----------------------------------------
@@ -291,7 +320,7 @@ $this->postLedger->handle(new PostLedgerFromPaymentEventInput(
     ],
 ));
 
-return;
+
                 }
 
                 // ここに来るのは基本的に無いが、念のため何もしない
@@ -399,4 +428,62 @@ return;
             // swallow
         }
     }
+
+    private function handleFeeOnlyIfPossible(
+    HandlePaymentWebhookInput $input,
+    $domainEvent,
+    ?int $paymentIdFromMeta,
+    ?int $orderIdFromMeta,
+): void {
+    // charge.* 以外は何もしない
+    if (!str_starts_with($input->eventType, 'charge.')) {
+        return;
+    }
+
+    $charge = $input->payload['data']['object'] ?? [];
+    if (!is_array($charge)) {
+        return;
+    }
+
+    // ① balance_transaction が無ければ fee は作れない（=何もしない）
+    $balanceTxnId = $charge['balance_transaction'] ?? null;
+    if (!is_string($balanceTxnId) || $balanceTxnId === '') {
+        return;
+    }
+
+    // ② Payment を特定（優先順）
+    $payment = null;
+
+    // (a) metadata.payment_id が取れるなら最優先
+    if (is_int($paymentIdFromMeta)) {
+        $payment = $this->payments->findById($paymentIdFromMeta);
+    }
+
+    // (b) charge.payment_intent から payment を引く（pi_xxx）
+    if (!$payment) {
+        $piId = $charge['payment_intent'] ?? null;
+        if (is_string($piId) && $piId !== '') {
+            $payment = $this->payments->findByProviderPaymentId($piId);
+        }
+    }
+
+    if (!$payment) {
+        return; // どの注文/支払いか特定できないので触らない
+    }
+
+    // ③ fee posting（冪等キーは txn:fee で PostFeeFromStripeChargeUseCase が担保）
+    $this->postFee->handle(
+        balanceTransactionId: $balanceTxnId,
+        shopId: $payment->shopId(),
+        orderId: $orderIdFromMeta ?? $payment->orderId(),
+        paymentId: $payment->id(),
+        occurredAt: $domainEvent->occurredAt,
+        meta: [
+            'provider_payment_id' => $domainEvent->providerPaymentId,
+            'charge_id' => $charge['id'] ?? null,
+            'webhook_event_type' => $input->eventType,
+            'webhook_event_id' => $input->eventId,
+        ],
+    );
+}
 }

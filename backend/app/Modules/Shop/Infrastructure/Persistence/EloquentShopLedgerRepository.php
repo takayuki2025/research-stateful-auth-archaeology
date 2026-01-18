@@ -5,6 +5,7 @@ namespace App\Modules\Shop\Infrastructure\Persistence;
 use App\Models\ShopLedger as EloquentShopLedger;
 use App\Modules\Shop\Domain\Repository\ShopLedgerRepository;
 use App\Modules\Shop\Domain\Enum\LedgerType;
+use Illuminate\Support\Facades\DB;
 
 final class EloquentShopLedgerRepository implements ShopLedgerRepository
 {
@@ -16,18 +17,8 @@ final class EloquentShopLedgerRepository implements ShopLedgerRepository
         int $paymentId,
         \DateTimeImmutable $occurredAt,
     ): void {
-
-        $exists = EloquentShopLedger::query()
-        ->where('type', LedgerType::SALE->value)
-        ->where('order_id', $orderId)
-        ->where('payment_id', $paymentId)
-        ->exists();
-
-    if ($exists) {
-        return;
-    }
-
-        EloquentShopLedger::create([
+        // ✅ UNIQUE(type, order_id, payment_id) に当たっても例外で落とさない
+        DB::table('shop_ledgers')->insertOrIgnore([
             'shop_id'     => $shopId,
             'type'        => LedgerType::SALE->value,
             'amount'      => $amount,
@@ -35,7 +26,9 @@ final class EloquentShopLedgerRepository implements ShopLedgerRepository
             'order_id'    => $orderId,
             'payment_id'  => $paymentId,
             'meta'        => null,
-            'occurred_at' => $occurredAt,
+            'occurred_at' => $occurredAt->format('Y-m-d H:i:s'),
+            'created_at'  => now(),
+            'updated_at'  => now(),
         ]);
     }
 
@@ -50,19 +43,23 @@ final class EloquentShopLedgerRepository implements ShopLedgerRepository
         ?string $reason,
         \DateTimeImmutable $occurredAt,
     ): void {
-        EloquentShopLedger::create([
+        // refund は既に existsRefundByProviderRefundId で冪等化しているが、
+        // ここも insertOrIgnore にしておくと「例外で落ちない」ので安全
+        DB::table('shop_ledgers')->insertOrIgnore([
             'shop_id'     => $shopId,
             'type'        => LedgerType::REFUND->value,
-            'amount'      => -abs($amount), // 🔴 必ずマイナス
+            'amount'      => -abs($amount),
             'currency'    => $currency,
             'order_id'    => $orderId,
             'payment_id'  => $paymentId,
-            'meta'        => [
-                'provider'            => $provider,
-                'provider_refund_id'  => $providerRefundId,
-                'reason'              => $reason,
-            ],
-            'occurred_at' => $occurredAt,
+            'meta'        => json_encode([
+                'provider'           => $provider,
+                'provider_refund_id' => $providerRefundId,
+                'reason'             => $reason,
+            ], JSON_UNESCAPED_UNICODE),
+            'occurred_at' => $occurredAt->format('Y-m-d H:i:s'),
+            'created_at'  => now(),
+            'updated_at'  => now(),
         ]);
     }
 

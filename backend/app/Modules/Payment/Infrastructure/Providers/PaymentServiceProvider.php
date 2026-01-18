@@ -16,7 +16,8 @@ use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLed
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerEntryRepository;
 use App\Modules\Payment\Domain\Ledger\Repository\LedgerQueryRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerQueryRepository;
-
+use App\Modules\Payment\Domain\Port\FeeQueryPort;
+use App\Modules\Payment\Infrastructure\Gateway\StripeFeeQuery;
 
 
 final class PaymentServiceProvider extends ServiceProvider
@@ -32,5 +33,6 @@ final class PaymentServiceProvider extends ServiceProvider
     $this->app->bind(LedgerEntryRepository::class, EloquentLedgerEntryRepository::class);
     $this->app->singleton(LedgerPoster::class, fn () => new LedgerPoster());
     $this->app->bind(LedgerQueryRepository::class, EloquentLedgerQueryRepository::class);
+    $this->app->bind(FeeQueryPort::class, StripeFeeQuery::class);
 }
 }
