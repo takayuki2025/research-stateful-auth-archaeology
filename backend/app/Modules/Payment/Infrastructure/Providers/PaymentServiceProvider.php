@@ -30,6 +30,8 @@ use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentBa
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentLedgerBalanceQueryRepository;
 use App\Modules\Payment\Domain\Account\Repository\HoldRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentHoldRepository;
+use App\Modules\Payment\Domain\Account\Repository\PayoutRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentPayoutRepository;
 
 final class PaymentServiceProvider extends ServiceProvider
 {
@@ -51,5 +53,6 @@ final class PaymentServiceProvider extends ServiceProvider
     $this->app->bind(BalanceRepository::class, EloquentBalanceRepository::class);
     $this->app->bind(LedgerBalanceQueryRepository::class, EloquentLedgerBalanceQueryRepository::class);
     $this->app->bind(HoldRepository::class, EloquentHoldRepository::class);
+    $this->app->bind(PayoutRepository::class, EloquentPayoutRepository::class);
 }
 }

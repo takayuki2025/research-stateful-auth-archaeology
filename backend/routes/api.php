@@ -505,3 +505,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/accounts/{accountId}/holds', CreateHoldController::class);
     Route::post('/holds/{holdId}/release', ReleaseHoldController::class);
 });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\RequestPayoutController;
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\MarkPayoutStatusController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/accounts/{accountId}/payouts', RequestPayoutController::class);
+    Route::post('/payouts/{payoutId}/status', MarkPayoutStatusController::class);
+});
