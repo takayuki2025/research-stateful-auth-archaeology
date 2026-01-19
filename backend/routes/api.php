@@ -496,3 +496,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/accounts/{accountId}/balance', GetBalanceController::class);
     Route::post('/shops/{shopId}/balance/recalculate', RecalculateBalanceController::class);
 });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\CreateHoldController;
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\ReleaseHoldController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/accounts/{accountId}/holds', CreateHoldController::class);
+    Route::post('/holds/{holdId}/release', ReleaseHoldController::class);
+});
