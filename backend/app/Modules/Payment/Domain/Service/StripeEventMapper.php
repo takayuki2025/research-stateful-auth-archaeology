@@ -54,19 +54,45 @@ final class StripeEventMapper
                 ),
 
             // Refund
-            'charge.refunded' =>
-                new DomainPaymentEvent(
-                    DomainPaymentEventType::REFUND_SUCCEEDED,
-                    $providerPaymentId,
-                    null,
-                    $input->occurredAt,
-                    [
-                        'provider' => 'stripe',
-                        'provider_refund_id' =>
-                            $object['refunds']['data'][0]['id'] ?? null,
-                        'reason' => 'stripe_webhook',
-                    ],
-                ),
+'charge.refunded' =>
+    new DomainPaymentEvent(
+        DomainPaymentEventType::REFUND_SUCCEEDED,
+        $providerPaymentId,
+        null,
+        $input->occurredAt,
+        [
+            'provider' => 'stripe',
+            'provider_refund_id' =>
+                $object['refunds']['data'][0]['id'] ?? null,
+
+            // ✅ v2-3.2: refund 実額（最小単位、JPYなら円）
+            'refund_amount' =>
+                $object['refunds']['data'][0]['amount'] ?? null,
+
+            // ✅ currency（念のため）
+            'currency' =>
+                strtoupper($object['currency'] ?? 'jpy'),
+
+            'reason' => 'stripe_webhook',
+        ],
+
+        
+    ),
+
+    'refund.updated' =>
+    new DomainPaymentEvent(
+        DomainPaymentEventType::REFUND_SUCCEEDED,
+        $providerPaymentId,
+        null,
+        $input->occurredAt,
+        [
+            'provider' => 'stripe',
+            'provider_refund_id' => $object['id'] ?? null,
+            'refund_amount' => $object['amount'] ?? null,
+            'currency' => strtoupper($object['currency'] ?? 'jpy'),
+            'reason' => 'stripe_refund.updated',
+        ],
+    ),
 
             default =>
                 DomainPaymentEvent::ignored($input->occurredAt),
@@ -74,17 +100,22 @@ final class StripeEventMapper
     }
 
     private function extractPaymentIntentId(string $eventType, array $object): ?string
-    {
-        if (str_starts_with($eventType, 'payment_intent.')) {
-            return $object['id'] ?? null;
-        }
-
-        if (str_starts_with($eventType, 'charge.')) {
-            return $object['payment_intent'] ?? null;
-        }
-
-        return null;
+{
+    if (str_starts_with($eventType, 'payment_intent.')) {
+        return $object['id'] ?? null;
     }
+
+    if (str_starts_with($eventType, 'charge.')) {
+        return $object['payment_intent'] ?? null;
+    }
+
+    // ✅ 追加：refund.* は object.payment_intent
+    if (str_starts_with($eventType, 'refund.')) {
+        return $object['payment_intent'] ?? null;
+    }
+
+    return null;
+}
 
     private function extractKonbiniInstructions(array $piObject): ?array
     {

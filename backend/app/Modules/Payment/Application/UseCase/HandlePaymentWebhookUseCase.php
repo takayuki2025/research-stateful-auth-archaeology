@@ -195,21 +195,45 @@ if ($payment && (str_starts_with($input->eventType, 'charge.'))) {
                 // -----------------------------------------
                 if ($domainEvent->type === DomainPaymentEventType::REFUND_SUCCEEDED) {
 
+\Log::info('[🔥REFUND] instructions', [
+  'event_type' => $input->eventType,
+  'instructions' => $domainEvent->instructions ?? null,
+]);
+
                     $meta = $domainEvent->instructions ?? [];
-                    $refundId = $meta['provider_refund_id'] ?? null;
+$refundId = $meta['provider_refund_id'] ?? null;
 
-                    if (!is_string($refundId) || $refundId === '') {
-                        return;
-                    }
+if (!is_string($refundId) || $refundId === '') {
+    return;
+}
 
-                    if ($this->ledgers->existsRefundByProviderRefundId('stripe', $refundId)) {
-                        return; // 冪等
-                    }
+// ✅ v2-3.2: refund 実額
+$refundAmount = $meta['refund_amount'] ?? null;
+if (!is_numeric($refundAmount)) {
+    return;
+}
+$refundAmount = (int)$refundAmount;
 
-                    $this->ledgers->recordRefund(
+if ($refundAmount <= 0) {
+    return;
+}
+
+// ✅ currency（payload優先、なければpaymentの通貨）
+$refundCurrency = $meta['currency'] ?? $payment->currency();
+$refundCurrency = is_string($refundCurrency) && $refundCurrency !== ''
+    ? $refundCurrency
+    : $payment->currency();
+
+// 冪等（shop_ledgers側）
+if ($this->ledgers->existsRefundByProviderRefundId('stripe', $refundId)) {
+    return;
+}
+
+// ✅ shop_ledgers（前段ログ）— refundAmount を渡す
+$this->ledgers->recordRefund(
     shopId: $payment->shopId(),
-    amount: $payment->amount(),
-    currency: $payment->currency(),
+    amount: $refundAmount,               // ★ payment->amount ではない
+    currency: $refundCurrency,
     orderId: $payment->orderId(),
     paymentId: $payment->id(),
     provider: 'stripe',
@@ -218,26 +242,27 @@ if ($payment && (str_starts_with($input->eventType, 'charge.'))) {
     occurredAt: $domainEvent->occurredAt,
 );
 
-// ✅ 次に v2 posting（冪等キーは refund_id:refund）
+// ✅ v2 posting（冪等キーは refund_id:refund）
 $sourceId = $refundId . ':' . PostingType::REFUND;
 
 $this->port->post(new PostLedgerCommand(
-  source_provider: 'stripe',
-  source_event_id: $sourceId,                 // ✅ refund_id:refund
-  shop_id: $payment->shopId(),
-  order_id: $payment->orderId(),
-  payment_id: $payment->id(),
-  posting_type: PostingType::REFUND,
-  amount: abs($payment->amount()),            // ✅ 正の額
-  currency: $payment->currency(),
-  occurred_at: $domainEvent->occurredAt->format('Y-m-d H:i:s'),
-  meta: [
-    'provider_payment_id' => $domainEvent->providerPaymentId,
-    'provider_refund_id' => $refundId,
-    'webhook_event_type' => $input->eventType,
-    'webhook_event_id' => $input->eventId,
-  ],
-  replay: false,
+    source_provider: 'stripe',
+    source_event_id: $sourceId,
+    shop_id: $payment->shopId(),
+    order_id: $payment->orderId(),
+    payment_id: $payment->id(),
+    posting_type: PostingType::REFUND,
+    amount: $refundAmount,               // ★ refund 実額（正）
+    currency: $refundCurrency,
+    occurred_at: $domainEvent->occurredAt->format('Y-m-d H:i:s'),
+    meta: [
+        'provider_payment_id' => $domainEvent->providerPaymentId,
+        'provider_refund_id'  => $refundId,
+        'refund_amount'       => $refundAmount,
+        'webhook_event_type'  => $input->eventType,
+        'webhook_event_id'    => $input->eventId,
+    ],
+    replay: false,
 ));
 
 return;
