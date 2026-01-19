@@ -44,6 +44,20 @@ use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentHo
 use App\Modules\Payment\Domain\Account\Repository\PayoutRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentPayoutRepository;
 
+use App\Modules\Payment\Domain\Ledger\Repository\AdminLedgerKpiQueryRepository;
+use App\Modules\Payment\Domain\Ledger\Repository\AdminLedgerPostingQueryRepository;
+use App\Modules\Payment\Domain\Ledger\Repository\AdminLedgerReconciliationQueryRepository;
+use App\Modules\Payment\Domain\Ledger\Repository\AdminWebhookEventQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentAdminLedgerKpiQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentAdminLedgerPostingQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentAdminLedgerReconciliationQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentAdminWebhookEventQueryRepository;
+
+use App\Modules\Payment\Domain\Account\Repository\AdminHoldQueryRepository;
+use App\Modules\Payment\Domain\Account\Repository\AdminPayoutQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentAdminHoldQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentAdminPayoutQueryRepository;
+
 final class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -77,5 +91,13 @@ final class PaymentServiceProvider extends ServiceProvider
 
         $this->app->bind(HoldRepository::class, EloquentHoldRepository::class);
         $this->app->bind(PayoutRepository::class, EloquentPayoutRepository::class);
+
+        $this->app->bind(AdminLedgerKpiQueryRepository::class, EloquentAdminLedgerKpiQueryRepository::class);
+        $this->app->bind(AdminLedgerPostingQueryRepository::class, EloquentAdminLedgerPostingQueryRepository::class);
+        $this->app->bind(AdminLedgerReconciliationQueryRepository::class, EloquentAdminLedgerReconciliationQueryRepository::class);
+        $this->app->bind(AdminWebhookEventQueryRepository::class, EloquentAdminWebhookEventQueryRepository::class);
+
+        $this->app->bind(AdminHoldQueryRepository::class, EloquentAdminHoldQueryRepository::class);
+        $this->app->bind(AdminPayoutQueryRepository::class, EloquentAdminPayoutQueryRepository::class);
     }
 }

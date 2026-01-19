@@ -13,4 +13,9 @@ return [
             'api_key' => env('TRUSTLEDGER_LEDGER_HTTP_API_KEY', null),
         ],
     ],
+
+    'admin_user_ids' => array_values(array_filter(array_map(
+        fn ($v) => is_numeric($v) ? (int)$v : null,
+        explode(',', env('TRUSTLEDGER_ADMIN_USER_IDS', '1'))
+    ))),
 ];

@@ -103,6 +103,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'              => \App\Http\Middleware\RoleMiddleware::class,
             'shop.role'         => \App\Http\Middleware\CheckShopRole::class,
             'shop.context'      => \App\Modules\Shop\Presentation\Http\Middleware\ShopContextMiddleware::class,
+
+            'admin.fixed' => \App\Http\Middleware\AdminFixed::class,
         ]);
 
         /*

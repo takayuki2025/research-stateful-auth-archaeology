@@ -340,9 +340,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
 
-
-
-
 // v3 Controllers
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
@@ -514,3 +511,39 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/accounts/{accountId}/payouts', RequestPayoutController::class);
     Route::post('/payouts/{payoutId}/status', MarkPayoutStatusController::class);
 });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger\{
+    GetGlobalKpiController,
+    GetShopKpisController,
+    SearchPostingsController,
+    GetPostingDetailController,
+    ListMissingSalesController,
+    ReplaySaleController,
+    ListWebhookEventsController,
+    ListHoldsController,
+    ListPayoutsController,
+    MarkPayoutStatusAdminController,
+    AdminRecalculateShopBalanceController
+};
+
+Route::middleware(['auth:sanctum', 'admin.fixed'])
+    ->prefix('admin/trustledger')
+    ->group(function () {
+        Route::get('kpis/global', GetGlobalKpiController::class);
+        Route::get('kpis/shops', GetShopKpisController::class);
+
+        Route::get('postings', SearchPostingsController::class);
+        Route::get('postings/{postingId}', GetPostingDetailController::class)->whereNumber('postingId');
+
+        Route::get('reconciliation/missing-sales', ListMissingSalesController::class);
+        Route::post('replay/sale', ReplaySaleController::class);
+
+        Route::get('webhooks/events', ListWebhookEventsController::class);
+
+        Route::get('holds', ListHoldsController::class);
+        Route::get('payouts', ListPayoutsController::class);
+        Route::post('payouts/{payoutId}/status', MarkPayoutStatusAdminController::class)->whereNumber('payoutId');
+
+        Route::post('shops/{shopId}/balance/recalculate', AdminRecalculateShopBalanceController::class)->whereNumber('shopId');
+    });

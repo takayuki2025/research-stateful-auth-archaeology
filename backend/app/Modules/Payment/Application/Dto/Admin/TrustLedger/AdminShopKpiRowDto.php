@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Modules\Payment\Application\Dto\Admin\TrustLedger;
+
+final class AdminShopKpiRowDto
+{
+    public function __construct(
+        public readonly int $shop_id,
+        public readonly string $from,
+        public readonly string $to,
+        public readonly string $currency,
+        public readonly int $sales_total,
+        public readonly int $refund_total,
+        public readonly int $fee_total,
+        public readonly int $net_total,
+        public readonly int $postings_count,
+    ) {
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'shop_id' => $this->shop_id,
+            'from' => $this->from,
+            'to' => $this->to,
+            'currency' => $this->currency,
+            'sales_total' => $this->sales_total,
+            'refund_total' => $this->refund_total,
+            'fee_total' => $this->fee_total,
+            'net_total' => $this->net_total,
+            'postings_count' => $this->postings_count,
+        ];
+    }
+}
