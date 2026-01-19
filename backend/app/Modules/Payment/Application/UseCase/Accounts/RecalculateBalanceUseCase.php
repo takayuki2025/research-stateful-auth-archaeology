@@ -29,6 +29,7 @@ final class RecalculateBalanceUseCase
             accountId: $accountId,
             available: $available,
             pending: $pending,
+            held: 0,
             currency: $currency,
             calculatedAt: new \DateTimeImmutable(),
         );
