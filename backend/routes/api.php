@@ -487,3 +487,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ledger/reconciliation', GetLedgerReconciliationController::class);
     Route::post('/ledger/replay/sale', ReplaySalePostingController::class);
 });
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\GetBalanceController;
+use App\Modules\Payment\Presentation\Http\Controllers\Accounts\RecalculateBalanceController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/accounts/{accountId}/balance', GetBalanceController::class);
+    Route::post('/shops/{shopId}/balance/recalculate', RecalculateBalanceController::class);
+});

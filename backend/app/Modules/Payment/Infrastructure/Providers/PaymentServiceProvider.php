@@ -22,6 +22,13 @@ use App\Modules\Payment\Domain\Ledger\Repository\LedgerReconciliationQueryReposi
 use App\Modules\Payment\Infrastructure\Persistence\Repository\Ledger\EloquentLedgerReconciliationQueryRepository;
 use App\Modules\Payment\Domain\Ledger\Port\PostLedgerPort;
 use App\Modules\Payment\Infrastructure\Ledger\LocalPostLedgerPort;
+use App\Modules\Payment\Domain\Account\Repository\AccountRepository;
+use App\Modules\Payment\Domain\Account\Repository\BalanceRepository;
+use App\Modules\Payment\Domain\Account\Repository\LedgerBalanceQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentAccountRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentBalanceRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\Account\EloquentLedgerBalanceQueryRepository;
+
 
 final class PaymentServiceProvider extends ServiceProvider
 {
@@ -39,5 +46,8 @@ final class PaymentServiceProvider extends ServiceProvider
     $this->app->bind(FeeQueryPort::class, StripeFeeQuery::class);
     $this->app->bind(LedgerReconciliationQueryRepository::class, EloquentLedgerReconciliationQueryRepository::class);
     $this->app->bind(PostLedgerPort::class, LocalPostLedgerPort::class);
+    $this->app->bind(AccountRepository::class, EloquentAccountRepository::class);
+    $this->app->bind(BalanceRepository::class, EloquentBalanceRepository::class);
+    $this->app->bind(LedgerBalanceQueryRepository::class, EloquentLedgerBalanceQueryRepository::class);
 }
 }
