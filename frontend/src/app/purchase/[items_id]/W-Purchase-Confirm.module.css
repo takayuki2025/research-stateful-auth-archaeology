@@ -119,3 +119,49 @@
   font-weight: bold;
   color: #6b7280;
 }
+
+.oneClickBox {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.oneClickRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.oneClickTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.oneClickHint {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.oneClickSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.oneClickCardInfo {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #111827;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.oneClickNote {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
