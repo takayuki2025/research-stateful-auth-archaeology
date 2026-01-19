@@ -1,4 +1,4 @@
-version: "3.8"
+# version: "3.8"
 
 services:
   # ============================================================
@@ -127,6 +127,24 @@ services:
       uvicorn atlaskernel.server:app
       --host 0.0.0.0
       --port 8000
+    networks:
+      - simulation1_network
+
+
+
+  # ============================================================
+  # 8) PaymentCore（TrustLedger Core / Spring Boot）
+  # ============================================================
+  payment_core:
+    build:
+      context: ./payment_core
+    ports:
+      - "8081:8081"
+    environment:
+      # 任意：Laravel -> PaymentCore の最小認証（X-TrustLedger-Key）
+      TRUSTLEDGER_API_KEY: dev-secret
+      SERVER_PORT: 8081
+      TZ: Asia/Tokyo
     networks:
       - simulation1_network
 
