@@ -119,20 +119,15 @@ final class EloquentShopRepository implements ShopRepository
     }
 
     public function findByCodeOrFail(string $shopCode): Shop
-    {
-        $model = ShopModel::where('shop_code', $shopCode)->first();
+{
+    $model = ShopModel::with('shippingAddress')
+        ->where('shop_code', $shopCode)
+        ->first();
 
-        if (! $model) {
-            throw new ModelNotFoundException("Shop not found: {$shopCode}");
-        }
-
-        // ★ Eloquent → Domain 変換
-        return new Shop(
-    id: $model->id,
-    shopCode: $model->shop_code,
-    ownerUserId: $model->owner_user_id,
-    name: $model->name,
-    status: ShopStatus::from($model->status), // ★ ここが重要
-);
+    if (! $model) {
+        throw new ModelNotFoundException("Shop not found: {$shopCode}");
     }
+
+    return $this->toEntity($model);
+}
 }

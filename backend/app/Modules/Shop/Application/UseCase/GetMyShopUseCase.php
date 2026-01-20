@@ -12,8 +12,10 @@ final class GetMyShopUseCase
     ) {
     }
 
-    public function handle(int $userId): ?Shop
+    public function handle(int $userId): ?ShopOutput
     {
-        return $this->shops->findByOwnerUserId($userId);
+        $shop = $this->shops->findByOwnerUserId($userId);
+
+        return $shop ? ShopOutput::fromEntity($shop) : null;
     }
 }

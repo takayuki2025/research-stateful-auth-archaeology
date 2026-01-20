@@ -4,7 +4,6 @@ namespace App\Modules\Shop\Application\Dto;
 
 use App\Modules\Shop\Domain\Entity\Shop;
 
-
 final class ShopOutput
 {
     public function __construct(

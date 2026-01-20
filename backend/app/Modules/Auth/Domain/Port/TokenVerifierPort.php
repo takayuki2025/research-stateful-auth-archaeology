@@ -2,11 +2,9 @@
 
 namespace App\Modules\Auth\Domain\Port;
 
+use App\Modules\Auth\Domain\Dto\DecodedToken;
+
 interface TokenVerifierPort
 {
-    /**
-     * @return object decoded JWT payload
-     * @throws \Throwable on invalid token
-     */
-    public function decode(string $jwt): object;
+    public function decode(string $jwt): DecodedToken;
 }

@@ -29,13 +29,13 @@ final class ShopController extends Controller
     }
 
     public function me(
-        Request $request,
-        GetMyShopUseCase $useCase
-    ) {
-        $shop = $useCase->handle($request->user()->id);
+    Request $request,
+    GetMyShopUseCase $useCase
+) {
+    $output = $useCase->handle($request->user()->id);
 
-        return response()->json([
-            'shop' => $shop?->toArray(),
-        ]);
-    }
+    return response()->json([
+        'shop' => $output?->toArray(),
+    ]);
+}
 }

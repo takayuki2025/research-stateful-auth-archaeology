@@ -2,6 +2,7 @@
 
 namespace App\Modules\Auth\Domain\ValueObject;
 
+use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 use App\Models\User;
 
 /**
@@ -42,6 +43,22 @@ final class AuthPrincipal
             shopRoles: [],
         );
     }
+
+    public static function fromProvisionedUser(
+    ProvisionedUser $user,
+    string $provider,
+    string $providerUid
+): self {
+    return new self(
+        userId: $user->userId,
+        email: $user->email ?? '',
+        provider: $provider,
+        providerUid: $providerUid,
+        emailVerified: (bool) $user->emailVerified,
+        roles: $user->roles ?? [],
+        shopRoles: [], // ★現段階ではここに shop role map を入れる仕組みが無いので空
+    );
+}
 
     /**
      * JWT / External IdP

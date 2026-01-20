@@ -12,11 +12,15 @@ use Illuminate\Support\Facades\Auth;
 |--------------------------------------------------------------------------
 */
 
+
+
+
+
 use App\Modules\Auth\Presentation\Http\Controllers\MeController;
 use App\Modules\Auth\Presentation\Http\Controllers\ConfirmFirstLoginController;
 use App\Modules\Auth\Presentation\Http\Controllers\RegisterController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::get('/me', MeController::class);
     Route::post('/auth/first-login', ConfirmFirstLoginController::class);
 });
@@ -31,6 +35,20 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->name('verification.verify');
 
 
+
+// 認証システム
+use App\Modules\Auth\Presentation\Http\Controllers\DevIssueJwtController;
+Route::middleware(['admin.fixed_or_key'])
+    ->post('/dev/jwt', DevIssueJwtController::class);
+
+    // use Illuminate\Http\Request;
+
+Route::get('/__debug/authz', function (Request $request) {
+    return response()->json([
+        'authorization' => $request->header('Authorization'),
+        'has_authz' => $request->headers->has('Authorization'),
+    ]);
+});
 /*
 |--------------------------------------------------------------------------
 | ③ User / MyPage
@@ -39,7 +57,7 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
 use App\Modules\Order\Presentation\Http\Controllers\MyPageBoughtController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->prefix('mypage')
     ->group(function () {
 
@@ -64,7 +82,7 @@ Route::middleware('auth:sanctum')
 */
 use App\Modules\Shop\Presentation\Http\Controllers\ShopController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::post('/shops', [ShopController::class, 'create']);
     Route::get('/shops/me', [ShopController::class, 'me']);
 });
@@ -95,7 +113,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\{
 };
 
 Route::prefix('shops/{shop_code}')
-    ->middleware(['auth:sanctum', 'shop.context'])
+    ->middleware(['auth.occ', 'shop.context'])
     ->group(function () {
 
         Route::get('/dashboard/orders', ShopOrderListController::class);
@@ -159,7 +177,7 @@ use App\Modules\Item\Presentation\Http\Controllers\{
     DeleteItemDraftController
 };
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::post('/items/drafts', CreateItemDraftController::class);
     Route::post('/items/drafts/{draftId}/image', UploadItemDraftImageController::class);
     Route::post('/items/drafts/{draftId}/publish', PublishItemController::class);
@@ -176,7 +194,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
 use App\Modules\Comment\Presentation\Http\Controllers\PostCommentController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::get('/items/favorite', [FavoriteController::class, 'index']);
     Route::post('/reactions/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/reactions/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
@@ -198,7 +216,7 @@ use App\Modules\Order\Presentation\Http\Controllers\{
     GetMyOrderShipmentController
 };
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::post('/orders', [OrderController::class, 'create']);
     Route::post('/orders/{orderId}/address', [OrderController::class, 'confirmAddress']);
     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
@@ -220,7 +238,7 @@ use App\Modules\Payment\Presentation\Http\Controllers\{
     PaymentReadController
 };
 
-Route::middleware('auth:sanctum')->post('/payments/start', [PaymentController::class, 'start']);
+Route::middleware('auth.occ')->post('/payments/start', [PaymentController::class, 'start']);
 Route::post('/webhooks/stripe', StripeWebhookController::class);
 Route::get('/payments/latest-by-order', [PaymentReadController::class, 'latestByOrder']);
 
@@ -238,7 +256,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\{
     CustomerShipmentController
 };
 
-Route::middleware('auth:sanctum')->prefix('shipments/{shipmentId}')->group(function () {
+Route::middleware('auth.occ')->prefix('shipments/{shipmentId}')->group(function () {
     Route::post('pack', PackShipmentController::class);
     Route::post('ship', ShipShipmentController::class);
     Route::post('in-transit', InTransitShipmentController::class);
@@ -246,10 +264,10 @@ Route::middleware('auth:sanctum')->prefix('shipments/{shipmentId}')->group(funct
 });
 
 Route::get('/admin/shipments/kpi', AdminShipmentKpiController::class)
-    ->middleware(['auth:sanctum', 'role:admin']);
+    ->middleware(['auth.occ', 'role:admin']);
 
 Route::get('/me/shipments/{id}', [CustomerShipmentController::class, 'show'])
-    ->middleware('auth:sanctum');
+    ->middleware('auth.occ');
 
 /*
 |--------------------------------------------------------------------------
@@ -275,7 +293,7 @@ Route::get('/entity-kpis', EntityKpiController::class);
 */
 use App\Modules\User\Presentation\Http\Controllers\UserAddressController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->get('/me/addresses/primary', [UserAddressController::class, 'primary']);
 
 
@@ -313,7 +331,7 @@ Route::get(
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\ReplayAnalysisController;
 
 
-Route::middleware(['auth:sanctum', 'can:atlas-review'])
+Route::middleware(['auth.occ', 'can:atlas-review'])
     ->post('/atlas/requests/{id}/replay', ReplayAnalysisController::class);
 
 
@@ -331,7 +349,7 @@ Route::get(
 
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestDecideController;
 
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth.occ'])->group(function () {
 
     // Aルート：Approve/Reject
     Route::post('/shops/{shop_code}/atlas/requests/{request_id}/decide', AtlasRequestDecideController::class);
@@ -345,7 +363,7 @@ use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasRequestContr
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReviewController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasReplayController;
 
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth.occ'])
     ->prefix('shops/{shop_code}/atlas')
     ->group(function () {
 
@@ -407,7 +425,7 @@ Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function (
 
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EditConfirmDBController;
 
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth.occ'])
     ->prefix('shops/{shop_code}/atlas/requests/{request_id}')
     ->group(function () {
         Route::post(
@@ -420,7 +438,7 @@ Route::middleware(['auth:sanctum'])
 
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\EditConfirmSelectController;
 
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth.occ'])
     ->prefix('entities')
     ->group(function () {
         Route::get('brands',     [EditConfirmSelectController::class, 'brands']);
@@ -432,7 +450,7 @@ Route::middleware(['auth:sanctum'])
 // トラストレジャーペイメントシステム
 use App\Modules\Payment\Presentation\Http\Controllers\Wallet\ListPaymentMethodsController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->prefix('wallet')
     ->group(function () {
         Route::get('payment-methods', ListPaymentMethodsController::class);
@@ -441,7 +459,7 @@ Route::middleware('auth:sanctum')
 
 use App\Modules\Payment\Presentation\Http\Controllers\Wallet\CreateSetupIntentController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->prefix('wallet')
     ->group(function () {
         Route::post('setup-intent', CreateSetupIntentController::class);
@@ -451,7 +469,7 @@ Route::middleware('auth:sanctum')
 use App\Modules\Payment\Presentation\Http\Controllers\Wallet\SetDefaultPaymentMethodController;
 use App\Modules\Payment\Presentation\Http\Controllers\Wallet\DetachPaymentMethodController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->prefix('wallet')
     ->group(function () {
         Route::post('payment-methods/{id}/default', SetDefaultPaymentMethodController::class);
@@ -461,7 +479,7 @@ Route::middleware('auth:sanctum')
 
 use App\Modules\Payment\Presentation\Http\Controllers\Wallet\OneClickCheckoutController;
 
-Route::middleware('auth:sanctum')
+Route::middleware('auth.occ')
     ->prefix('wallet')
     ->group(function () {
         Route::post('one-click-checkout', OneClickCheckoutController::class);
@@ -471,7 +489,7 @@ Route::middleware('auth:sanctum')
 use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerSummaryController;
 use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerEntriesController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::get('/ledger/summary', GetLedgerSummaryController::class);
     Route::get('/ledger/entries', GetLedgerEntriesController::class);
 });
@@ -480,7 +498,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Modules\Payment\Presentation\Http\Controllers\Ledger\GetLedgerReconciliationController;
 use App\Modules\Payment\Presentation\Http\Controllers\Ledger\ReplaySalePostingController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::get('/ledger/reconciliation', GetLedgerReconciliationController::class);
     Route::post('/ledger/replay/sale', ReplaySalePostingController::class);
 });
@@ -489,7 +507,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\GetBalanceController;
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\RecalculateBalanceController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::get('/accounts/{accountId}/balance', GetBalanceController::class);
     Route::post('/shops/{shopId}/balance/recalculate', RecalculateBalanceController::class);
 });
@@ -498,7 +516,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\CreateHoldController;
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\ReleaseHoldController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::post('/accounts/{accountId}/holds', CreateHoldController::class);
     Route::post('/holds/{holdId}/release', ReleaseHoldController::class);
 });
@@ -507,7 +525,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\RequestPayoutController;
 use App\Modules\Payment\Presentation\Http\Controllers\Accounts\MarkPayoutStatusController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.occ')->group(function () {
     Route::post('/accounts/{accountId}/payouts', RequestPayoutController::class);
     Route::post('/payouts/{payoutId}/status', MarkPayoutStatusController::class);
 });

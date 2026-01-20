@@ -28,8 +28,9 @@ final class JwtUserResolver
         $token = substr($authHeader, 7);
 
         try {
-            // ★ Application は署名方式を一切知らない
-            $payload = $this->verifier->decode($token);
+            $decoded = $this->verifier->decode($token); // DecodedToken
+            $payload = $decoded->payload;               // object
+            $provider = $decoded->provider;             // string
         } catch (\Throwable $e) {
             Log::warning('[JwtUserResolver] token verification failed', [
                 'error' => $e->getMessage(),
@@ -41,31 +42,39 @@ final class JwtUserResolver
             return null;
         }
 
-        /* =========================================
-         * ① DB の事実を確定（Token → ProvisionedUser）
-         * ========================================= */
-        $provisioned = $this->provisioning->provisionFromJwt(
-            userId: (int) $payload->sub
+        $sub = (string) $payload->sub;
+
+        // ✅ 全方式共通（外部ID）
+        $provisioned = $this->provisioning->provisionFromExternalIdentity(
+            provider: $provider,
+            providerUid: $sub,
+            email: $payload->email ?? null,
+            emailVerified: $payload->email_verified ?? null,
+            displayName: $payload->name ?? null,
+            claims: (array) $payload,
         );
 
-        /* =========================================
-         * ② Laravel User（互換レイヤー）
-         * ========================================= */
+        // 互換：もし既存トークンが sub=内部user_id の場合
+        if (! $provisioned->userId && ctype_digit($sub)) {
+            $provisioned = $this->provisioning->provisionFromJwt((int) $sub);
+        }
+
         $eloquentUser = User::find($provisioned->userId);
         if (! $eloquentUser) {
             return null;
         }
 
-        /* =========================================
-         * ③ AuthPrincipal（唯一の真実）
-         * ========================================= */
-
         $principal = AuthPrincipal::fromProvisionedUser(
             user: $provisioned,
-            provider: 'token',
-            providerUid: (string) $payload->sub
+            provider: $provider,
+            providerUid: $sub
         );
 
+\Log::info('[🔥JwtUserResolver] decoded', [
+  'provider' => $provider,
+  'sub' => $sub,
+  'email' => $payload->email ?? null,
+]);
 
         return [
             'user'      => $eloquentUser,
