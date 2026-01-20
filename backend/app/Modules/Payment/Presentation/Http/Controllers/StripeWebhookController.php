@@ -8,6 +8,7 @@ use App\Modules\Payment\Application\UseCase\Wallet\HandleWalletWebhookUseCase;
 use App\Modules\Payment\Application\Dto\HandlePaymentWebhookInput;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\DB;
 use Stripe\Webhook;
 
 final class StripeWebhookController extends Controller
@@ -45,6 +46,30 @@ final class StripeWebhookController extends Controller
             payloadHash: hash('sha256', $payload),
             occurredAt: $occurredAt,
         );
+\Log::info('[StripeWebhook] payload saved', [
+    'event_id' => $input->eventId,
+    'event_type' => $input->eventType,
+    'payload_len' => strlen($payload),
+]);
+        // ✅ 受信イベントをDB保存（Replay用）
+// 既存行がある場合は payload を埋める（今回のような payload=null を救済）
+$raw = $payload; // すでに $payload = $request->getContent();
+
+$hash = hash('sha256', $raw);
+
+DB::table('payment_webhook_events')->updateOrInsert(
+    ['provider' => 'stripe', 'event_id' => $input->eventId],
+    [
+        'event_type'   => $input->eventType,
+        'payload_hash' => $hash,      // ✅ DBに保存するpayloadから計算
+        'payload'      => $raw,       // ✅ rawそのまま
+        'signature'    => $sig,
+        // statusは既存運用によりけり。上書きしたくないなら削除可
+        'status'       => 'received',
+        'updated_at'   => now(),
+        'created_at'   => now(),
+    ]
+);
 
         try {
             // Wallet系

@@ -112,6 +112,8 @@ final class EloquentPaymentQueryRepository implements PaymentQueryRepository
         'payload_hash' => $event->payload_hash,
         'status' => $event->status,
         'payment_id' => $event->payment_id,
+        'payload' => $event->payload, // JSON（castsしていれば array）
+        'signature' => $event->signature,
         'order_id' => $event->order_id,
         'error_message' => $event->error_message,
         'created_at' => (string) $event->created_at,
