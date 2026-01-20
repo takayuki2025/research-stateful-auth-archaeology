@@ -43,6 +43,10 @@ payment_core/build/
 
 # Spring Boot logs (local)
 payment_core/paymentcore.log
+
+
+
+admin_rails/config/master.key
 # =====================================
 # Logs
 # =====================================

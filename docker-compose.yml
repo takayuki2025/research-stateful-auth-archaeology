@@ -148,6 +148,31 @@ services:
     networks:
       - simulation1_network
 
+
+
+
+  # ============================================================
+  # 9) Admin UI（Rails）
+  # ============================================================
+  admin_rails:
+    image: ruby:4.0.1
+    working_dir: /app
+    volumes:
+      - ./admin_rails:/app
+    environment:
+      RAILS_ENV: development
+      TZ: Asia/Tokyo
+
+      # Rails -> Laravel Admin API（当面Laravelを叩く）
+      TRUSTLEDGER_ADMIN_API_BASE_URL: "http://nginx"
+      TRUSTLEDGER_ADMIN_API_KEY: "dev-secret"
+    command: bash -lc "bundle install && bin/rails server -b 0.0.0.0 -p 3000"
+    ports:
+      - "3001:3000"
+    depends_on:
+      - nginx
+    networks:
+      - simulation1_network
 # ============================================================
 # Network
 # ============================================================
