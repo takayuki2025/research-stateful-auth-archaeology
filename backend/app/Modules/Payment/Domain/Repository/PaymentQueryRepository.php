@@ -26,4 +26,6 @@ interface PaymentQueryRepository
         ?int $orderId = null,
         ?string $errorMessage = null,
     ): void;
+
+    public function findWebhookEventByEventId(string $eventId): ?array;
 }

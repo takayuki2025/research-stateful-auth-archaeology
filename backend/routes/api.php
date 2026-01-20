@@ -513,6 +513,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 
+// Ruby
 use App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger\{
     GetGlobalKpiController,
     GetShopKpisController,
@@ -527,9 +528,19 @@ use App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger\{
     AdminRecalculateShopBalanceController
 };
 
-Route::middleware(['auth:sanctum', 'admin.fixed'])
+use App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger\GetWebhookEventDetailController;
+use App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger\ReplayWebhookEventController;
+
+Route::middleware(['admin.fixed_or_key'])
     ->prefix('admin/trustledger')
     ->group(function () {
+
+    Route::get('health', fn () => response()->json([
+            'ok' => true,
+            'service' => 'trustledger-admin',
+            'time' => now()->toIso8601String(),
+        ]));
+
         Route::get('kpis/global', GetGlobalKpiController::class);
         Route::get('kpis/shops', GetShopKpisController::class);
 
@@ -546,4 +557,7 @@ Route::middleware(['auth:sanctum', 'admin.fixed'])
         Route::post('payouts/{payoutId}/status', MarkPayoutStatusAdminController::class)->whereNumber('payoutId');
 
         Route::post('shops/{shopId}/balance/recalculate', AdminRecalculateShopBalanceController::class)->whereNumber('shopId');
+
+        Route::get('webhooks/events/{eventId}', GetWebhookEventDetailController::class);
+        Route::post('webhooks/events/{eventId}/replay', ReplayWebhookEventController::class);
     });

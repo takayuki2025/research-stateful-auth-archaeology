@@ -1,0 +1,80 @@
+<h1>TrustLedger Webhook Events</h1>
+
+<form method="get" style="margin-bottom: 16px;">
+  <label>from:
+    <input type="text" name="from" placeholder="YYYY-MM-DD" value="<%= params[:from] %>" />
+  </label>
+
+  <label style="margin-left: 12px;">to:
+    <input type="text" name="to" placeholder="YYYY-MM-DD" value="<%= params[:to] %>" />
+  </label>
+
+  <label style="margin-left: 12px;">event_type:
+    <input type="text" name="event_type" value="<%= params[:event_type] %>" />
+  </label>
+
+  <label style="margin-left: 12px;">status:
+    <input type="text" name="status" value="<%= params[:status] %>" />
+  </label>
+
+  <label style="margin-left: 12px;">per_page:
+    <input type="number" name="per_page" value="<%= params[:per_page].presence || 50 %>" style="width: 90px;" />
+  </label>
+
+  <%# cursor はUI入力させない（Nextリンクで付与） %>
+  <button type="submit" style="margin-left: 12px;">Search</button>
+</form>
+
+<% if @error.present? %>
+  <h2 style="color:red;">ERROR</h2>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+  <h2 style="color:green;">OK</h2>
+
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>created_at</th>
+        <th>status</th>
+        <th>event_type</th>
+        <th>event_id</th>
+        <th>payment_id</th>
+        <th>order_id</th>
+        <th>error</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @items.each do |e| %>
+        <tr>
+          <td><%= e["created_at"] %></td>
+          <td><%= e["status"] %></td>
+          <td><%= e["event_type"] %></td>
+        <td style="font-family: monospace;">
+  <a href="/admin/trustledger/webhook-events/<%= e["event_id"] %>"><%= e["event_id"] %></a>
+</td>
+          <td><%= e["payment_id"] %></td>
+          <td><%= e["order_id"] %></td>
+          <td><%= e["error_message"] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+
+
+  <div style="margin-top: 12px;">
+    <% base_params = request.query_parameters.except("nav", "next_cursor", "cursor") %>
+
+    <% if @stack_size.to_i > 0 %>
+      <% newer_params = base_params.merge("nav" => "newer") %>
+      <a href="<%= url_for(newer_params) %>">Newer</a>
+      <span style="margin: 0 10px;">|</span>
+    <% end %>
+
+    <% if @next_cursor.present? %>
+      <% older_params = base_params.merge("nav" => "older", "next_cursor" => @next_cursor) %>
+      <a href="<%= url_for(older_params) %>">Older</a>
+      <span style="color:#666;">(cursor=<%= @next_cursor %>)</span>
+    <% end %>
+  </div>
+  <% end %>

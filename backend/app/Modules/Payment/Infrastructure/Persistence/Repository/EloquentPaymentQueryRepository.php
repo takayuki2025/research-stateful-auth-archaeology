@@ -87,4 +87,45 @@ final class EloquentPaymentQueryRepository implements PaymentQueryRepository
                 'updated_at'    => now(),
             ]);
     }
+
+    public function findWebhookEventByEventId(string $eventId): ?array
+{
+    $event = \DB::table('payment_webhook_events')
+        ->where('event_id', $eventId)
+        ->first();
+
+    if (!$event) {
+        return null;
+    }
+
+    $processed = \DB::table('processed_webhook_events')
+        ->where('event_id', $eventId)
+        ->orderByDesc('id')
+        ->first();
+
+    return [
+        // payment_webhook_events
+        'id' => $event->id,
+        'provider' => $event->provider,
+        'event_id' => $event->event_id,
+        'event_type' => $event->event_type,
+        'payload_hash' => $event->payload_hash,
+        'status' => $event->status,
+        'payment_id' => $event->payment_id,
+        'order_id' => $event->order_id,
+        'error_message' => $event->error_message,
+        'created_at' => (string) $event->created_at,
+        'updated_at' => (string) $event->updated_at,
+
+        // processed_webhook_events（存在すれば）
+        'processed' => $processed ? [
+            'id' => $processed->id,
+            'status' => $processed->status,
+            'error_code' => $processed->error_code,
+            'error_message' => $processed->error_message,
+            'processed_at' => (string) $processed->processed_at,
+            'created_at' => (string) $processed->created_at,
+        ] : null,
+    ];
+}
 }

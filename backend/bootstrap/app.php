@@ -104,7 +104,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'shop.role'         => \App\Http\Middleware\CheckShopRole::class,
             'shop.context'      => \App\Modules\Shop\Presentation\Http\Middleware\ShopContextMiddleware::class,
 
+            // Ruby
             'admin.fixed' => \App\Http\Middleware\AdminFixed::class,
+            'admin.fixed_or_key' => \App\Http\Middleware\AdminFixedOrKeyMiddleware::class,
         ]);
 
         /*

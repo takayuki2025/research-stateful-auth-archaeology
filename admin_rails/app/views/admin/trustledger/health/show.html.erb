@@ -1,0 +1,9 @@
+<h1>TrustLedger Admin Health</h1>
+
+<% if @error.present? %>
+  <h2 style="color:red;">ERROR</h2>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+  <h2 style="color:green;">OK</h2>
+  <pre><%= JSON.pretty_generate(@data) %></pre>
+<% end %>

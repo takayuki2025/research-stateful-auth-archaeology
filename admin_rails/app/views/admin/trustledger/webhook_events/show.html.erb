@@ -1,0 +1,47 @@
+<h1>Webhook Event Detail</h1>
+
+<p>
+  <a href="/admin/trustledger/webhook-events">← Back to list</a>
+</p>
+
+<% if @error.present? %>
+  <h2 style="color:red;">ERROR</h2>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+  <h2 style="color:green;">OK</h2>
+
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <tr><th>created_at</th><td><%= @data["created_at"] %></td></tr>
+    <tr><th>provider</th><td><%= @data["provider"] %></td></tr>
+    <tr><th>event_type</th><td><%= @data["event_type"] %></td></tr>
+    <tr><th>event_id</th><td style="font-family: monospace;"><%= @data["event_id"] %></td></tr>
+    <tr><th>status</th><td><%= @data["status"] %></td></tr>
+    <tr><th>payment_id</th><td><%= @data["payment_id"] %></td></tr>
+    <tr><th>order_id</th><td><%= @data["order_id"] %></td></tr>
+    <tr><th>payload_hash</th><td style="font-family: monospace;"><%= @data["payload_hash"] %></td></tr>
+    <tr><th>error_message</th><td><%= @data["error_message"] %></td></tr>
+    <tr><th>updated_at</th><td><%= @data["updated_at"] %></td></tr>
+  </table>
+
+<form method="post" action="/admin/trustledger/webhook-events/<%= @data["event_id"] %>/replay" style="margin: 12px 0;">
+  <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+  <button type="submit">Replay</button>
+</form>
+
+  <h2 style="margin-top: 16px;">Processed (idempotency)</h2>
+  <% if @data["processed"].present? %>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <tr><th>processed_at</th><td><%= @data["processed"]["processed_at"] %></td></tr>
+      <tr><th>status</th><td><%= @data["processed"]["status"] %></td></tr>
+      <tr><th>error_code</th><td><%= @data["processed"]["error_code"] %></td></tr>
+      <tr><th>error_message</th><td><%= @data["processed"]["error_message"] %></td></tr>
+    </table>
+  <% else %>
+    <p>Not processed record found.</p>
+  <% end %>
+
+  <details style="margin-top: 16px;">
+    <summary>Raw JSON</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+<% end %>

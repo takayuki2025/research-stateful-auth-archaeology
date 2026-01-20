@@ -45,7 +45,8 @@ payment_core/build/
 payment_core/paymentcore.log
 
 
-
+# admin_rails secrets
+admin_rails/.kamal/secrets
 admin_rails/config/master.key
 # =====================================
 # Logs
