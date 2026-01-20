@@ -4,6 +4,19 @@
   <a href="/admin/trustledger/webhook-events">← Back to list</a>
 </p>
 
+<% if flash[:notice].present? %>
+  <div style="border:1px solid #2d8a3a; padding:10px; margin:12px 0; background:#f3fff5;">
+    <strong>Success</strong>: <%= flash[:notice] %>
+  </div>
+<% end %>
+
+<% if flash[:alert].present? %>
+  <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
+    <strong>Error</strong>: <%= flash[:alert] %>
+  </div>
+<% end %>
+
+
 <% if @error.present? %>
   <h2 style="color:red;">ERROR</h2>
   <pre><%= JSON.pretty_generate(@error) %></pre>
@@ -23,10 +36,17 @@
     <tr><th>updated_at</th><td><%= @data["updated_at"] %></td></tr>
   </table>
 
-<form method="post" action="/admin/trustledger/webhook-events/<%= @data["event_id"] %>/replay" style="margin: 12px 0;">
-  <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
-  <button type="submit">Replay</button>
-</form>
+<% if @data["payload_is_null"] %>
+  <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
+    Replay disabled: payload is not stored for this event (legacy event).  
+    Use Backfill (later) or replay only for events received after payload storage was enabled.
+  </div>
+<% else %>
+  <form method="post" action="/admin/trustledger/webhook-events/<%= @data["event_id"] %>/replay" style="margin: 12px 0;">
+    <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+    <button type="submit">Replay</button>
+  </form>
+<% end %>
 
   <h2 style="margin-top: 16px;">Processed (idempotency)</h2>
   <% if @data["processed"].present? %>

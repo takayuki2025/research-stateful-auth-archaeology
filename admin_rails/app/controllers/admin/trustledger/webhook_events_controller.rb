@@ -3,9 +3,9 @@ require "date"
 module Admin
   module Trustledger
     class WebhookEventsController < ApplicationController
-        SESSION_STACK_KEY   = "tl_webhook_cursor_stack"
-        SESSION_FILTER_KEY  = "tl_webhook_filters"
-        SESSION_CURSOR_KEY  = "tl_webhook_current_cursor"
+      SESSION_STACK_KEY  = "tl_webhook_cursor_stack"
+      SESSION_FILTER_KEY = "tl_webhook_filters"
+      SESSION_CURSOR_KEY = "tl_webhook_current_cursor"
 
       def index
         client = ::TrustLedger::AdminApi::Client.new
@@ -30,38 +30,23 @@ module Admin
         if session[SESSION_FILTER_KEY] != filters
           session[SESSION_FILTER_KEY] = filters
           session[SESSION_STACK_KEY] = []
+          session[SESSION_CURSOR_KEY] = nil
         end
-
-        def show
-  client = ::TrustLedger::AdminApi::Client.new
-  @data = client.get_webhook_event(params[:event_id])
-rescue ::TrustLedger::AdminApi::Error => e
-  @error = { message: e.message, status: e.status, body: e.body }
-end
 
         stack = (session[SESSION_STACK_KEY] ||= [])
 
-nav = params[:nav].to_s # "older" / "newer" / ""
-current_cursor = session[SESSION_CURSOR_KEY] # ✅ 現在カーソルは session 主語
+        nav = params[:nav].to_s # "older" / "newer" / ""
+        current_cursor = session[SESSION_CURSOR_KEY]
 
-if nav == "older"
-  stack << current_cursor
-  current_cursor = params[:next_cursor].presence
-elsif nav == "newer"
-  current_cursor = stack.pop
-end
+        if nav == "older"
+          stack << current_cursor
+          current_cursor = params[:next_cursor].presence
+        elsif nav == "newer"
+          current_cursor = stack.pop
+        end
 
-        def replay
-  client = ::TrustLedger::AdminApi::Client.new
-  @data = client.replay_webhook_event(params[:event_id])
-rescue ::TrustLedger::AdminApi::Error => e
-  @error = { message: e.message, status: e.status, body: e.body }
-ensure
-  redirect_to action: :show, event_id: params[:event_id]
-end
-
-session[SESSION_STACK_KEY] = stack
-session[SESSION_CURSOR_KEY] = current_cursor
+        session[SESSION_STACK_KEY] = stack
+        session[SESSION_CURSOR_KEY] = current_cursor
 
         api_params = {
           from: filters["from"],
@@ -78,9 +63,29 @@ session[SESSION_CURSOR_KEY] = current_cursor
 
         @cursor = current_cursor
         @stack_size = stack.size
-        @nav = nav
       rescue ::TrustLedger::AdminApi::Error => e
         @error = { message: e.message, status: e.status, body: e.body }
+      end
+
+      def show
+        client = ::TrustLedger::AdminApi::Client.new
+        @data = client.get_webhook_event(params[:event_id])
+      rescue ::TrustLedger::AdminApi::Error => e
+        @error = { message: e.message, status: e.status, body: e.body }
+      end
+
+      def replay
+        client = ::TrustLedger::AdminApi::Client.new
+        result = client.replay_webhook_event(params[:event_id])
+
+        # ✅ flash に結果を乗せる（表示は show.html.erb）
+        flash[:notice] = "Replay OK: #{result.dig("result", "status") || "ok"}"
+      rescue ::TrustLedger::AdminApi::Error => e
+        # ✅ flash にエラーを乗せる
+        msg = e.body.presence || e.message
+        flash[:alert] = "Replay FAILED: #{e.status || "?"} #{msg}"
+      ensure
+        redirect_to action: :show, event_id: params[:event_id]
       end
     end
   end
