@@ -19,10 +19,26 @@ final class SearchPostingsUseCase
         string $currency,
         string $postingType,
         ?string $q,
+        ?int $paymentId,
+        ?int $orderId,
+        ?string $sourceEventId,
         int $limit,
         ?string $cursor
     ): CursorPageDto {
-        $r = $this->postings->searchPostings($shopIds, $from, $to, $currency, $postingType, $q, $limit, $cursor);
+        $r = $this->postings->searchPostings(
+            $shopIds,
+            $from,
+            $to,
+            $currency,
+            $postingType,
+            $q,
+            $paymentId,
+            $orderId,
+            $sourceEventId,
+            $limit,
+            $cursor
+        );
+
         return new CursorPageDto($r['items'], $r['next_cursor']);
     }
 }

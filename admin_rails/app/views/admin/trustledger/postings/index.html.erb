@@ -1,0 +1,98 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>仕訳（Postings）一覧</h1>
+
+<form method="get" style="margin-bottom: 16px;">
+  <label>開始日:
+    <input name="from" value="<%= params[:from] %>" placeholder="YYYY-MM-DD">
+  </label>
+
+  <label style="margin-left:12px;">終了日:
+    <input name="to" value="<%= params[:to] %>" placeholder="YYYY-MM-DD">
+  </label>
+
+  <label style="margin-left:12px;">種別:
+    <input name="posting_type" value="<%= params[:posting_type] %>" style="width:120px;">
+  </label>
+
+  <label style="margin-left:12px;">shop_id:
+    <input name="shop_id" value="<%= params[:shop_id] %>" style="width:80px;">
+  </label>
+
+  <label style="margin-left:12px;">order_id:
+    <input name="order_id" value="<%= params[:order_id] %>" style="width:80px;">
+  </label>
+
+  <label style="margin-left:12px;">payment_id:
+    <input name="payment_id" value="<%= params[:payment_id] %>" style="width:80px;">
+  </label>
+
+  <label style="margin-left:12px;">source_event_id:
+    <input name="source_event_id" value="<%= params[:source_event_id] %>" style="width:220px;">
+  </label>
+
+  <label style="margin-left:12px;">件数:
+    <input name="limit" value="<%= params[:limit].presence || 50 %>" style="width:80px;">
+  </label>
+
+  <label style="margin-left:12px;">検索(q):
+  <input name="q" value="<%= params[:q] %>" style="width:220px;">
+  </label>
+
+  <button type="submit" style="margin-left:12px;">検索</button>
+</form>
+
+<% active = request.query_parameters.slice("shop_id","order_id","payment_id","posting_type","source_event_id").reject { |_,v| v.blank? } %>
+<% if active.any? %>
+  <div style="margin:8px 0; color:#333;">
+    <strong>適用中フィルタ:</strong>
+    <%= active.map { |k,v| "#{k}=#{v}" }.join(" / ") %>
+    <span style="margin-left:8px;">
+      <a href="/admin/trustledger/postings">クリア</a>
+    </span>
+  </div>
+<% end %>
+
+<% if @error.present? %>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+
+<p style="margin:8px 0; color:#555;">
+  表示件数: <strong><%= @items.length %></strong>
+</p>
+
+
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>posting_id</th>
+        <th>occurred_at</th>
+        <th>種別</th>
+        <th>金額</th>
+        <th>shop_id</th>
+        <th>order_id</th>
+        <th>payment_id</th>
+        <th>source_event_id</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @items.each do |p| %>
+        <tr>
+          <td><a href="/admin/trustledger/postings/<%= p["posting_id"] || p["id"] %>"><%= p["posting_id"] || p["id"] %></a></td>
+          <td><%= p["occurred_at"] %></td>
+          <td><%= p["type"] || p["posting_type"] %></td>
+          <td><%= p["amount"] %></td>
+          <td><%= p["shop_id"] %></td>
+          <td><%= p["order_id"] %></td>
+          <td><%= p["payment_id"] %></td>
+          <td style="font-family: monospace;"><%= p["source_event_id"] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <details style="margin-top: 12px;">
+    <summary>Raw JSON</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+<% end %>

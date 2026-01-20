@@ -16,15 +16,19 @@ final class SearchPostingsController extends Controller
     public function __invoke(Request $request)
     {
         $data = $request->validate([
-            'from' => 'required|date_format:Y-m-d',
-            'to' => 'required|date_format:Y-m-d',
-            'currency' => 'sometimes|string|in:JPY',
-            'shop_ids' => 'sometimes|string',
-            'posting_type' => 'sometimes|string|in:all,sale,fee,refund',
-            'q' => 'sometimes|string',
-            'limit' => 'sometimes|integer|min:1|max:200',
-            'cursor' => 'sometimes|string',
-        ]);
+    'from' => 'required|date_format:Y-m-d',
+    'to' => 'required|date_format:Y-m-d',
+    'currency' => 'sometimes|string|in:JPY',
+    'shop_ids' => 'sometimes|string',
+    'posting_type' => 'sometimes|string|in:all,sale,fee,refund',
+    'q' => 'sometimes|string',
+    'limit' => 'sometimes|integer|min:1|max:200',
+    'cursor' => 'sometimes|string',
+
+    'payment_id' => 'sometimes|integer',
+    'order_id' => 'sometimes|integer',
+    'source_event_id' => 'sometimes|string',
+]);
 
         $shopIds = null;
         if (!empty($data['shop_ids'])) {
@@ -35,15 +39,18 @@ final class SearchPostingsController extends Controller
         }
 
         $page = $this->useCase->handle(
-            shopIds: $shopIds,
-            from: $data['from'],
-            to: $data['to'],
-            currency: $data['currency'] ?? 'JPY',
-            postingType: $data['posting_type'] ?? 'all',
-            q: $data['q'] ?? null,
-            limit: (int)($data['limit'] ?? 50),
-            cursor: $data['cursor'] ?? null,
-        );
+    shopIds: $shopIds,
+    from: $data['from'],
+    to: $data['to'],
+    currency: $data['currency'] ?? 'JPY',
+    postingType: $data['posting_type'] ?? 'all',
+    q: $data['q'] ?? null,
+    paymentId: $data['payment_id'] ?? null,
+    orderId: $data['order_id'] ?? null,
+    sourceEventId: $data['source_event_id'] ?? null,
+    limit: (int)($data['limit'] ?? 50),
+    cursor: $data['cursor'] ?? null,
+);
 
         return response()->json($page->toArray(), 200);
     }

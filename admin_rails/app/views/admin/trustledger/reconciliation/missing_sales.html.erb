@@ -1,0 +1,69 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>欠損検知（Missing Sales）</h1>
+
+<% if flash[:notice].present? %>
+  <div style="border:1px solid #2d8a3a; padding:10px; margin:12px 0; background:#f3fff5;">
+    <strong>Success</strong>: <%= flash[:notice] %>
+  </div>
+<% end %>
+
+<% if flash[:alert].present? %>
+  <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
+    <strong>Error</strong>: <%= flash[:alert] %>
+  </div>
+<% end %>
+
+
+<form method="get" style="margin-bottom: 16px;">
+  <label>from: <input name="from" value="<%= params[:from] %>" placeholder="YYYY-MM-DD"></label>
+  <label style="margin-left:12px;">to: <input name="to" value="<%= params[:to] %>" placeholder="YYYY-MM-DD"></label>
+  <label style="margin-left:12px;">shop_id: <input name="shop_id" value="<%= params[:shop_id] %>" style="width:80px;"></label>
+  <label style="margin-left:12px;">limit: <input name="limit" value="<%= params[:limit].presence || 50 %>" style="width:80px;"></label>
+  <button type="submit" style="margin-left:12px;">Search</button>
+</form>
+
+<% if @error.present? %>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>shop_id</th>
+        <th>payment_id</th>
+        <th>order_id</th>
+        <th>provider_payment_id</th>
+        <th>updated_at</th>
+        <th>replay</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @items.each do |m| %>
+        <tr>
+          <td><%= m["shop_id"] %></td>
+          <td><%= m["payment_id"] %></td>
+          <td><%= m["order_id"] %></td>
+          <td style="font-family: monospace;"><%= m["provider_payment_id"] %></td>
+          <td><%= m["updated_at"] %></td>
+          <td>
+            <form method="post" action="/admin/trustledger/reconciliation/replay/sale" onsubmit="return confirm('Replay sale?');" style="margin:0;">
+              <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+              <input type="hidden" name="from" value="<%= params[:from] %>">
+              <input type="hidden" name="to" value="<%= params[:to] %>">
+              <input type="hidden" name="shop_id" value="<%= m["shop_id"] %>">
+              <input type="hidden" name="payment_id" value="<%= m["payment_id"] %>">
+              <input type="hidden" name="order_id" value="<%= m["order_id"] %>">
+              <input type="hidden" name="provider_payment_id" value="<%= m["provider_payment_id"] %>">
+              <button type="submit">Replay</button>
+            </form>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <details style="margin-top: 12px;">
+    <summary>Raw JSON</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+<% end %>

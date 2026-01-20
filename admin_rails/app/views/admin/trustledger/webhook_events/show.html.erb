@@ -1,54 +1,66 @@
-<h1>Webhook Event Detail</h1>
+<%= render "admin/trustledger/nav" %>
+
+<h1>Webhook イベント詳細</h1>
 
 <p>
-  <a href="/admin/trustledger/webhook-events">← Back to list</a>
+  <a href="/admin/trustledger/webhook-events">← Webhook一覧へ戻る</a>
 </p>
 
 <% if flash[:notice].present? %>
   <div style="border:1px solid #2d8a3a; padding:10px; margin:12px 0; background:#f3fff5;">
-    <strong>Success</strong>: <%= flash[:notice] %>
+    <strong>成功</strong>: <%= flash[:notice] %>
   </div>
 <% end %>
 
 <% if flash[:alert].present? %>
   <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
-    <strong>Error</strong>: <%= flash[:alert] %>
+    <strong>失敗</strong>: <%= flash[:alert] %>
   </div>
 <% end %>
-
 
 <% if @error.present? %>
-  <h2 style="color:red;">ERROR</h2>
+  <h2 style="color:red;">エラー</h2>
   <pre><%= JSON.pretty_generate(@error) %></pre>
 <% else %>
-  <h2 style="color:green;">OK</h2>
+
 
   <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-    <tr><th>created_at</th><td><%= @data["created_at"] %></td></tr>
-    <tr><th>provider</th><td><%= @data["provider"] %></td></tr>
-    <tr><th>event_type</th><td><%= @data["event_type"] %></td></tr>
-    <tr><th>event_id</th><td style="font-family: monospace;"><%= @data["event_id"] %></td></tr>
-    <tr><th>status</th><td><%= @data["status"] %></td></tr>
-    <tr><th>payment_id</th><td><%= @data["payment_id"] %></td></tr>
-    <tr><th>order_id</th><td><%= @data["order_id"] %></td></tr>
+    <tr><th>受信時刻</th><td><%= @data["created_at"] %></td></tr>
+    <tr><th>プロバイダ</th><td><%= @data["provider"] %></td></tr>
+    <tr><th>イベント種別</th><td><%= @data["event_type"] %></td></tr>
+    <tr><th>イベントID</th><td style="font-family: monospace;"><%= @data["event_id"] %></td></tr>
+    <tr><th>状態</th><td><%= @data["status"] %></td></tr>
+    <tr><th>payment_id</th>
+      <td>
+        <% if @data["payment_id"] %>
+          <a href="/admin/trustledger/postings?payment_id=<%= @data["payment_id"] %>"><%= @data["payment_id"] %></a>
+        <% else %>-<% end %>
+      </td>
+    </tr>
+    <tr><th>order_id</th>
+      <td>
+        <% if @data["order_id"] %>
+          <a href="/admin/trustledger/postings?order_id=<%= @data["order_id"] %>"><%= @data["order_id"] %></a>
+        <% else %>-<% end %>
+      </td>
+    </tr>
     <tr><th>payload_hash</th><td style="font-family: monospace;"><%= @data["payload_hash"] %></td></tr>
-    <tr><th>error_message</th><td><%= @data["error_message"] %></td></tr>
-    <tr><th>updated_at</th><td><%= @data["updated_at"] %></td></tr>
+    <tr><th>エラー</th><td><%= @data["error_message"] %></td></tr>
+    <tr><th>更新時刻</th><td><%= @data["updated_at"] %></td></tr>
   </table>
 
-<% if @data["payload_is_null"] %>
-  <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
-    Replay disabled: payload is not stored for this event (legacy event).  
-    Use Backfill (later) or replay only for events received after payload storage was enabled.
-  </div>
-<% else %>
-  <form method="post" action="/admin/trustledger/webhook-events/<%= @data["event_id"] %>/replay" style="margin: 12px 0;">
-    <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
-    <button type="submit">Replay</button>
-  </form>
-<% end %>
+  <% if @data["payload_is_null"] %>
+    <div style="border:1px solid #c0392b; padding:10px; margin:12px 0; background:#fff3f3;">
+      Replay 無効：このイベントは payload が保存されていないため再処理できません（旧イベント）。
+    </div>
+  <% else %>
+    <form method="post" action="/admin/trustledger/webhook-events/<%= @data["event_id"] %>/replay" style="margin: 12px 0;">
+      <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+      <button type="submit">Replay（再処理）</button>
+    </form>
+  <% end %>
 
-  <h2 style="margin-top: 16px;">Processed (idempotency)</h2>
+  <h2 style="margin-top: 16px;">処理状況（冪等）</h2>
   <% if @data["processed"].present? %>
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
       <tr><th>processed_at</th><td><%= @data["processed"]["processed_at"] %></td></tr>
@@ -57,11 +69,11 @@
       <tr><th>error_message</th><td><%= @data["processed"]["error_message"] %></td></tr>
     </table>
   <% else %>
-    <p>Not processed record found.</p>
+    <p>処理レコードなし</p>
   <% end %>
 
   <details style="margin-top: 16px;">
-    <summary>Raw JSON</summary>
+    <summary>Raw JSON（監査用）</summary>
     <pre><%= JSON.pretty_generate(@data) %></pre>
   </details>
 <% end %>

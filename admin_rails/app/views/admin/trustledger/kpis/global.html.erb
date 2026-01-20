@@ -1,0 +1,65 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>全体KPI</h1>
+
+<form method="get" style="margin-bottom: 16px;">
+  <label>開始日: <input name="from" value="<%= params[:from] %>" placeholder="YYYY-MM-DD"></label>
+  <label style="margin-left:12px;">終了日: <input name="to" value="<%= params[:to] %>" placeholder="YYYY-MM-DD"></label>
+  <button type="submit" style="margin-left:12px;">適用</button>
+</form>
+
+<% if @error.present? %>
+  <h2 style="color:red;">エラー</h2>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+
+  <% def jpy(n) %>
+    <% return "-" if n.nil? %>
+    <%= n.to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse %>
+  <% end %>
+
+  <% data = @data || {} %>
+  <p style="color:#555;">
+    期間：<strong><%= data["from"] %></strong> 〜 <strong><%= data["to"] %></strong>
+    ／ 通貨：<strong><%= data["currency"] || "JPY" %></strong>
+  </p>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin: 12px 0;">
+    <div style="flex: 1 1 220px; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa;">
+      <div style="color:#666;">売上合計</div>
+      <div style="font-size:24px; font-weight:700;"><%= jpy(data["sales_total"]) %></div>
+    </div>
+
+    <div style="flex: 1 1 220px; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa;">
+      <div style="color:#666;">返金合計</div>
+      <div style="font-size:24px; font-weight:700;"><%= jpy(data["refund_total"]) %></div>
+    </div>
+
+    <div style="flex: 1 1 220px; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa;">
+      <div style="color:#666;">手数料合計</div>
+      <div style="font-size:24px; font-weight:700;"><%= jpy(data["fee_total"]) %></div>
+    </div>
+
+    <div style="flex: 1 1 220px; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa;">
+      <div style="color:#666;">純額（ネット）</div>
+      <div style="font-size:24px; font-weight:700;"><%= jpy(data["net_total"]) %></div>
+    </div>
+
+    <div style="flex: 1 1 220px; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa;">
+      <div style="color:#666;">仕訳件数</div>
+      <div style="font-size:24px; font-weight:700;"><%= data["postings_count"] || "-" %></div>
+    </div>
+  </div>
+
+  <p style="margin-top:12px;">
+    <a href="/admin/trustledger/reconciliation/missing-sales">→ 欠損検知（Reconciliation）へ</a>
+    <span style="margin:0 8px;">|</span>
+    <a href="/admin/trustledger/postings">→ 仕訳（Postings）で監査</a>
+  </p>
+
+  <details style="margin-top: 12px;">
+    <summary>Raw JSON（監査用）</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+
+<% end %>

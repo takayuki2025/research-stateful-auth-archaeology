@@ -1,46 +1,47 @@
-<h1>TrustLedger Webhook Events</h1>
+<%= render "admin/trustledger/nav" %>
+
+<h1>Webhook イベント一覧</h1>
 
 <form method="get" style="margin-bottom: 16px;">
-  <label>from:
+  <label>開始日:
     <input type="text" name="from" placeholder="YYYY-MM-DD" value="<%= params[:from] %>" />
   </label>
 
-  <label style="margin-left: 12px;">to:
+  <label style="margin-left: 12px;">終了日:
     <input type="text" name="to" placeholder="YYYY-MM-DD" value="<%= params[:to] %>" />
   </label>
 
-  <label style="margin-left: 12px;">event_type:
+  <label style="margin-left: 12px;">イベント種別:
     <input type="text" name="event_type" value="<%= params[:event_type] %>" />
   </label>
 
-  <label style="margin-left: 12px;">status:
+  <label style="margin-left: 12px;">状態:
     <input type="text" name="status" value="<%= params[:status] %>" />
   </label>
 
-  <label style="margin-left: 12px;">per_page:
+  <label style="margin-left: 12px;">件数:
     <input type="number" name="per_page" value="<%= params[:per_page].presence || 50 %>" style="width: 90px;" />
   </label>
 
-  <%# cursor はUI入力させない（Nextリンクで付与） %>
-  <button type="submit" style="margin-left: 12px;">Search</button>
+  <button type="submit" style="margin-left: 12px;">検索</button>
 </form>
 
 <% if @error.present? %>
-  <h2 style="color:red;">ERROR</h2>
+  <h2 style="color:red;">エラー</h2>
   <pre><%= JSON.pretty_generate(@error) %></pre>
 <% else %>
-  <h2 style="color:green;">OK</h2>
+
 
   <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
     <thead>
       <tr>
-        <th>created_at</th>
-        <th>status</th>
-        <th>event_type</th>
-        <th>event_id</th>
+        <th>受信時刻</th>
+        <th>状態</th>
+        <th>イベント種別</th>
+        <th>イベントID</th>
         <th>payment_id</th>
         <th>order_id</th>
-        <th>error</th>
+        <th>エラー</th>
       </tr>
     </thead>
     <tbody>
@@ -49,32 +50,42 @@
           <td><%= e["created_at"] %></td>
           <td><%= e["status"] %></td>
           <td><%= e["event_type"] %></td>
-        <td style="font-family: monospace;">
-  <a href="/admin/trustledger/webhook-events/<%= e["event_id"] %>"><%= e["event_id"] %></a>
-</td>
-          <td><%= e["payment_id"] %></td>
-          <td><%= e["order_id"] %></td>
+          <td style="font-family: monospace;">
+            <a href="/admin/trustledger/webhook-events/<%= e["event_id"] %>"><%= e["event_id"] %></a>
+          </td>
+          <td>
+            <% if e["payment_id"] %>
+              <a href="/admin/trustledger/postings?payment_id=<%= e["payment_id"] %>"><%= e["payment_id"] %></a>
+            <% else %>
+              -
+            <% end %>
+          </td>
+          <td>
+            <% if e["order_id"] %>
+              <a href="/admin/trustledger/postings?order_id=<%= e["order_id"] %>"><%= e["order_id"] %></a>
+            <% else %>
+              -
+            <% end %>
+          </td>
           <td><%= e["error_message"] %></td>
         </tr>
       <% end %>
     </tbody>
   </table>
 
-
-
   <div style="margin-top: 12px;">
     <% base_params = request.query_parameters.except("nav", "next_cursor", "cursor") %>
 
     <% if @stack_size.to_i > 0 %>
       <% newer_params = base_params.merge("nav" => "newer") %>
-      <a href="<%= url_for(newer_params) %>">Newer</a>
+      <a href="<%= url_for(newer_params) %>">新しい方へ</a>
       <span style="margin: 0 10px;">|</span>
     <% end %>
 
     <% if @next_cursor.present? %>
       <% older_params = base_params.merge("nav" => "older", "next_cursor" => @next_cursor) %>
-      <a href="<%= url_for(older_params) %>">Older</a>
+      <a href="<%= url_for(older_params) %>">古い方へ</a>
       <span style="color:#666;">(cursor=<%= @next_cursor %>)</span>
     <% end %>
   </div>
-  <% end %>
+<% end %>

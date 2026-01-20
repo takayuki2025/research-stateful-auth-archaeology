@@ -1,0 +1,70 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>ショップ別KPI</h1>
+
+<form method="get" style="margin-bottom: 16px;">
+  <label>開始日: <input name="from" value="<%= params[:from] %>" placeholder="YYYY-MM-DD"></label>
+  <label style="margin-left:12px;">終了日: <input name="to" value="<%= params[:to] %>" placeholder="YYYY-MM-DD"></label>
+  <label style="margin-left:12px;">表示件数: <input name="limit" value="<%= params[:limit].presence || 20 %>" style="width:80px;"></label>
+  <button type="submit" style="margin-left:12px;">適用</button>
+</form>
+
+<% if @error.present? %>
+  <h2 style="color:red;">エラー</h2>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+
+  <% def jpy(n) %>
+    <% return "-" if n.nil? %>
+    <%= n.to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse %>
+  <% end %>
+
+  <% data = @data || {} %>
+  <% items = data["items"] || [] %>
+
+  <p style="color:#555;">
+    期間：<strong><%= items.first && items.first["from"] %></strong> 〜 <strong><%= items.first && items.first["to"] %></strong>
+    ／ 通貨：<strong><%= items.first && items.first["currency"] || "JPY" %></strong>
+  </p>
+
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>shop_id</th>
+        <th>売上</th>
+        <th>返金</th>
+        <th>手数料</th>
+        <th>純額</th>
+        <th>仕訳件数</th>
+        <th>監査</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.each do |s| %>
+        <tr>
+          <td><%= s["shop_id"] %></td>
+          <td><%= jpy(s["sales_total"]) %></td>
+          <td><%= jpy(s["refund_total"]) %></td>
+          <td><%= jpy(s["fee_total"]) %></td>
+          <td><%= jpy(s["net_total"]) %></td>
+          <td><%= s["postings_count"] || "-" %></td>
+          <td>
+            <a href="/admin/trustledger/postings?shop_id=<%= s["shop_id"] %>">仕訳を見る</a>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <p style="margin-top:12px;">
+    <a href="/admin/trustledger/kpis/global">→ 全体KPIへ</a>
+    <span style="margin:0 8px;">|</span>
+    <a href="/admin/trustledger/reconciliation/missing-sales">→ 欠損検知へ</a>
+  </p>
+
+  <details style="margin-top: 12px;">
+    <summary>Raw JSON（監査用）</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+
+<% end %>

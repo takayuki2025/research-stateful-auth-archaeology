@@ -1,0 +1,62 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>仕訳（Posting）詳細</h1>
+
+<p><a href="/admin/trustledger/postings">← 一覧へ戻る</a></p>
+
+<% if @error.present? %>
+  <pre><%= JSON.pretty_generate(@error) %></pre>
+<% else %>
+
+
+  <% posting = @data["posting"] || {} %>
+  <% entries = @data["entries"] || [] %>
+
+  <h2>仕訳ヘッダ</h2>
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <tr><th>posting_id</th><td><%= posting["posting_id"] || posting["id"] %></td></tr>
+    <tr><th>shop_id</th><td><%= posting["shop_id"] %></td></tr>
+    <tr><th>occurred_at</th><td><%= posting["occurred_at"] %></td></tr>
+    <tr><th>種別</th><td><%= posting["posting_type"] || posting["type"] %></td></tr>
+    <tr><th>amount</th><td><%= posting["amount"] %> <%= posting["currency"] %></td></tr>
+    <tr><th>order_id</th><td><%= posting["order_id"] %></td></tr>
+    <tr><th>payment_id</th><td><%= posting["payment_id"] %></td></tr>
+    <tr><th>source_event_id</th><td style="font-family: monospace;"><%= posting["source_event_id"] %></td></tr>
+    <tr><th>webhook_event_id</th>
+      <td style="font-family: monospace;">
+        <% if posting["meta"] && posting["meta"]["webhook_event_id"] %>
+          <a href="/admin/trustledger/webhook-events/<%= posting["meta"]["webhook_event_id"] %>"><%= posting["meta"]["webhook_event_id"] %></a>
+        <% else %>
+          -
+        <% end %>
+      </td>
+    </tr>
+  </table>
+
+  <h2 style="margin-top: 16px;">仕訳明細（debit/credit）</h2>
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>account_code</th>
+        <th>side</th>
+        <th>amount</th>
+        <th>currency</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% entries.each do |e| %>
+        <tr>
+          <td><%= e["account_code"] %></td>
+          <td><%= e["side"] %></td>
+          <td><%= e["amount"] %></td>
+          <td><%= e["currency"] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <details style="margin-top: 12px;">
+    <summary>Raw JSON（監査用）</summary>
+    <pre><%= JSON.pretty_generate(@data) %></pre>
+  </details>
+<% end %>
