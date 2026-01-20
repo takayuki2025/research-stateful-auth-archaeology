@@ -5,6 +5,7 @@ namespace App\Modules\Payment\Presentation\Http\Controllers\Admin\TrustLedger;
 use App\Http\Controllers\Controller;
 use App\Modules\Payment\Application\UseCase\Admin\TrustLedger\GetShopKpisUseCase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 final class GetShopKpisController extends Controller
 {
@@ -37,6 +38,47 @@ final class GetShopKpisController extends Controller
             currency: $data['currency'] ?? 'JPY',
         );
 
-        return response()->json($page->toArray(), 200);
+        // ---- ここから追加：shop_name / shop_type / owner_name を items に付与（N+1回避） ----
+        $arr = $page->toArray();
+        $items = $arr['items'] ?? [];
+
+        $ids = array_values(array_unique(array_filter(array_map(
+            fn ($s) => isset($s['shop_id']) ? (int)$s['shop_id'] : null,
+            $items
+        ), fn ($v) => is_int($v) && $v > 0)));
+
+        $shopMap = [];
+        if (count($ids) > 0) {
+            $rows = DB::table('shops')
+                ->leftJoin('users', 'users.id', '=', 'shops.owner_user_id')
+                ->whereIn('shops.id', $ids)
+                ->select([
+                    'shops.id as shop_id',
+                    'shops.name as shop_name',
+                    'shops.type as shop_type',
+                    'users.name as owner_name',
+                ])
+                ->get();
+
+            foreach ($rows as $r) {
+                $shopMap[(int)$r->shop_id] = [
+                    'shop_name' => $r->shop_name,
+                    'shop_type' => $r->shop_type,
+                    'owner_name' => $r->owner_name,
+                ];
+            }
+        }
+
+        foreach ($items as &$s) {
+            $sid = isset($s['shop_id']) ? (int)$s['shop_id'] : 0;
+            $s['shop_name'] = $shopMap[$sid]['shop_name'] ?? null;
+            $s['shop_type'] = $shopMap[$sid]['shop_type'] ?? null;
+            $s['owner_name'] = $shopMap[$sid]['owner_name'] ?? null;
+        }
+        unset($s);
+
+        $arr['items'] = $items;
+
+        return response()->json($arr, 200);
     }
 }

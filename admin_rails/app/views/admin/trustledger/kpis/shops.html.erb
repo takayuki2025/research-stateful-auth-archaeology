@@ -31,6 +31,9 @@
     <thead>
       <tr>
         <th>shop_id</th>
+        <th>ショップ名</th>
+        <th>種別</th>
+        <th>オーナー</th>
         <th>売上</th>
         <th>返金</th>
         <th>手数料</th>
@@ -40,20 +43,29 @@
       </tr>
     </thead>
     <tbody>
-      <% items.each do |s| %>
-        <tr>
-          <td><%= s["shop_id"] %></td>
-          <td><%= jpy(s["sales_total"]) %></td>
-          <td><%= jpy(s["refund_total"]) %></td>
-          <td><%= jpy(s["fee_total"]) %></td>
-          <td><%= jpy(s["net_total"]) %></td>
-          <td><%= s["postings_count"] || "-" %></td>
-          <td>
-            <a href="/admin/trustledger/postings?shop_id=<%= s["shop_id"] %>">仕訳を見る</a>
-          </td>
-        </tr>
-      <% end %>
-    </tbody>
+  <% items.each do |s| %>
+    <% type_label =
+      case s["shop_type"]
+      when "personal" then "個人"
+      when "business" then "法人"
+      else "-"
+      end
+    %>
+
+    <tr>
+      <td><%= s["shop_id"] %></td>
+      <td><%= s["shop_name"] || "-" %></td>
+      <td><%= type_label %></td>
+      <td><%= s["owner_name"] || "-" %></td>
+      <td><%= jpy(s["sales_total"]) %></td>
+      <td><%= jpy(s["refund_total"]) %></td>
+      <td><%= jpy(s["fee_total"]) %></td>
+      <td><%= jpy(s["net_total"]) %></td>
+      <td><%= s["postings_count"] || "-" %></td>
+      <td><a href="/admin/trustledger/postings?shop_id=<%= s["shop_id"] %>">仕訳を見る</a></td>
+    </tr>
+  <% end %>
+</tbody>
   </table>
 
   <p style="margin-top:12px;">

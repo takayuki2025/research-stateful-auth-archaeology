@@ -57,6 +57,15 @@
   <pre><%= JSON.pretty_generate(@error) %></pre>
 <% else %>
 
+<% def jp_posting_type(t) %>
+  <% return "-" if t.nil? %>
+  <% s = t.to_s %>
+  <% return "売上" if s == "sale" %>
+  <% return "手数料" if s == "fee" %>
+  <% return "返金" if s == "refund" %>
+  <%= s %>
+<% end %>
+
 <p style="margin:8px 0; color:#555;">
   表示件数: <strong><%= @items.length %></strong>
 </p>
@@ -80,7 +89,10 @@
         <tr>
           <td><a href="/admin/trustledger/postings/<%= p["posting_id"] || p["id"] %>"><%= p["posting_id"] || p["id"] %></a></td>
           <td><%= p["occurred_at"] %></td>
-          <td><%= p["type"] || p["posting_type"] %></td>
+          <td>
+          <div><%= jp_posting_type(p["posting_type"] || p["type"]) %></div>
+            <div style="color:#666; font-size:12px;"><%= (p["posting_type"] || p["type"]) %></div>
+          </td>
           <td><%= p["amount"] %></td>
           <td><%= p["shop_id"] %></td>
           <td><%= p["order_id"] %></td>

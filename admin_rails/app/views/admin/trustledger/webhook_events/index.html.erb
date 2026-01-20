@@ -31,6 +31,26 @@
   <pre><%= JSON.pretty_generate(@error) %></pre>
 <% else %>
 
+<% def jp_event_type(t) %>
+  <% return "-" if t.nil? %>
+  <% s = t.to_s %>
+
+  <% return "決済 作成" if s == "payment_intent.created" %>
+  <% return "決済 完了（成功）" if s == "payment_intent.succeeded" %>
+
+  <% return "課金 完了（成功）" if s == "charge.succeeded" %>
+  <% return "課金 更新" if s == "charge.updated" %>
+  <% return "課金 返金完了（成功）" if s == "charge.refunded" %>
+  <% return "返金 更新" if s == "charge.refund.updated" %>
+
+  <% return "返金 作成" if s == "refund.created" %>
+  <% return "返金 更新" if s == "refund.updated" %>
+
+  <% return "残高 更新" if s == "balance.available" %>
+
+  <%= s %>
+<% end %>
+
 
   <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
     <thead>
@@ -49,7 +69,10 @@
         <tr>
           <td><%= e["created_at"] %></td>
           <td><%= e["status"] %></td>
-          <td><%= e["event_type"] %></td>
+          <td>
+            <div><%= jp_event_type(e["event_type"]) %></div>
+          <div style="color:#666; font-size:12px;"><%= e["event_type"] %></div>
+            </td>
           <td style="font-family: monospace;">
             <a href="/admin/trustledger/webhook-events/<%= e["event_id"] %>"><%= e["event_id"] %></a>
           </td>
