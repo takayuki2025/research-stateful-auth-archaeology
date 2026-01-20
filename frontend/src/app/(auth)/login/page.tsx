@@ -7,7 +7,7 @@ import { useAuth } from "@/ui/auth/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, apiClient, refresh } = useAuth() as any;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,14 +20,40 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      /**
-       * 🔐 認証のみを行う
-       * - 状態同期は AuthProvider
-       * - 遷移判断は useAuthGuard
-       */
       await login({ email, password });
 
-      // ✅ ここでは必ずトップへ
+      // ✅ ログイン時刻（UI表示用）
+      try {
+        localStorage.setItem("last_login_at", new Date().toISOString());
+      } catch {
+        // ignore
+      }
+
+      // ✅ 認証状態の同期完了を待つ（Sanctum等の直後競合を避ける）
+      if (typeof refresh === "function") {
+        await refresh();
+      }
+
+      // ✅ apiClient は内部で /api prefix を付けている可能性があるため /me を使う
+      const me = await apiClient.get("/me");
+
+      // 1) プロフィール未完了ならオンボーディングへ
+      if (me?.profile_completed === false) {
+        router.replace("/mypage/profile");
+        return;
+      }
+
+      // 2) shop_roles があればショップ導線へ
+      const shopRoles = Array.isArray(me?.shop_roles) ? me.shop_roles : [];
+      if (shopRoles.length > 0) {
+        const primary = shopRoles[0];
+        if (primary?.shop_code) {
+          router.replace(`/shops/${primary.shop_code}/dashboard`);
+          return;
+        }
+      }
+
+      // 3) それ以外は一般トップへ
       router.replace("/");
     } catch {
       setApiError("ログインに失敗しました");
@@ -82,10 +108,18 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="mt-6 text-center">
-        <Link href="/register" className="text-blue-500 text-sm">
+      <div className="mt-6 text-center space-y-2">
+        <Link href="/register" className="text-blue-500 text-sm block">
           会員登録はこちら
         </Link>
+
+        {/* 管理者コンソール（別アプリ）へのリンク（開発用） */}
+        <a
+          href="http://localhost:3001/admin/trustledger/kpis/global"
+          className="text-gray-600 text-xs underline block"
+        >
+          管理者/開発者コンソールへ（TrustLedger）（開発用）
+        </a>
       </div>
     </div>
   );
