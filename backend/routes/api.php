@@ -417,11 +417,12 @@ Route::prefix('shops/{shop_code}/atlas')->group(function () {
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasResolveController;
 use App\Modules\Item\Presentation\Http\Controllers\AtlasKernel\AtlasDecideController;
 
-Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')->group(function () {
-    // Route::get('/review',  /* 既存 */);
-    Route::post('/resolve', AtlasResolveController::class); // ✅ 追加
-    Route::post('/decide',  AtlasDecideController::class);  // ✅ 既存
-});
+Route::prefix('shops/{shop_code}/atlas/requests/{request_id}')
+    ->middleware(['auth.occ', 'shop.context'])
+    ->group(function () {
+        Route::post('/resolve', AtlasResolveController::class);
+        Route::post('/decide',  AtlasDecideController::class);
+    });
 
 
 

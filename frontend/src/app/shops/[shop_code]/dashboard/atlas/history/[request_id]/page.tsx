@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 /* =========================
    Types
@@ -22,15 +23,9 @@ type ApiResponse = {
   decisions: Decision[];
 };
 
-/* =========================
-   Fetcher
-========================= */
-
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error("Fetch failed");
-  return res.json();
-};
+function normalizeApiPath(path: string): string {
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
 /* =========================
    Page
@@ -43,10 +38,21 @@ export default function AtlasDecisionHistoryDetailPage() {
     request_id: string;
   }>();
 
-  const { data, error, isLoading } = useSWR<ApiResponse>(
-    `/api/shops/${shop_code}/atlas/requests/${request_id}/history`,
-    fetcher
-  );
+  const { apiClient } = useAuth() as any;
+
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  const url = `/api/shops/${shop_code}/atlas/requests/${request_id}/history`;
+
+  const fetcher = async (u: string): Promise<ApiResponse> => {
+    const r = await apiClient.get(normalizeApiPath(u));
+    return unwrap<ApiResponse>(r);
+  };
+
+  const { data, error, isLoading } = useSWR<ApiResponse>(url, fetcher);
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error) return <div className="p-6 text-red-600">取得失敗</div>;
@@ -102,20 +108,17 @@ export default function AtlasDecisionHistoryDetailPage() {
           onClick={async () => {
             if (!confirm("この分析を再実行しますか？")) return;
 
-            const res = await fetch(
-              `/api/shops/${shop_code}/atlas/requests/${request_id}/replay`,
-              {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ version: "v3_ai" }),
-              }
-            );
+            try {
+              await apiClient.post(
+                normalizeApiPath(
+                  `/api/shops/${shop_code}/atlas/requests/${request_id}/replay`,
+                ),
+                { version: "v3_ai" },
+              );
 
-            if (res.ok) {
               alert("Replay を受け付けました（非同期）");
               router.push(`/shops/${shop_code}/dashboard/atlas/requests`);
-            } else {
+            } catch {
               alert("Replay に失敗しました");
             }
           }}

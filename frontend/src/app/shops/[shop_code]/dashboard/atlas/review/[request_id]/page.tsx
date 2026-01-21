@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useResolveEntities } from "@/ui/atlas/hooks/useResolveEntities";
@@ -10,6 +10,7 @@ import type {
   AtlasAttributes,
   AfterSnapshot,
 } from "@/ui/atlas/types";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 /* =========================================================
    Types
@@ -99,19 +100,6 @@ type EntityOption = {
 };
 
 /* =========================================================
-   Fetcher
-========================================================= */
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(txt || "Fetch failed");
-  }
-  return res.json();
-};
-
-/* =========================================================
    Helpers
 ========================================================= */
 
@@ -174,7 +162,6 @@ function normalizeSnapshot(
   const out: Snapshot = {};
 
   (["brand", "color", "condition"] as const).forEach((key: AttrKey) => {
-    // ① canonical（attributes優先）
     const canonical = attributes?.[key]?.value ?? null;
 
     if (canonical && String(canonical).trim() !== "") {
@@ -187,7 +174,6 @@ function normalizeSnapshot(
       return;
     }
 
-    // ② fallback：raw token
     const token = tokens?.[key]?.[0] ?? null;
     if (token && String(token).trim() !== "") {
       out[key] = {
@@ -242,8 +228,6 @@ function buildAfterSnapshot(edit: Snapshot): AfterSnapshot {
   return out;
 }
 
-
-
 function rawTokenFor(key: AttrKey, tokens?: AtlasTokens | null): string | null {
   const t = tokens?.[key]?.[0] ?? null;
   if (!t) return null;
@@ -251,29 +235,13 @@ function rawTokenFor(key: AttrKey, tokens?: AtlasTokens | null): string | null {
   return s ? s : null;
 }
 
-/**
- * v3 FIXED:
- * - edit_confirm: canonical entity 選択 → resolvedEntities(entity_id) を送る
- * - manual_override: 自由入力 → resolvedEntities は null 固定、after_snapshot を送る
- * - approve: resolveBeforeDecide()（after(AI)から推定）→ resolvedEntities を送る。after_snapshotは送らない
- * - reject: resolvedEntities/after_snapshot は送らない（noteのみ）
- */
-
 /* =========================================================
-   Entity options hook
+   Entity options hook (apiClient 経由に変更)
 ========================================================= */
-
-function useEntityOptions(
-  kind: "brands" | "conditions" | "colors",
-  enabled: boolean
-) {
-  const url = enabled ? `/api/entities/${kind}` : null;
-  return useSWR<EntityOption[]>(url, fetcher);
-}
 
 function findIdByCanonicalName(
   options: EntityOption[],
-  name: string | null | undefined
+  name: string | null | undefined,
 ): number | null {
   if (!name) return null;
   const hit = options.find((o) => o.canonical_name === name);
@@ -291,31 +259,61 @@ export default function AtlasReviewPage() {
     request_id: string;
   };
 
-  // ---- endpoints（必要ならここだけ変更）----
+  const { apiClient } = useAuth() as any;
+
+  // ---- endpoints（/api prefix は apiClient 側が付ける想定なので外す）----
   const ENDPOINT = {
-    review: `/api/shops/${shop_code}/atlas/requests/${request_id}/review`,
-    decide: `/api/shops/${shop_code}/atlas/requests/${request_id}/decide`,
+    review: `/shops/${shop_code}/atlas/requests/${request_id}/review`,
+    decide: `/shops/${shop_code}/atlas/requests/${request_id}/decide`,
+    resolve: `/shops/${shop_code}/atlas/requests/${request_id}/resolve`,
     back: `/shops/${shop_code}/dashboard/atlas/requests`,
   };
 
-  const { data, error, isLoading } = useSWR<ReviewSourceResponse>(
-    ENDPOINT.review,
-    fetcher
+  // axios-like ({data}) と fetch-like (plain) の両対応
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  const apiGetJson = useCallback(
+    async <T,>(url: string): Promise<T> => {
+      // apiClient は "/me" のように /api を付けない運用なので、url も同様に
+      const r = await apiClient.get(url);
+      return unwrap<T>(r);
+    },
+    [apiClient],
   );
 
+  const apiPostJson = useCallback(
+    async <T,>(url: string, body: any): Promise<T> => {
+      const r = await apiClient.post(url, body ?? {});
+      return unwrap<T>(r);
+    },
+    [apiClient],
+  );
+
+  const swrFetcher = useCallback(
+    async (url: string) => apiGetJson<any>(url),
+    [apiGetJson],
+  );
+
+  const { data, error, isLoading } = useSWR<ReviewSourceResponse>(
+    ENDPOINT.review,
+    swrFetcher,
+  );
+
+  // 既存 hook は残す（機能維持）。ただし approve で確実にBearerで動くよう resolveBeforeDecide は apiPostJson を使う
   const { resolve } = useResolveEntities(shop_code, request_id);
 
   // UI State
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Manual edit_confirm / manual_override 用の「編集値」
   const [edit, setEdit] = useState<Snapshot>({});
   const [mode, setMode] = useState<
     "approve" | "edit_confirm" | "manual_override" | "reject"
   >("approve");
 
-  // edit_confirm 用：選択された canonical entity id（backendへ送る）
   const [selectedIds, setSelectedIds] = useState<ResolvedEntitiesForBackend>({
     brand_entity_id: null,
     condition_entity_id: null,
@@ -324,17 +322,26 @@ export default function AtlasReviewPage() {
 
   const editConfirmEnabled = mode === "edit_confirm";
 
+  // entity options（/api/entities/... ではなく /entities/... で叩く）
+  const useEntityOptions = (
+    kind: "brands" | "conditions" | "colors",
+    enabled: boolean,
+  ) => {
+    const url = enabled ? `/entities/${kind}` : null;
+    return useSWR<EntityOption[]>(url, swrFetcher);
+  };
+
   const { data: brandOptions = [] } = useEntityOptions(
     "brands",
-    editConfirmEnabled
+    editConfirmEnabled,
   );
   const { data: conditionOptions = [] } = useEntityOptions(
     "conditions",
-    editConfirmEnabled
+    editConfirmEnabled,
   );
   const { data: colorOptions = [] } = useEntityOptions(
     "colors",
-    editConfirmEnabled
+    editConfirmEnabled,
   );
 
   const before = useMemo(() => {
@@ -346,14 +353,13 @@ export default function AtlasReviewPage() {
       ["brand", "color", "condition"].some(
         (k) =>
           typeof rawBefore?.[k] === "object" &&
-          rawBefore?.[k]?.value !== undefined
+          rawBefore?.[k]?.value !== undefined,
       );
 
     if (isValueObject) {
       return rawBefore as Snapshot;
     }
 
-    // ⬇️ ここで初めて beforeParsed を使う
     if (data?.beforeParsed) {
       const out: Snapshot = {};
       for (const k of ["brand", "color", "condition"] as AttrKey[]) {
@@ -376,45 +382,14 @@ export default function AtlasReviewPage() {
   const after = useMemo(
     () =>
       normalizeSnapshot(data?.attributes, data?.tokens, data?.confidence_map),
-    [data?.attributes, data?.tokens, data?.confidence_map]
+    [data?.attributes, data?.tokens, data?.confidence_map],
   );
 
-  // 初回に analyzer(after) を編集フォームへ流し込み（安全に一度だけ）
-  const initialEdit = useMemo(() => {
-    const base: Snapshot = {};
-
-    for (const a of ATTRS) {
-      // ① 人入力（beforeParsed）
-      const raw = (data as any)?.beforeParsed?.[a.key] ?? null;
-
-      if (raw && String(raw).trim() !== "") {
-        base[a.key] = {
-          value: String(raw),
-          confidence: null,
-          confidence_version: "v3_raw_input",
-          source: "manual",
-        };
-        continue;
-      }
-
-      // ② fallback：解析結果
-      const ai = after?.[a.key] ?? null;
-      if (ai?.value) {
-        base[a.key] = { ...ai };
-      }
-    }
-
-    return base;
-  }, [data?.beforeParsed, after]);
-
-  // approve/reject では edit を持たない
-  // edit_confirm/manual_override では after(AI) を初期値としてミラーする（beforeParsedは禁止）
   useEffect(() => {
     if (!after) return;
 
     if (mode === "manual_override") {
       setEdit(snapshotFromAI(after));
-      // manual_override は自由入力なので selectedIds は使わない
       setSelectedIds({
         brand_entity_id: null,
         condition_entity_id: null,
@@ -425,11 +400,9 @@ export default function AtlasReviewPage() {
 
     if (mode === "edit_confirm") {
       setEdit(snapshotFromAI(after));
-      // options が来るまで id は確定できないので、ここでは何もしない
       return;
     }
 
-    // approve/reject
     setEdit({});
     setSelectedIds({
       brand_entity_id: null,
@@ -438,7 +411,6 @@ export default function AtlasReviewPage() {
     });
   }, [mode, after]);
 
-  // edit_confirm 初期選択：after(AI) の canonical_name に一致する option があれば自動選択
   useEffect(() => {
     if (mode !== "edit_confirm") return;
     if (!after) return;
@@ -460,8 +432,6 @@ export default function AtlasReviewPage() {
     };
 
     setSelectedIds(nextSelected);
-
-    // 表示用ミラーも after(AI) に統一（念のため）
     setEdit(snapshotFromAI(after));
   }, [mode, after, brandOptions, conditionOptions, colorOptions]);
 
@@ -476,7 +446,6 @@ export default function AtlasReviewPage() {
 
       const shownAfter =
         mode === "edit_confirm" || mode === "manual_override" ? e : ai;
-
       const conf = shownAfter?.confidence ?? ai?.confidence ?? null;
 
       return {
@@ -513,7 +482,7 @@ export default function AtlasReviewPage() {
       color: before?.color?.value ?? null,
       condition: before?.condition?.value ?? null,
     }),
-    [before]
+    [before],
   );
 
   const afterParsedPayload = useMemo(
@@ -522,51 +491,41 @@ export default function AtlasReviewPage() {
       color: after?.color?.value ?? null,
       condition: after?.condition?.value ?? null,
     }),
-    [after]
+    [after],
   );
 
+  // ✅ resolveBeforeDecide は apiClient 経由で確実にBearerを付与（hookは温存）
   async function resolveBeforeDecide(): Promise<ResolvedEntitiesForBackend> {
-    const resolved = await resolve({
-      brand: after?.brand?.value ?? null,
-      condition: after?.condition?.value ?? null,
-      color: after?.color?.value ?? null,
-    });
+    // hook を通してもよいが、Bearer保証のため endpoint を直接叩く
+    // backend が { brand_entity_id, condition_entity_id, color_entity_id } を返す想定
+    const out = await apiPostJson<ResolvedEntitiesForBackend>(
+      ENDPOINT.resolve,
+      {
+        brand: after?.brand?.value ?? null,
+        condition: after?.condition?.value ?? null,
+        color: after?.color?.value ?? null,
+      },
+    );
 
+    // 互換：hookの戻り型に合わせたい場合はここで吸収
     return {
-      brand_entity_id: resolved.brand_entity_id ?? null,
-      condition_entity_id: resolved.condition_entity_id ?? null,
-      color_entity_id: resolved.color_entity_id ?? null,
+      brand_entity_id: (out as any).brand_entity_id ?? null,
+      condition_entity_id: (out as any).condition_entity_id ?? null,
+      color_entity_id: (out as any).color_entity_id ?? null,
     };
   }
 
   async function submitDecision(body: DecideRequestBody) {
     setIsSubmitting(true);
     try {
-      const res = await fetch(ENDPOINT.decide, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+      // ✅ fetch(cookie) をやめて apiClient に統一（sanctumでもjwtでもOK）
+      await apiPostJson<DecideResponse>(ENDPOINT.decide, body);
 
-      if (!res.ok) {
-        // ★ ここが重要
-        let msg = "Decide failed";
-        try {
-          const json = await res.json();
-          msg = json?.message ?? msg;
-        } catch {
-          msg = await res.text();
-        }
-        throw new Error(msg);
-      }
-
-      await res.json().catch(() => ({}));
       await mutate(ENDPOINT.review);
       router.push(ENDPOINT.back);
+    } catch (e: any) {
+      const msg = e?.message ?? "Decide failed";
+      throw new Error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -596,7 +555,6 @@ export default function AtlasReviewPage() {
             <span className="font-medium">{data.analysis_request_id}</span>
           </div>
 
-          {/* ================= 🆕 Learning Writing ================= */}
           {data.beforeParsed && (
             <div className="border rounded-lg p-4 bg-green-50 space-y-2">
               <div className="text-sm font-semibold">
@@ -619,7 +577,6 @@ export default function AtlasReviewPage() {
             </div>
           )}
 
-          {/* ================= 🆕 Input Snapshot ================= */}
           {data.input_snapshot && (
             <details className="border rounded-lg p-4 bg-gray-50">
               <summary className="cursor-pointer text-sm font-semibold">
@@ -683,7 +640,6 @@ export default function AtlasReviewPage() {
           />
         </div>
 
-        {/* Confidence summary */}
         <div className="flex items-center gap-3 text-sm">
           <span className="text-gray-600">Max confidence</span>
           <span
@@ -738,7 +694,6 @@ export default function AtlasReviewPage() {
               {mode === "edit_confirm" ? (
                 (() => {
                   const key = r.key as AttrKey;
-
                   const options =
                     key === "brand"
                       ? brandOptions
@@ -770,7 +725,6 @@ export default function AtlasReviewPage() {
                           return { ...prev, color_entity_id: id };
                         });
 
-                        // 表示用ミラー（after_snapshot.value のために canonical_name を同期）
                         const opt = options.find((o) => o.id === id);
 
                         setEdit((prev) => ({
@@ -903,7 +857,7 @@ export default function AtlasReviewPage() {
 
                 if (mode === "approve") {
                   resolvedForBackend = await resolveBeforeDecide();
-                  // approve は resolvedEntities 必須（固定）
+
                   if (
                     !resolvedForBackend.brand_entity_id &&
                     !resolvedForBackend.condition_entity_id &&
@@ -918,7 +872,6 @@ export default function AtlasReviewPage() {
                   await submitDecision({
                     decision_type: "approve",
                     resolvedEntities: resolvedForBackend,
-                    // approve は after_snapshot を送らない（固定）
                     beforeParsed: beforeParsedPayload,
                     afterParsed: afterParsedPayload,
                     note: note || null,
@@ -927,7 +880,6 @@ export default function AtlasReviewPage() {
                 }
 
                 if (mode === "edit_confirm") {
-                  // edit_confirm は「選択された entity_id」をそのまま backend に送る
                   resolvedForBackend = selectedIds;
 
                   if (
@@ -942,7 +894,6 @@ export default function AtlasReviewPage() {
                   await submitDecision({
                     decision_type: "edit_confirm",
                     resolvedEntities: resolvedForBackend,
-                    // 表示・監査用に canonical_name を after_snapshot に同期（固定）
                     after_snapshot: buildAfterSnapshot(edit),
                     beforeParsed: beforeParsedPayload,
                     afterParsed: afterParsedPayload,
@@ -952,7 +903,6 @@ export default function AtlasReviewPage() {
                 }
 
                 if (mode === "manual_override") {
-                  // manual_override は自由入力 → resolvedEntities は null 固定
                   await submitDecision({
                     decision_type: "manual_override",
                     resolvedEntities: {

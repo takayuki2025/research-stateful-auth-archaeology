@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/AuthProvider";
@@ -9,10 +9,20 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading, apiClient, refresh } = useAuth() as any;
 
+  const mode = process.env.NEXT_PUBLIC_AUTH_MODE ?? "sanctum";
+  const isIdaas = mode === "idaas";
+  const isDev = process.env.NODE_ENV !== "production";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const modeLabel = useMemo(() => {
+    if (mode === "idaas") return "IdaaS (Cognito PKCE)";
+    if (mode === "firebase_jwt") return "Firebase JWT";
+    return "Sanctum (Stateful)";
+  }, [mode]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,30 +30,32 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      // Idaas は PKCE リダイレクトが本体なので、email/passwordは使わない
+      if (isIdaas) {
+        await login({ email: "", password: "" });
+        return;
+      }
+
+      // Sanctum / firebase_jwt
       await login({ email, password });
 
-      // ✅ ログイン時刻（UI表示用）
       try {
         localStorage.setItem("last_login_at", new Date().toISOString());
       } catch {
         // ignore
       }
 
-      // ✅ 認証状態の同期完了を待つ（Sanctum等の直後競合を避ける）
       if (typeof refresh === "function") {
         await refresh();
       }
 
-      // ✅ apiClient は内部で /api prefix を付けている可能性があるため /me を使う
       const me = await apiClient.get("/me");
 
-      // 1) プロフィール未完了ならオンボーディングへ
       if (me?.profile_completed === false) {
         router.replace("/mypage/profile");
         return;
       }
 
-      // 2) shop_roles があればショップ導線へ
       const shopRoles = Array.isArray(me?.shop_roles) ? me.shop_roles : [];
       if (shopRoles.length > 0) {
         const primary = shopRoles[0];
@@ -53,10 +65,11 @@ export default function LoginPage() {
         }
       }
 
-      // 3) それ以外は一般トップへ
       router.replace("/");
-    } catch {
-      setApiError("ログインに失敗しました");
+    } catch (e: any) {
+      setApiError(
+        isIdaas ? "SSOログインの開始に失敗しました" : "ログインに失敗しました",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -68,52 +81,137 @@ export default function LoginPage() {
         ログイン
       </h2>
 
+      {/* =========================
+          Dev-only mode info + links
+      ========================= */}
+      {isDev && (
+        <div className="mb-6 p-3 rounded border bg-gray-50 text-sm">
+          <div className="font-semibold">開発用：認証モード</div>
+          <div className="mt-1">
+            現在：<span className="font-mono">{mode}</span>（{modeLabel}）
+          </div>
+
+          <div className="mt-2 text-xs text-gray-600">
+            切替は .env の{" "}
+            <span className="font-mono">NEXT_PUBLIC_AUTH_MODE</span> を変更して
+            Next.js を再起動してください。
+          </div>
+
+          <div className="mt-3 flex flex-col gap-1">
+            <span className="text-xs text-gray-600">利用する導線：</span>
+            <ul className="list-disc ml-5 text-xs text-gray-700 space-y-1">
+              <li>
+                <span className="font-mono">idaas</span>：この画面の
+                「SSOでログイン」ボタン（PKCEリダイレクト）
+              </li>
+              <li>
+                <span className="font-mono">sanctum</span> /{" "}
+                <span className="font-mono">firebase_jwt</span>
+                ：下のメール/パスワードフォーム
+              </li>
+            </ul>
+
+            {/* 便利リンク（開発用） */}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a className="text-xs underline text-gray-700" href="/login">
+                /login を再表示
+              </a>
+              <a
+                className="text-xs underline text-gray-700"
+                href="/oidc/callback"
+              >
+                /oidc/callback（PKCE受口）
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {apiError && (
         <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded">
           {apiError}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block mb-1 text-sm">メールアドレス</label>
-          <input
-            type="email"
-            className="w-full px-4 py-2 border rounded"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+      {/* =========================
+          Idaas (Cognito PKCE)
+      ========================= */}
+      {isIdaas ? (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <button
+            type="submit"
             disabled={isSubmitting || isLoading}
-          />
-        </div>
+            className="w-full py-3 bg-black text-white rounded"
+          >
+            {isSubmitting ? "リダイレクト中..." : "SSOでログイン（Cognito）"}
+          </button>
 
-        <div>
-          <label className="block mb-1 text-sm">パスワード</label>
-          <input
-            type="password"
-            className="w-full px-4 py-2 border rounded"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
+          <p className="text-xs text-gray-600">
+            SSOログインはメール/パスワード入力ではなく、CognitoのHosted
+            UIへリダイレクトします。
+          </p>
+
+          {/* 開発用：他モードが必要なときの案内 */}
+          {isDev && (
+            <p className="text-xs text-gray-500">
+              Sanctum / Firebase JWT に戻す場合は{" "}
+              <span className="font-mono">NEXT_PUBLIC_AUTH_MODE</span>{" "}
+              を変更して再起動してください。
+            </p>
+          )}
+        </form>
+      ) : (
+        /* =========================
+           email/password login
+        ========================= */
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block mb-1 text-sm">メールアドレス</label>
+            <input
+              type="email"
+              className="w-full px-4 py-2 border rounded"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isSubmitting || isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-sm">パスワード</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border rounded"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isSubmitting || isLoading}
+            />
+          </div>
+
+          <button
+            type="submit"
             disabled={isSubmitting || isLoading}
-          />
-        </div>
+            className="w-full py-3 bg-red-600 text-white rounded"
+          >
+            {isSubmitting ? "ログイン中..." : "ログインする"}
+          </button>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || isLoading}
-          className="w-full py-3 bg-red-600 text-white rounded"
-        >
-          {isSubmitting ? "ログイン中..." : "ログインする"}
-        </button>
-      </form>
+          {isDev && (
+            <div className="text-xs text-gray-500">
+              ※ SSO（Cognito PKCE）を使う場合は{" "}
+              <span className="font-mono">NEXT_PUBLIC_AUTH_MODE=idaas</span>{" "}
+              に変更して再起動してください。
+            </div>
+          )}
+        </form>
+      )}
 
       <div className="mt-6 text-center space-y-2">
         <Link href="/register" className="text-blue-500 text-sm block">
           会員登録はこちら
         </Link>
 
-        {/* 管理者コンソール（別アプリ）へのリンク（開発用） */}
         <a
           href="http://localhost:3001/admin/trustledger/kpis/global"
           className="text-gray-600 text-xs underline block"

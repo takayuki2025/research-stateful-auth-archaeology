@@ -39,25 +39,12 @@ export class LaravelAuthApi {
     firebaseToken: string,
     deviceId: string,
   ): Promise<LoginWithFirebaseResult> {
-    // =========================================================
-    // ✅ DEBUG (remove this block after verification)
-    // - トークン本体は出さず「長さ」だけ出す（漏洩防止）
-    // =========================================================
-    console.log(
-      "[DEBUG][loginWithFirebaseToken] id_token length =",
-      firebaseToken?.length ?? 0,
-    );
-
     const res = await this.client.post("/login_or_register", {
-      // ✅ Laravel 側 validate に合わせる（必須）
-      id_token: firebaseToken,
+      id_token: firebaseToken, // Laravel側のvalidateに合わせて固定
       device_id: deviceId,
     });
 
-    // =========================================================
-    // ✅ Response key normalization (supports both styles)
-    // - Laravel 側が access_token/token のどちらを返しても吸収
-    // =========================================================
+    // Response key normalization (supports both styles)
     const accessToken =
       res.data?.access_token ?? res.data?.token ?? firebaseToken;
 

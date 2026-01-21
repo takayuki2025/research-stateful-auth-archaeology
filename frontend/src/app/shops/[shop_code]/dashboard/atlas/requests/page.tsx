@@ -48,7 +48,7 @@ type AtlasRequestRow = {
   before: {
     brand: string | null;
     condition: string | null; // "" may come
-    color: string | null; // design: null
+    color: string | null;
   };
 
   ai: {
@@ -82,17 +82,19 @@ type AtlasRequestRow = {
 type ApiResponse = { requests: AtlasRequestRow[] };
 
 /* =========================================================
-   Fetcher
+   apiClient fetcher (no credentials include)
 ========================================================= */
 
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.message ?? "Fetch failed");
-  }
-  return res.json();
-};
+function normalizeApiPath(path: string): string {
+  // apiClient が /api prefix を付ける想定があるので、SWRキーが /api/... でも剥がして叩く
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
+
+function unwrap<T>(r: any): T {
+  // axios-like {data} / fetch-like plain
+  if (r && typeof r === "object" && "data" in r) return r.data as T;
+  return r as T;
+}
 
 /* =========================================================
    UI utils
@@ -133,7 +135,7 @@ function ConfidencePill({ v }: { v?: number | null }) {
     <span
       className={clsx(
         "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ring-1",
-        confTone(v)
+        confTone(v),
       )}
     >
       {pct(v)}%
@@ -208,10 +210,6 @@ function DecisionBadge({
   );
 }
 
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs text-gray-500">{children}</div>;
-}
-
 function Chip({
   tone,
   children,
@@ -234,7 +232,7 @@ function Chip({
     <span
       className={clsx(
         "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ring-1",
-        cls
+        cls,
       )}
     >
       {children}
@@ -242,15 +240,12 @@ function Chip({
   );
 }
 
-
-
 function EmptyHint({ text }: { text: string }) {
   return <div className="text-sm text-gray-500">{text}</div>;
 }
 
-
 /* =========================================================
-  TabHeader・Filters / sorting
+  Tabs / filters
 ========================================================= */
 type TabKey = "timeline" | "diff" | "confidence" | "replay" | "policy";
 
@@ -307,7 +302,7 @@ function TabHeader({
             "px-3 py-1.5 rounded-md text-sm font-semibold ring-1 transition",
             active === t.key
               ? "bg-gray-900 text-white ring-gray-900"
-              : "bg-white text-gray-800 ring-gray-200 hover:bg-gray-50"
+              : "bg-white text-gray-800 ring-gray-200 hover:bg-gray-50",
           )}
         >
           <span className="inline-flex items-center gap-2">
@@ -318,7 +313,7 @@ function TabHeader({
                   "text-xs px-1.5 py-0.5 rounded",
                   active === t.key
                     ? "bg-white/20 text-white"
-                    : "bg-gray-100 text-gray-700"
+                    : "bg-gray-100 text-gray-700",
                 )}
               >
                 {t.badge}
@@ -328,7 +323,7 @@ function TabHeader({
           <span
             className={clsx(
               "ml-2 text-xs font-normal",
-              active === t.key ? "text-white/80" : "text-gray-500"
+              active === t.key ? "text-white/80" : "text-gray-500",
             )}
           >
             {t.hint}
@@ -338,9 +333,6 @@ function TabHeader({
     </div>
   );
 }
-
-
-
 
 type FilterKey =
   | "all"
@@ -376,20 +368,15 @@ function isHuman(r: AtlasRequestRow) {
     r.decision.type !== "reject"
   );
 }
-
 function highRiskReview(r: AtlasRequestRow) {
   const c = r.ai?.max_confidence;
   return isReview(r) && c !== null && c !== undefined && c >= 0.85;
 }
 
-/**
- * Risk / mismatch detection (priority #5)
- */
 function riskSignals(
-  r: AtlasRequestRow
+  r: AtlasRequestRow,
 ): Array<{ tone: "red" | "yellow" | "blue"; text: string }> {
   const out: Array<{ tone: "red" | "yellow" | "blue"; text: string }> = [];
-
   const c = r.ai?.max_confidence;
   const decided = !!r.decision;
 
@@ -405,9 +392,8 @@ function riskSignals(
     out.push({ tone: "red", text: "LowConfidenceApproved" });
   }
 
-  if (decided && !r.final) {
+  if (decided && !r.final)
     out.push({ tone: "yellow", text: "FinalMissingAfterDecision" });
-  }
 
   if (
     decided &&
@@ -428,25 +414,24 @@ function riskSignals(
 }
 
 function compareByDateDesc(a?: string | null, b?: string | null) {
-  // server returns "YYYY-MM-DD HH:MM:SS"
   const ta = a ? Date.parse(a.replace(" ", "T")) : 0;
   const tb = b ? Date.parse(b.replace(" ", "T")) : 0;
   return tb - ta;
 }
 
 /* =========================================================
-   Confidence mini bars (priority #3)
+   Confidence mini bars
 ========================================================= */
 
 function MiniConfidenceBars({ map }: { map: Record<string, number> | null }) {
   if (!map) return <span className="text-xs text-gray-400">no map</span>;
 
   const entries = Object.entries(map)
-    .filter(([k, v]) => typeof v === "number")
+    .filter(([, v]) => typeof v === "number")
     .sort(
       ([a], [b]) =>
         ["brand", "condition", "color"].indexOf(a) -
-        ["brand", "condition", "color"].indexOf(b)
+        ["brand", "condition", "color"].indexOf(b),
     );
 
   if (!entries.length)
@@ -479,11 +464,10 @@ function MiniConfidenceBars({ map }: { map: Record<string, number> | null }) {
 }
 
 /* =========================================================
-   Reason labels (priority #2)
+   Reason labels
 ========================================================= */
 
 function beforeValueLabel(v: string | null) {
-  // differentiate null vs empty string
   if (v === null) return { text: "—", hint: "N/A (no field / not captured)" };
   if (v === "") return { text: "(empty)", hint: "Empty input" };
   return { text: v, hint: null };
@@ -491,7 +475,6 @@ function beforeValueLabel(v: string | null) {
 
 function finalMissingReason(r: AtlasRequestRow): string {
   if (!r.decision) return "No decision yet";
-  // decided but no final
   if (r.decision.type === "approve" && r.ai?.brand)
     return "Approved but SoT not applied (brand may be unregistered)";
   return "Decided but SoT not applied yet";
@@ -507,7 +490,6 @@ function diffMissingReason(r: AtlasRequestRow): string {
 /* =========================================================
    Views
 ========================================================= */
-
 
 function SectionTitle({
   title,
@@ -540,7 +522,6 @@ function RowHeader({ r }: { r: AtlasRequestRow }) {
           <DecisionBadge decision={r.decision} />
           <ConfidencePill v={r.ai?.max_confidence} />
 
-          {/* Risk/mismatch chips */}
           {signals.map((s, idx) => (
             <Chip key={`${s.text}-${idx}`} tone={s.tone}>
               {s.text}
@@ -565,22 +546,44 @@ function RowHeader({ r }: { r: AtlasRequestRow }) {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* ✅ 導線を強化（機能追加、デザインは現状テイストで最小） */}
+      <div className="flex flex-wrap items-center gap-3 text-xs">
         {r.decision ? (
           <Link
             href={`/shops/${r.shop_code}/dashboard/atlas/history/${r.request_id}`}
-            className="text-sm font-semibold text-gray-900 underline"
+            className="font-semibold text-gray-900 underline"
           >
-            管理者判断履歴
+            履歴
           </Link>
         ) : (
           <Link
             href={`/shops/${r.shop_code}/dashboard/atlas/review/${r.request_id}`}
-            className="text-sm font-semibold text-blue-600 underline"
+            className="font-semibold text-blue-600 underline"
           >
-            管理者判断へ
+            判断
           </Link>
         )}
+
+        <Link
+          href={`/shops/${r.shop_code}/dashboard/atlas/compare/${r.request_id}`}
+          className="font-semibold text-gray-900 underline"
+        >
+          Compare
+        </Link>
+
+        <Link
+          href={`/shops/${r.shop_code}/dashboard/atlas/decide/${r.request_id}`}
+          className="font-semibold text-gray-900 underline"
+        >
+          Decide
+        </Link>
+
+        <Link
+          href={`/shops/${r.shop_code}/dashboard/atlas/requests/${r.request_id}`}
+          className="font-semibold text-gray-900 underline"
+        >
+          Raw
+        </Link>
       </div>
     </div>
   );
@@ -635,8 +638,6 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
       <div className="space-y-3">
         {rows.map((r) => {
           const bBrand = beforeValueLabel(r.before?.brand ?? null);
-          const bCond = beforeValueLabel(r.before?.condition ?? null);
-          const bColor = beforeValueLabel(r.before?.color ?? null);
 
           return (
             <div key={r.request_id} className="rounded-xl border bg-white p-4">
@@ -649,27 +650,17 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
                   </div>
                   <div className="mt-2">
                     <Line
-                      label="Modalities"
+                      label="Brand"
                       value={bBrand.text}
                       hint={bBrand.hint}
                     />
-                    {/* <Line
-                      label="Condition（今回はNULL）"
-                      value={bCond.text}
-                      hint={bCond.hint}
-                    />
-                    <Line
-                      label="Color（今回はNULL）"
-                      value={bColor.text}
-                      hint={bColor.hint}
-                    /> */}
                     <Line label="at" value={fmtDT(r.submitted_at)} />
                   </div>
                 </div>
 
                 <div className="rounded-xl border bg-gray-50 p-3">
                   <div className="text-sm font-semibold">
-                    Analyzed (AI)（Atlaskernel解析結果）
+                    Analyzed (AI)（解析結果）
                   </div>
                   <div className="mt-2">
                     <Line label="Brand" value={safe(r.ai.brand)} />
@@ -698,9 +689,7 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
                 </div>
 
                 <div className="rounded-xl border bg-gray-50 p-3">
-                  <div className="text-sm font-semibold">
-                    Decided / Final（管理者による確定結果）
-                  </div>
+                  <div className="text-sm font-semibold">Decided / Final</div>
                   <div className="mt-2">
                     <Line label="Decision" value={safe(r.decision?.type)} />
                     <Line label="By" value={safe(r.decision?.by)} />
@@ -725,50 +714,16 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
                         />
                       </>
                     ) : (
-                      <>
-                        <Line
-                          label="Final"
-                          value="(missing)"
-                          hint={finalMissingReason(r)}
-                        />
-                      </>
-                    )}
-
-                    {/* Trigger */}
-                    {(r.trigger?.by ||
-                      r.trigger?.reason ||
-                      r.trigger?.replay) && (
-                      <div className="mt-3 rounded-md bg-white p-2 ring-1 ring-gray-200 text-xs text-gray-700">
-                        <div className="font-semibold text-gray-900">
-                          Trigger
-                        </div>
-                        <div className="mt-1">
-                          by:{" "}
-                          <span className="font-semibold">
-                            {safe(r.trigger.by)}
-                          </span>
-                        </div>
-                        {r.trigger.reason ? (
-                          <div>
-                            reason:{" "}
-                            <span className="font-semibold">
-                              {safe(r.trigger.reason)}
-                            </span>
-                          </div>
-                        ) : null}
-                        {r.trigger.replay ? (
-                          <div className="text-gray-600">
-                            Replay #{r.trigger.replay.index} (from #
-                            {r.trigger.replay.original_request_id})
-                          </div>
-                        ) : null}
-                      </div>
+                      <Line
+                        label="Final"
+                        value="(missing)"
+                        hint={finalMissingReason(r)}
+                      />
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Quick reason lines (priority #2) */}
               <div className="mt-3 text-xs text-gray-500">
                 Diff: {r.diff ? "available" : diffMissingReason(r)} / SoT:{" "}
                 {r.final ? "applied" : finalMissingReason(r)}
@@ -838,7 +793,7 @@ function DiffView({ rows }: { rows: AtlasRequestRow[] }) {
                               "inline-block px-2 py-0.5 rounded mr-2",
                               changed
                                 ? "bg-red-50 text-red-700"
-                                : "bg-gray-50 text-gray-600"
+                                : "bg-gray-50 text-gray-600",
                             )}
                           >
                             {safe(d.before)}
@@ -849,7 +804,7 @@ function DiffView({ rows }: { rows: AtlasRequestRow[] }) {
                               "inline-block px-2 py-0.5 rounded ml-2",
                               changed
                                 ? "bg-green-50 text-green-700"
-                                : "bg-gray-50 text-gray-600"
+                                : "bg-gray-50 text-gray-600",
                             )}
                           >
                             {safe(d.after)}
@@ -898,9 +853,9 @@ function ConfidenceView({ rows }: { rows: AtlasRequestRow[] }) {
       rows.filter(
         (r) =>
           r.ai?.confidence_map &&
-          Object.keys(r.ai.confidence_map ?? {}).length > 0
+          Object.keys(r.ai.confidence_map ?? {}).length > 0,
       ),
-    [rows]
+    [rows],
   );
 
   return (
@@ -949,7 +904,7 @@ function ConfidenceView({ rows }: { rows: AtlasRequestRow[] }) {
 function ReplayView({ rows }: { rows: AtlasRequestRow[] }) {
   const candidates = useMemo(
     () => rows.filter((r) => !!r.trigger?.replay),
-    [rows]
+    [rows],
   );
 
   return (
@@ -987,7 +942,7 @@ function ReplayView({ rows }: { rows: AtlasRequestRow[] }) {
 function PolicyView({ rows }: { rows: AtlasRequestRow[] }) {
   const candidates = useMemo(
     () => rows.filter((r) => r.decision?.type === "system_approve"),
-    [rows]
+    [rows],
   );
 
   return (
@@ -1040,29 +995,34 @@ export default function AtlasRequestsPage() {
   const params = useParams();
   const shop_code = String((params as any)?.shop_code ?? "");
 
-  const { authReady, isAuthenticated, user } = useAuth();
+  const { authReady, isAuthenticated, user, apiClient } = useAuth() as any;
 
   const isReviewer =
     user?.shop_roles?.some(
       (r: any) =>
-        r.shop_code === shop_code && ["owner", "manager"].includes(r.role)
+        r.shop_code === shop_code && ["owner", "manager"].includes(r.role),
     ) ?? false;
+
+  // ✅ apiClient 版 fetcher（JWT/IdaaSでも動く）
+  const apiFetcher = async (url: string): Promise<ApiResponse> => {
+    const r = await apiClient.get(normalizeApiPath(url));
+    return unwrap<ApiResponse>(r);
+  };
 
   const { data, error, isLoading } = useSWR<ApiResponse>(
     isReviewer ? `/api/shops/${shop_code}/atlas/requests` : null,
-    fetcher
+    apiFetcher,
   );
 
   const all = data?.requests ?? [];
 
-  // 1) filter + sort
+  // filter + sort
   const [filter, setFilter] = useState<FilterKey>("review");
   const [sort, setSort] = useState<SortKey>("confidence_desc");
 
   const filtered = useMemo(() => {
     let rows = [...all];
 
-    // filter
     rows = rows.filter((r) => {
       switch (filter) {
         case "all":
@@ -1084,7 +1044,6 @@ export default function AtlasRequestsPage() {
       }
     });
 
-    // sort
     rows.sort((a, b) => {
       if (sort === "confidence_desc") {
         const ca = a.ai?.max_confidence ?? -1;
@@ -1094,27 +1053,25 @@ export default function AtlasRequestsPage() {
       if (sort === "decided_desc") {
         return compareByDateDesc(
           a.decided_at ?? a.decision?.decided_at ?? null,
-          b.decided_at ?? b.decision?.decided_at ?? null
+          b.decided_at ?? b.decision?.decided_at ?? null,
         );
       }
-      // analyzed_desc
       return compareByDateDesc(a.analyzed_at, b.analyzed_at);
     });
 
     return rows;
   }, [all, filter, sort]);
 
-  // counts for tabs
   const counts = useMemo(() => {
     const diff = filtered.filter((r) => !!r.diff).length;
     const hasConfidenceMap = filtered.filter(
       (r) =>
         !!r.ai?.confidence_map &&
-        Object.keys(r.ai.confidence_map ?? {}).length > 0
+        Object.keys(r.ai.confidence_map ?? {}).length > 0,
     ).length;
     const hasReplay = filtered.filter((r) => !!r.trigger?.replay).length;
     const hasPolicy = filtered.filter(
-      (r) => r.decision?.type === "system_approve"
+      (r) => r.decision?.type === "system_approve",
     ).length;
     return { diff, hasConfidenceMap, hasReplay, hasPolicy };
   }, [filtered]);
@@ -1126,7 +1083,11 @@ export default function AtlasRequestsPage() {
   if (!isReviewer) return <div className="p-6">アクセス権限がありません。</div>;
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error)
-    return <div className="p-6 text-red-600">取得失敗：{error.message}</div>;
+    return (
+      <div className="p-6 text-red-600">
+        取得失敗：{(error as Error).message}
+      </div>
+    );
 
   return (
     <div className="p-6 space-y-4">
@@ -1147,12 +1108,20 @@ export default function AtlasRequestsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* ✅ 導線：戻る/履歴一覧 */}
+        <div className="flex items-center gap-3 flex-wrap">
           <Link
             href={`/shops/${shop_code}/dashboard`}
             className="text-sm font-semibold text-gray-900 underline"
           >
             ダッシュボードへ戻る
+          </Link>
+
+          <Link
+            href={`/shops/${shop_code}/dashboard/atlas/history`}
+            className="text-sm font-semibold text-gray-900 underline"
+          >
+            判断履歴一覧
           </Link>
         </div>
       </div>

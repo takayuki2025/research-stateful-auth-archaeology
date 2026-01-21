@@ -1,27 +1,30 @@
 import useSWR from "swr";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 export type EntityOption = {
   id: number;
   canonical_name: string;
 };
 
-const fetcher = async (u: string): Promise<EntityOption[]> => {
-  const res = await fetch(u, { credentials: "include" });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(txt || "Fetch failed");
-  }
-  return (await res.json()) as EntityOption[];
-};
+function normalizeApiPath(path: string): string {
+  // apiClient が /api prefix を付ける前提なので /api を剥がして統一
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
-/**
- * useEntityOptions
- * - Edit Confirm 時のみ canonical entity 候補を取得する
- */
 export function useEntityOptions(
   kind: "brands" | "conditions" | "colors",
-  enabled: boolean
+  enabled: boolean,
 ) {
-  const url = enabled ? `/api/entities/${kind}` : null;
+  const { apiClient } = useAuth() as any;
+
+  const url = enabled ? `/entities/${kind}` : null;
+
+  const fetcher = async (u: string): Promise<EntityOption[]> => {
+    const r = await apiClient.get(normalizeApiPath(u));
+    const data =
+      r && typeof r === "object" && "data" in r ? (r as any).data : r;
+    return data as EntityOption[];
+  };
+
   return useSWR<EntityOption[]>(url, fetcher);
 }

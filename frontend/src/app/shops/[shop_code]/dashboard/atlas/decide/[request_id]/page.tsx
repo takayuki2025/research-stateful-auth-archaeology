@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { DecisionPanelReview } from "../../review/[request_id]/DecisionPanelDecide";
 
 type ApiResponse = {
@@ -17,14 +18,9 @@ type ApiResponse = {
   } | null;
 };
 
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.message ?? "Fetch failed");
-  }
-  return res.json();
-};
+function normalizeApiPath(path: string): string {
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
 export default function AtlasDecidePage() {
   const router = useRouter();
@@ -33,9 +29,21 @@ export default function AtlasDecidePage() {
     request_id: string;
   }>();
 
+  const { apiClient } = useAuth() as any;
+
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  const fetcher = async (url: string): Promise<ApiResponse> => {
+    const r = await apiClient.get(normalizeApiPath(url));
+    return unwrap<ApiResponse>(r);
+  };
+
   const { data, error, isLoading } = useSWR<ApiResponse>(
     `/api/shops/${shop_code}/atlas/requests/${request_id}`,
-    fetcher
+    fetcher,
   );
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;

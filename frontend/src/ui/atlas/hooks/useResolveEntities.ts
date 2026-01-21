@@ -1,26 +1,24 @@
 import type { ResolvePayload, ResolveResult } from "../types";
+import { useAuth } from "@/ui/auth/AuthProvider";
+
+function normalizeApiPath(path: string): string {
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
 export function useResolveEntities(shopCode: string, requestId: string) {
+  const { apiClient } = useAuth() as any;
+
   const resolve = async (payload: ResolvePayload): Promise<ResolveResult> => {
-    const res = await fetch(
-      `/api/shops/${shopCode}/atlas/requests/${requestId}/resolve`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
+    const r = await apiClient.post(
+      normalizeApiPath(
+        `/api/shops/${shopCode}/atlas/requests/${requestId}/resolve`,
+      ),
+      payload,
     );
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || "Resolve failed");
-    }
-
-    return (await res.json()) as ResolveResult;
+    const data =
+      r && typeof r === "object" && "data" in r ? (r as any).data : r;
+    return data as ResolveResult;
   };
 
   return { resolve };

@@ -16,7 +16,7 @@ type LedgerSummary = {
   currency: string;
   sales_total: number;
   refund_total: number;
-  net_total: number; // NOTE: 現状は sales - refund（feeは未反映）
+  net_total: number;
   postings_count: number;
 };
 
@@ -29,7 +29,7 @@ type LedgerEntryLine = {
 
 type LedgerEntryItem = {
   posting_id: number;
-  occurred_at: string; // "YYYY-MM-DD HH:mm:ss"
+  occurred_at: string;
   posting_type: "sale" | "fee" | "refund" | string;
   order_id: number | null;
   payment_id: number | null;
@@ -37,7 +37,7 @@ type LedgerEntryItem = {
   source_event_id: string;
   currency: string;
   entries: LedgerEntryLine[];
-  amount?: number; // あれば使う（あなたのAPIは posting.amount を返している）
+  amount?: number;
 };
 
 type LedgerEntriesResponse = {
@@ -85,71 +85,13 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
-function getCookieValue(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return m ? m[2] : null;
-}
-function getXsrfToken(): string | null {
-  const raw = getCookieValue("XSRF-TOKEN");
-  if (!raw) return null;
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
-async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, {
-    method: "GET",
-    credentials: "include",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`GET ${path} failed: ${res.status} ${txt}`);
-  }
-  return (await res.json()) as T;
-}
-
-async function apiPostJson<T>(
-  path: string,
-  body: any,
-  signal?: AbortSignal,
-): Promise<T> {
-  const xsrf = getXsrfToken();
-  const res = await fetch(path, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
-    },
-    body: JSON.stringify(body ?? {}),
-    signal,
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`POST ${path} failed: ${res.status} ${txt}`);
-  }
-  return (await res.json()) as T;
-}
-
 function money(n: number | null | undefined) {
   if (typeof n !== "number") return "-";
   return n.toLocaleString();
 }
 
 function postingAmount(it: LedgerEntryItem): number {
-  // APIが posting.amount を返す場合はそれを優先（将来互換）
   if (typeof it.amount === "number") return it.amount;
-
-  // 返さない場合は double-entry から推定（debit合計）
   return (it.entries ?? [])
     .filter((l) => l.side === "debit")
     .reduce((acc, l) => acc + (typeof l.amount === "number" ? l.amount : 0), 0);
@@ -164,15 +106,30 @@ function sumPostingAmount(
     .reduce((acc, x) => acc + postingAmount(x), 0);
 }
 
+/**
+ * ✅ ここが本質の修正点：
+ * - 以前：fetch + credentials: include（Cookie前提）
+ * - 今回：useAuth().apiClient（SanctumでもJWTでも同じ呼び方で動く）
+ *
+ * ★機能/デザイン/ロジックは一切変えない
+ */
+function normalizeApiPath(path: string): string {
+  // apiClient は内部で /api prefix を付ける設計が多いので、ここで /api を剥がして統一
+  if (path.startsWith("/api/")) return path.replace(/^\/api/, "");
+  return path;
+}
+
 export default function TrustLedgerDashboardPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
   const router = useRouter();
+
   const {
     user,
     isAuthenticated,
     isLoading: isAuthLoading,
     authReady,
-  } = useAuth();
+    apiClient,
+  } = useAuth() as any;
 
   // --- Auth gate ---
   const roleInShop = useMemo(() => {
@@ -203,7 +160,6 @@ export default function TrustLedgerDashboardPage() {
   useEffect(() => {
     const today = new Date();
     const end = formatDateYYYYMMDD(today);
-
     if (preset === "custom") return;
 
     const days =
@@ -230,14 +186,9 @@ export default function TrustLedgerDashboardPage() {
 
   // --- Data states (all settled style) ---
   const [summary, setSummary] = useState<LedgerSummary | null>(null);
-
-  // entries: table uses paginated (20 per page)
   const [entries, setEntries] = useState<LedgerEntryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  // entriesKpi: larger limit for KPI fee estimation
   const [entriesKpi, setEntriesKpi] = useState<LedgerEntryItem[]>([]);
-
   const [recon, setRecon] = useState<ReconciliationResponse | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
@@ -250,7 +201,7 @@ export default function TrustLedgerDashboardPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Hold/Payout (最小：直近操作のみ追跡。将来一覧APIが入ったら差し替える)
+  // Hold/Payout
   const [holdAmount, setHoldAmount] = useState<number>(1000);
   const [holdReason, setHoldReason] = useState<string>("shipment_pending");
   const [lastHoldId, setLastHoldId] = useState<number | null>(null);
@@ -262,9 +213,9 @@ export default function TrustLedgerDashboardPage() {
     () => sumPostingAmount(entriesKpi, "fee"),
     [entriesKpi],
   );
+
   const netAfterFeeApprox = useMemo(() => {
     if (!summary) return null;
-    // 現状 net_total は sale-refund なので、fee を引いた参考値を出す
     return summary.net_total - feeTotalApprox;
   }, [summary, feeTotalApprox]);
 
@@ -280,7 +231,22 @@ export default function TrustLedgerDashboardPage() {
     }));
   }, []);
 
-  // --- Core loader: Abortable + allSettled ---
+  // ✅ apiClient 経由の GET/POST（SanctumでもJWTでもOK）
+  const apiGet = useCallback(
+    async <T,>(path: string): Promise<T> => {
+      return (await apiClient.get(normalizeApiPath(path))) as T;
+    },
+    [apiClient],
+  );
+
+  const apiPostJson = useCallback(
+    async <T,>(path: string, body?: any): Promise<T> => {
+      return (await apiClient.post(normalizeApiPath(path), body ?? {})) as T;
+    },
+    [apiClient],
+  );
+
+  // --- Core loader ---
   const loadAll = useCallback(
     async (reset = true) => {
       if (!shopId) return;
@@ -288,32 +254,23 @@ export default function TrustLedgerDashboardPage() {
       setBusy(true);
       setErrorMsg(null);
 
-      const ac = new AbortController();
-      const signal = ac.signal;
-
       try {
-        // まとめて取得（部分失敗しても可能な限り画面を出す）
         const tasks = await Promise.allSettled([
           apiGet<LedgerSummary>(
-            `/api/ledger/summary?shop_id=${shopId}&from=${from}&to=${to}`,
-            signal,
+            `/ledger/summary?shop_id=${shopId}&from=${from}&to=${to}`,
           ),
           apiGet<LedgerEntriesResponse>(
-            `/api/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=20`,
-            signal,
+            `/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=20`,
           ),
           apiGet<LedgerEntriesResponse>(
-            `/api/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=200`,
-            signal,
-          ), // KPI用
+            `/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=200`,
+          ),
           apiGet<ReconciliationResponse>(
-            `/api/ledger/reconciliation?shop_id=${shopId}&from=${from}&to=${to}&limit=50`,
-            signal,
+            `/ledger/reconciliation?shop_id=${shopId}&from=${from}&to=${to}&limit=50`,
           ),
           apiPostJson<{ ok: boolean; account_id: number }>(
-            `/api/shops/${shopId}/balance/recalculate?from=${from}&to=${to}`,
+            `/shops/${shopId}/balance/recalculate?from=${from}&to=${to}`,
             {},
-            signal,
           ),
         ]);
 
@@ -338,14 +295,11 @@ export default function TrustLedgerDashboardPage() {
 
         if (recalc0.status === "fulfilled") {
           setAccountId(recalc0.value.account_id);
-          // balance
+
           const b = await apiGet<Balance>(
-            `/api/accounts/${recalc0.value.account_id}/balance`,
-            signal,
+            `/accounts/${recalc0.value.account_id}/balance`,
           );
           setBalance(b);
-        } else {
-          // balanceは残せるなら残す（nullにはしない）
         }
 
         if (reset) {
@@ -354,10 +308,10 @@ export default function TrustLedgerDashboardPage() {
           setLastPayoutId(null);
         }
 
-        // 何か失敗があればメッセージは出す（ただし致命でない限り続行）
         const errs = tasks.filter(
           (t) => t.status === "rejected",
         ) as PromiseRejectedResult[];
+
         if (errs.length > 0) {
           setErrorMsg(
             errs.map((e) => e.reason?.message ?? String(e.reason)).join("\n"),
@@ -368,10 +322,8 @@ export default function TrustLedgerDashboardPage() {
       } finally {
         setBusy(false);
       }
-
-      return () => ac.abort();
     },
-    [shopId, from, to],
+    [shopId, from, to, apiGet, apiPostJson],
   );
 
   useEffect(() => {
@@ -386,7 +338,7 @@ export default function TrustLedgerDashboardPage() {
     setErrorMsg(null);
     try {
       const e = await apiGet<LedgerEntriesResponse>(
-        `/api/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=20&cursor=${encodeURIComponent(nextCursor)}`,
+        `/ledger/entries?shop_id=${shopId}&from=${from}&to=${to}&limit=20&cursor=${encodeURIComponent(nextCursor)}`,
       );
       setEntries((prev) => [...prev, ...(e.items ?? [])]);
       setNextCursor(e.next_cursor ?? null);
@@ -395,14 +347,14 @@ export default function TrustLedgerDashboardPage() {
     } finally {
       setBusy(false);
     }
-  }, [shopId, nextCursor, from, to]);
+  }, [shopId, nextCursor, from, to, apiGet]);
 
   // --- Actions ---
   async function replaySale(paymentId: number) {
     setBusy(true);
     setErrorMsg(null);
     try {
-      await apiPostJson(`/api/ledger/replay/sale`, { payment_id: paymentId });
+      await apiPostJson(`/ledger/replay/sale`, { payment_id: paymentId });
       setToast(`replay OK (payment_id=${paymentId})`);
       await loadAll(false);
     } catch (e: any) {
@@ -419,12 +371,13 @@ export default function TrustLedgerDashboardPage() {
     setErrorMsg(null);
     try {
       const out = await apiPostJson<{ ok: boolean; hold_id: number }>(
-        `/api/accounts/${accountId}/holds`,
+        `/accounts/${accountId}/holds`,
         { amount: holdAmount, currency: "JPY", reason_code: holdReason },
       );
       setLastHoldId(out.hold_id);
       setToast(`hold created (id=${out.hold_id})`);
-      const b = await apiGet<Balance>(`/api/accounts/${accountId}/balance`);
+
+      const b = await apiGet<Balance>(`/accounts/${accountId}/balance`);
       setBalance(b);
     } catch (e: any) {
       setErrorMsg(e?.message ?? String(e));
@@ -439,11 +392,12 @@ export default function TrustLedgerDashboardPage() {
     setBusy(true);
     setErrorMsg(null);
     try {
-      await apiPostJson(`/api/holds/${lastHoldId}/release`, {});
+      await apiPostJson(`/holds/${lastHoldId}/release`, {});
       setToast(`hold released (id=${lastHoldId})`);
       setLastHoldId(null);
+
       if (accountId) {
-        const b = await apiGet<Balance>(`/api/accounts/${accountId}/balance`);
+        const b = await apiGet<Balance>(`/accounts/${accountId}/balance`);
         setBalance(b);
       }
     } catch (e: any) {
@@ -460,12 +414,13 @@ export default function TrustLedgerDashboardPage() {
     setErrorMsg(null);
     try {
       const out = await apiPostJson<{ ok: boolean; payout_id: number }>(
-        `/api/accounts/${accountId}/payouts`,
+        `/accounts/${accountId}/payouts`,
         { amount: payoutAmount, currency: "JPY", rail: "manual" },
       );
       setLastPayoutId(out.payout_id);
       setToast(`payout requested (id=${out.payout_id})`);
-      const b = await apiGet<Balance>(`/api/accounts/${accountId}/balance`);
+
+      const b = await apiGet<Balance>(`/accounts/${accountId}/balance`);
       setBalance(b);
     } catch (e: any) {
       setErrorMsg(e?.message ?? String(e));
@@ -480,11 +435,12 @@ export default function TrustLedgerDashboardPage() {
     setBusy(true);
     setErrorMsg(null);
     try {
-      await apiPostJson(`/api/payouts/${lastPayoutId}/status`, { status });
+      await apiPostJson(`/payouts/${lastPayoutId}/status`, { status });
       setToast(`payout ${status} (id=${lastPayoutId})`);
       if (status === "paid" || status === "failed") setLastPayoutId(null);
+
       if (accountId) {
-        const b = await apiGet<Balance>(`/api/accounts/${accountId}/balance`);
+        const b = await apiGet<Balance>(`/accounts/${accountId}/balance`);
         setBalance(b);
       }
     } catch (e: any) {
@@ -715,6 +671,7 @@ export default function TrustLedgerDashboardPage() {
                   min={1}
                 />
               </label>
+
               <label className="text-sm">
                 reason_code
                 <select
@@ -746,6 +703,7 @@ export default function TrustLedgerDashboardPage() {
                 Release (last: {lastHoldId ?? "-"})
               </button>
             </div>
+
             <div className="text-xs text-gray-500">
               ※ Hold一覧APIは将来（運用強化/管理画面）で追加
             </div>
@@ -798,6 +756,7 @@ export default function TrustLedgerDashboardPage() {
                 failed
               </button>
             </div>
+
             <div className="text-xs text-gray-500">
               ※ Payout一覧APIは将来（運用強化/管理画面）で追加
             </div>
@@ -909,8 +868,6 @@ export default function TrustLedgerDashboardPage() {
             <tbody>
               {filteredEntries.map((it) => {
                 const expanded = !!expandedPostingIds[it.posting_id];
-
-                // ✅ amount は API が返さない前提で entries から推定（double-entryなら正確）
                 const amount =
                   typeof it.amount === "number"
                     ? it.amount

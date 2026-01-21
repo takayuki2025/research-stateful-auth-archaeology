@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 type AnalysisRequest = {
   id: number;
@@ -20,37 +21,50 @@ export default function AnalysisRequestReviewPage({
 }) {
   const requestId = params.request_id;
 
+  const { apiClient } = useAuth() as any;
+
   const [request, setRequest] = useState<AnalysisRequest | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/atlas/requests/${requestId}`);
-        if (!res.ok) throw new Error("Failed to load request");
-        const data = await res.json();
-        setRequest(data.request);
-        setResult(data.result);
-      } catch (e: any) {
-        setError(e.message);
-      }
+  // axios-like ({data}) / fetch-like (plain) 両対応
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+
+      // "/api" は apiClient 側で付く前提なので外す
+      const r = await apiClient.get(`/atlas/requests/${requestId}`);
+      const data = unwrap<{ request: AnalysisRequest; result: AnalysisResult }>(
+        r,
+      );
+
+      setRequest(data.request);
+      setResult(data.result);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load request");
     }
+  }, [apiClient, requestId]);
+
+  useEffect(() => {
     load();
-  }, [requestId]);
+  }, [load]);
 
   async function replay() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/atlas/requests/${requestId}/replay`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Replay failed");
-      // 再取得
-      location.reload();
+      setError(null);
+      // "/api" を外す + apiClient に統一（JWT/IdaaSでも動く）
+      await apiClient.post(`/atlas/requests/${requestId}/replay`, {});
+      // 再取得（元の「再取得」挙動を維持）
+      await load();
     } catch (e: any) {
-      setError(e.message);
+      setError(e?.message ?? "Replay failed");
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 /* =========================
    Types
@@ -24,28 +25,27 @@ type ApiResponse = {
   histories: DecisionHistoryItem[];
 };
 
-/* =========================
-   Fetcher
-========================= */
-
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.message ?? "Fetch failed");
-  }
-  return res.json();
-};
-
-/* =========================
-   Page
-========================= */
+function normalizeApiPath(path: string): string {
+  // apiClient 側が /api prefix を付ける想定なので剥がして統一
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
 export default function AtlasDecisionHistoryPage() {
   const router = useRouter();
   const { shop_code } = useParams<{ shop_code: string }>();
+  const { apiClient } = useAuth() as any;
+
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
 
   const apiUrl = `/api/shops/${shop_code}/atlas/history`;
+
+  const fetcher = async (url: string): Promise<ApiResponse> => {
+    const r = await apiClient.get(normalizeApiPath(url));
+    return unwrap<ApiResponse>(r);
+  };
 
   const { data, error, isLoading } = useSWR<ApiResponse>(apiUrl, fetcher);
 
@@ -54,7 +54,11 @@ export default function AtlasDecisionHistoryPage() {
   }
 
   if (error) {
-    return <div className="p-6 text-red-600">取得失敗：{error.message}</div>;
+    return (
+      <div className="p-6 text-red-600">
+        取得失敗：{(error as Error).message}
+      </div>
+    );
   }
 
   if (!data || data.histories.length === 0) {
@@ -110,7 +114,7 @@ export default function AtlasDecisionHistoryPage() {
               <td className="p-2 border">
                 {h.decided_by
                   ? `${h.decided_by.name} (${h.decided_by.role})`
-                  : "system"}　
+                  : "system"}
               </td>
 
               <td className="p-2 border text-gray-600">{h.note ?? "—"}</td>
@@ -124,7 +128,7 @@ export default function AtlasDecisionHistoryPage() {
                   className="text-blue-600 hover:underline"
                   onClick={() =>
                     router.push(
-                      `/shops/${shop_code}/dashboard/atlas/history/${h.request_id}`
+                      `/shops/${shop_code}/dashboard/atlas/history/${h.request_id}`,
                     )
                   }
                 >

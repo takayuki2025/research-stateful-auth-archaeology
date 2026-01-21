@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 type Props = {
   shopCode: string;
@@ -13,43 +14,29 @@ type Props = {
   onDecided: () => Promise<void> | void;
 };
 
-function getCookie(name: string) {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-async function postDecide(shopCode: string, requestId: number, body: any) {
-  const xsrf = getCookie("XSRF-TOKEN");
-
-  const res = await fetch(
-    `/api/shops/${shopCode}/atlas/requests/${requestId}/decide`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
-      },
-      body: JSON.stringify(body),
-    }
-  );
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message ?? "Decide failed");
-  }
-
-  return res.json().catch(() => ({}));
-}
-
 export function DecisionPanelReview({
   shopCode,
   requestId,
   analysis,
   onDecided,
 }: Props) {
+  const { apiClient } = useAuth() as any;
+
+  // axios-like ({data}) / fetch-like (plain) 両対応
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  async function postDecide(body: any) {
+    // "/api" は apiClient 側で付く前提なので外す
+    const r = await apiClient.post(
+      `/shops/${shopCode}/atlas/requests/${requestId}/decide`,
+      body,
+    );
+    return unwrap<any>(r);
+  }
+
   const confidence = analysis?.confidence;
 
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -65,10 +52,10 @@ export function DecisionPanelReview({
     setErr(null);
     setSaving(true);
     try {
-      await postDecide(shopCode, requestId, { decision: "approve" });
+      await postDecide({ decision: "approve" });
       await onDecided();
     } catch (e: any) {
-      setErr(e.message ?? "Approve failed");
+      setErr(e?.message ?? "Approve failed");
     } finally {
       setSaving(false);
     }
@@ -84,13 +71,13 @@ export function DecisionPanelReview({
     setErr(null);
     setSaving(true);
     try {
-      await postDecide(shopCode, requestId, {
+      await postDecide({
         decision: "reject",
         reason: reason.trim(),
       });
       await onDecided();
     } catch (e: any) {
-      setErr(e.message ?? "Reject failed");
+      setErr(e?.message ?? "Reject failed");
     } finally {
       setSaving(false);
     }

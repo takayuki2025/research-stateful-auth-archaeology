@@ -18,34 +18,22 @@ type ShopsMeResponse =
   | ShopOutput
   | ShopOutput[];
 
-function getCookieValue(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return m ? m[2] : null;
-}
-function getXsrfToken(): string | null {
-  const raw = getCookieValue("XSRF-TOKEN");
-  if (!raw) return null;
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
+// function getCookieValue(name: string): string | null {
+//   if (typeof document === "undefined") return null;
+//   const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+//   return m ? m[2] : null;
+// }
+// function getXsrfToken(): string | null {
+//   const raw = getCookieValue("XSRF-TOKEN");
+//   if (!raw) return null;
+//   try {
+//     return decodeURIComponent(raw);
+//   } catch {
+//     return raw;
+//   }
+// }
 
-async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, {
-    method: "GET",
-    credentials: "include",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`GET ${path} failed: ${res.status} ${txt}`);
-  }
-  return (await res.json()) as T;
-}
+
 
 export default function ShopDashboardPage() {
   const params = useParams();
@@ -57,6 +45,7 @@ export default function ShopDashboardPage() {
     isAuthenticated,
     isLoading: isAuthLoading,
     authReady,
+    apiClient,
   } = useAuth() as any;
 
   // 追加：表示用
@@ -75,10 +64,7 @@ const [loginAt] = useState<string | null>(() => {
     if (!isAuthenticated) return;
     if (!shop_code) return;
 
-    const ac = new AbortController();
-    const signal = ac.signal;
-
-    apiGet<ShopsMeResponse>("/api/shops/me", signal)
+    (apiClient.get("/shops/me") as Promise<ShopsMeResponse>)
       .then((res) => {
         let shops: ShopOutput[] = [];
 
@@ -96,9 +82,7 @@ const [loginAt] = useState<string | null>(() => {
         setShopName(hit?.name ?? null);
       })
       .catch(() => setShopName(null));
-
-    return () => ac.abort();
-  }, [authReady, isAuthLoading, isAuthenticated, shop_code]);
+  }, [authReady, isAuthLoading, isAuthenticated, shop_code, apiClient]);
 
   if (!authReady || isAuthLoading) {
     return <div className="p-6">読み込み中...</div>;

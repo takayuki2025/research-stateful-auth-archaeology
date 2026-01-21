@@ -2,9 +2,11 @@
 
 import { useParams } from "next/navigation";
 import useSWR from "swr";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((r) => r.json());
+function normalizeApiPath(path: string): string {
+  return path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+}
 
 export default function AtlasComparePage() {
   const { shop_code, request_id } = useParams<{
@@ -12,9 +14,21 @@ export default function AtlasComparePage() {
     request_id: string;
   }>();
 
+  const { apiClient } = useAuth() as any;
+
+  const unwrap = <T,>(r: any): T => {
+    if (r && typeof r === "object" && "data" in r) return r.data as T;
+    return r as T;
+  };
+
+  const fetcher = async (url: string) => {
+    const r = await apiClient.get(normalizeApiPath(url));
+    return unwrap<any>(r);
+  };
+
   const { data, isLoading } = useSWR(
     `/api/shops/${shop_code}/atlas/requests/${request_id}/decision`,
-    fetcher
+    fetcher,
   );
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
