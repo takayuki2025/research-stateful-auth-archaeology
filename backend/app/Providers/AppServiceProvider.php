@@ -15,11 +15,6 @@ use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
 use App\Modules\Search\Domain\Repository\ItemSearchRepository;
 use App\Modules\Search\Infrastructure\Persistence\Repository\EloquentItemSearchRepository;
-use App\Modules\Auth\Domain\Port\TokenVerifierPort;
-// 切り替え
-use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
-use App\Modules\Auth\Infrastructure\Security\MultiProviderJwtVerifier;
-
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
 use App\Modules\User\Application\Service\UserProvisioningService;
 // ✅ User モジュール内の Repository Interface を追加
@@ -81,15 +76,45 @@ use App\Modules\Item\Application\Query\AtlasReviewQuery;
 use App\Modules\Item\Infrastructure\Persistence\Query\DbAtlasReviewQuery;
 use App\Modules\Item\Domain\Repository\ReviewDecisionRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentReviewDecisionRepository;
+// 切り替え
+use App\Modules\Auth\Domain\Port\TokenVerifierPort;
+// JWT
+use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
+use App\Modules\Auth\Infrastructure\Security\MultiProviderJwtVerifier;
+// AWS
+use App\Modules\Auth\Infrastructure\Security\CompositeTokenVerifier;
+use App\Modules\Auth\Infrastructure\Security\CognitoJwksTokenVerifier;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
+        $this->app->bind(TokenVerifierPort::class, function () {
+        $providers = array_filter(array_map('trim', explode(',', env('JWT_PROVIDERS', 'custom'))));
 
+        $verifiers = [];
+
+        if (in_array('cognito', $providers, true)) {
+            $issuer = (string) env('COGNITO_ISSUER', '');
+            $aud    = (string) env('COGNITO_AUDIENCE', '');
+            if ($issuer === '' || $aud === '') {
+                throw new \RuntimeException('COGNITO_ISSUER / COGNITO_AUDIENCE required when JWT_PROVIDERS includes cognito');
+            }
+            $cacheSec = (int) env('COGNITO_JWKS_CACHE_SECONDS', 3600);
+
+            $verifiers['cognito'] = new CognitoJwksTokenVerifier(
+                issuer: $issuer,
+                audience: $aud,
+                jwksCacheSeconds: $cacheSec,
+            );
+        }
+
+        // 既存 custom/fb/auth0 をここに足すのは後でOK（PoCは cognito 単独で十分）
+        return new CompositeTokenVerifier($verifiers, $providers);
+    });
         // 切り替え
         // $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
-        $this->app->bind(TokenVerifierPort::class, MultiProviderJwtVerifier::class);
+        // $this->app->bind(TokenVerifierPort::class, MultiProviderJwtVerifier::class);
 
         $this->app->bind(UserProvisioningPort::class, UserProvisioningService::class);
 

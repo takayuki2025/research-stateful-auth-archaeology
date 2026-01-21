@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { AuthContext } from "@/ui/auth/contracts";
 import type { AuthUser } from "@/domain/auth/AuthUser";
 import { AuthCtx } from "@/ui/auth/core/AuthContextCore";
-
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
 
 type ApiClient = {
@@ -44,20 +43,22 @@ function createBearerApiClient(): ApiClient {
       try {
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) {
-          const j = await res.json();
-          msg = j?.message ?? msg;
+          const j = await res.json().catch(() => ({}));
+          msg = (j as any)?.message ?? msg;
         } else {
-          const t = await res.text();
-          if (t) msg = t;
+          const t = await res.text().catch(() => "");
+          if (t) msg = t.slice(0, 300);
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
       const e: any = new Error(msg);
       e.status = res.status;
       throw e;
     }
 
     if (res.status === 204) return undefined as unknown as T;
-    return res.json();
+    return (await res.json()) as T;
   };
 
   return {
@@ -105,6 +106,27 @@ const PKCE_VERIFIER_KEY = "oidc_pkce_verifier_v1";
 const OIDC_STATE_KEY = "oidc_state_v1";
 const OIDC_RETURN_TO_KEY = "oidc_return_to_v1";
 
+function clearOidcSessionState() {
+  try {
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(OIDC_STATE_KEY);
+    sessionStorage.removeItem(OIDC_RETURN_TO_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function clearAuthLocalState() {
+  TokenStorage.clear();
+}
+
+function safeReturnTo(raw: string | null | undefined): string {
+  // open redirect を防ぐ（相対パスだけ許可）
+  if (!raw) return "/";
+  if (raw.startsWith("/")) return raw;
+  return "/";
+}
+
 export default function IdaasProvider({
   children,
 }: {
@@ -136,46 +158,77 @@ export default function IdaasProvider({
     try {
       const u = await apiClient.get<AuthUser>("/me");
       setUser(u);
+      return u;
     } catch {
       setUser(null);
+      return null;
     }
   };
 
+  // ================
+  // Init / Callback
+  // ================
   useEffect(() => {
     (async () => {
       try {
         const code = searchParams.get("code");
         const state = searchParams.get("state");
         const error = searchParams.get("error");
+        const errorDescription = searchParams.get("error_description");
 
+        // OIDC error callback
         if (error) {
-          TokenStorage.clear();
+          clearAuthLocalState();
+          clearOidcSessionState();
           setUser(null);
+          // ここはUIで表示するならクエリで渡す設計もできるが、まずはログインへ戻す
+          router.replace(
+            `/login?oidc_error=${encodeURIComponent(error)}${errorDescription ? `&oidc_error_description=${encodeURIComponent(errorDescription)}` : ""}`,
+          );
           return;
         }
 
-        // callback: code -> tokens
+        // Callback: code -> token exchange
         if (code && !exchangeInFlight.current) {
           exchangeInFlight.current = true;
 
-          const expectedState = sessionStorage.getItem(OIDC_STATE_KEY);
-          sessionStorage.removeItem(OIDC_STATE_KEY);
+          const expectedState = (() => {
+            try {
+              const v = sessionStorage.getItem(OIDC_STATE_KEY);
+              sessionStorage.removeItem(OIDC_STATE_KEY);
+              return v;
+            } catch {
+              return null;
+            }
+          })();
 
           if (!expectedState || state !== expectedState) {
-            TokenStorage.clear();
-            router.replace("/login");
+            clearAuthLocalState();
+            clearOidcSessionState();
+            setUser(null);
+            router.replace("/login?oidc_error=state_mismatch");
             return;
           }
 
-          const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
-          sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+          const verifier = (() => {
+            try {
+              const v = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+              sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+              return v;
+            } catch {
+              return null;
+            }
+          })();
 
           if (!verifier) {
-            TokenStorage.clear();
-            router.replace("/login");
+            clearAuthLocalState();
+            clearOidcSessionState();
+            setUser(null);
+            router.replace("/login?oidc_error=missing_verifier");
             return;
           }
 
+          // token exchange
           const body = new URLSearchParams();
           body.set("grant_type", "authorization_code");
           body.set("client_id", clientId);
@@ -193,36 +246,73 @@ export default function IdaasProvider({
           });
 
           if (!res.ok) {
-            TokenStorage.clear();
-            router.replace("/login");
+            // token exchange failure details
+            const text = await res.text().catch(() => "");
+            clearAuthLocalState();
+            clearOidcSessionState();
+            setUser(null);
+            router.replace(
+              `/login?oidc_error=token_exchange_failed&status=${res.status}${text ? `&detail=${encodeURIComponent(text.slice(0, 200))}` : ""}`,
+            );
             return;
           }
 
-          const json = await res.json();
-          const idToken = json.id_token as string | undefined;
-          const accessToken = json.access_token as string | undefined;
-          const refreshToken = (json.refresh_token as string | undefined) ?? "";
+          const json = (await res.json().catch(() => ({}))) as any;
 
+          const idToken =
+            typeof json?.id_token === "string" ? json.id_token : undefined;
+          const accessToken =
+            typeof json?.access_token === "string"
+              ? json.access_token
+              : undefined;
+          const refreshToken =
+            typeof json?.refresh_token === "string" ? json.refresh_token : "";
+
+          // OCC backend は token_use=id を優先採用（あなたの方針）
           const bearer = idToken ?? accessToken;
           if (!bearer) {
-            TokenStorage.clear();
-            router.replace("/login");
+            clearAuthLocalState();
+            clearOidcSessionState();
+            setUser(null);
+            router.replace("/login?oidc_error=missing_tokens");
             return;
           }
 
           TokenStorage.save({
-            accessToken: bearer, // token_use=id を優先
+            accessToken: bearer,
             refreshToken,
           });
 
-          const returnTo = sessionStorage.getItem(OIDC_RETURN_TO_KEY) ?? "/";
-          sessionStorage.removeItem(OIDC_RETURN_TO_KEY);
+          // ここで /me を確定させる
+          const me = await reloadMe();
 
-          router.replace(returnTo);
+          // return_to
+          const returnTo = (() => {
+            try {
+              const v = sessionStorage.getItem(OIDC_RETURN_TO_KEY);
+              sessionStorage.removeItem(OIDC_RETURN_TO_KEY);
+              return v;
+            } catch {
+              return null;
+            }
+          })();
+
+          // shop dashboardへ（既存導線）
+          if (me) {
+            const roles = Array.isArray((me as any)?.shop_roles)
+              ? (me as any).shop_roles
+              : [];
+            if (roles.length > 0 && roles[0]?.shop_code) {
+              router.replace(`/shops/${roles[0].shop_code}/dashboard`);
+              return;
+            }
+          }
+
+          router.replace(safeReturnTo(returnTo));
           return;
         }
 
-        // normal init
+        // Normal init (already has token)
         const { accessToken } = TokenStorage.load();
         if (accessToken) {
           await reloadMe();
@@ -235,7 +325,9 @@ export default function IdaasProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // AuthContext signature 互換：args を受けて無視し、PKCEリダイレクト
+  // ================
+  // login: PKCE redirect
+  // ================
   const login = async (_args: { email: string; password: string }) => {
     if (!domain || !clientId) {
       throw new Error(
@@ -246,28 +338,43 @@ export default function IdaasProvider({
     const verifier = randomString(64);
     const challenge = await sha256Base64Url(verifier);
 
-    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+    try {
+      sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
 
-    const state = randomString(32);
-    sessionStorage.setItem(OIDC_STATE_KEY, state);
+      const state = randomString(32);
+      sessionStorage.setItem(OIDC_STATE_KEY, state);
 
-    // login page からの復帰先（必要なら拡張）
-    sessionStorage.setItem(OIDC_RETURN_TO_KEY, "/");
+      // return_to: /login 自身なら / にする。そうでなければ現在パスを保存
+      const currentPath =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "/";
+      const returnTo = currentPath.startsWith("/login") ? "/" : currentPath;
+      sessionStorage.setItem(OIDC_RETURN_TO_KEY, returnTo);
 
-    const params = new URLSearchParams();
-    params.set("response_type", "code");
-    params.set("client_id", clientId);
-    params.set("redirect_uri", redirectUri);
-    params.set("scope", scopes);
-    params.set("code_challenge", challenge);
-    params.set("code_challenge_method", "S256");
-    params.set("state", state);
+      const params = new URLSearchParams();
+      params.set("response_type", "code");
+      params.set("client_id", clientId);
+      params.set("redirect_uri", redirectUri);
+      params.set("scope", scopes);
+      params.set("code_challenge", challenge);
+      params.set("code_challenge_method", "S256");
+      params.set("state", state);
 
-    window.location.assign(`${endpoints.authorize}?${params.toString()}`);
+      window.location.assign(`${endpoints.authorize}?${params.toString()}`);
+    } catch {
+      clearAuthLocalState();
+      clearOidcSessionState();
+      throw new Error("oidc_login_start_failed");
+    }
   };
 
+  // ================
+  // logout
+  // ================
   const logout = async () => {
-    TokenStorage.clear();
+    clearAuthLocalState();
+    clearOidcSessionState();
     setUser(null);
 
     if (!domain || !clientId) {
