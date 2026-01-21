@@ -16,7 +16,10 @@ use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepositor
 use App\Modules\Search\Domain\Repository\ItemSearchRepository;
 use App\Modules\Search\Infrastructure\Persistence\Repository\EloquentItemSearchRepository;
 use App\Modules\Auth\Domain\Port\TokenVerifierPort;
+// 切り替え
 use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
+use App\Modules\Auth\Infrastructure\Security\MultiProviderJwtVerifier;
+
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
 use App\Modules\User\Application\Service\UserProvisioningService;
 // ✅ User モジュール内の Repository Interface を追加
@@ -84,8 +87,9 @@ class AppServiceProvider extends ServiceProvider
     public function register()
     {
 
-
-        $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
+        // 切り替え
+        // $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
+        $this->app->bind(TokenVerifierPort::class, MultiProviderJwtVerifier::class);
 
         $this->app->bind(UserProvisioningPort::class, UserProvisioningService::class);
 

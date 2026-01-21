@@ -49,6 +49,10 @@ Route::get('/__debug/authz', function (Request $request) {
         'has_authz' => $request->headers->has('Authorization'),
     ]);
 });
+
+use App\Modules\Auth\Presentation\Http\Controllers\FirebaseAuthController;
+
+Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegister']);
 /*
 |--------------------------------------------------------------------------
 | ③ User / MyPage

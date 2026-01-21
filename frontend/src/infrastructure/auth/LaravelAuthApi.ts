@@ -33,24 +33,44 @@ export class LaravelAuthApi {
   }
 
   /**
-   * Firebase ID Token → Laravel JWT
+   * Firebase ID Token → Laravel JWT (or pass-through)
    */
   async loginWithFirebaseToken(
     firebaseToken: string,
     deviceId: string,
   ): Promise<LoginWithFirebaseResult> {
+    // =========================================================
+    // ✅ DEBUG (remove this block after verification)
+    // - トークン本体は出さず「長さ」だけ出す（漏洩防止）
+    // =========================================================
+    console.log(
+      "[DEBUG][loginWithFirebaseToken] id_token length =",
+      firebaseToken?.length ?? 0,
+    );
+
     const res = await this.client.post("/login_or_register", {
-      firebase_token: firebaseToken,
+      // ✅ Laravel 側 validate に合わせる（必須）
+      id_token: firebaseToken,
       device_id: deviceId,
     });
 
+    // =========================================================
+    // ✅ Response key normalization (supports both styles)
+    // - Laravel 側が access_token/token のどちらを返しても吸収
+    // =========================================================
+    const accessToken =
+      res.data?.access_token ?? res.data?.token ?? firebaseToken;
+
+    const refreshToken =
+      res.data?.refresh_token ?? res.data?.refreshToken ?? "";
+
     return {
       tokens: {
-        accessToken: res.data.token,
-        refreshToken: res.data.refreshToken,
+        accessToken,
+        refreshToken,
       },
-      user: res.data.user as AuthUser,
-      isFirstLogin: res.data.isFirstLogin,
+      user: (res.data?.user ?? res.data) as AuthUser,
+      isFirstLogin: !!(res.data?.isFirstLogin ?? res.data?.is_first_login),
     };
   }
 

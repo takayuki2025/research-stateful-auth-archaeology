@@ -2,7 +2,6 @@ import { FirebaseAuthClient } from "@/infrastructure/auth/FirebaseAuthClient";
 import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
 import { getDeviceId } from "@/utils/deviceId";
-import type { User } from "firebase/auth";
 import type { AuthUser } from "@/types/auth";
 import { sendEmailVerification, updateProfile } from "firebase/auth";
 
@@ -42,6 +41,7 @@ export class AuthService {
 
     // ② ★ 必ず最新トークンを取得
     const firebaseToken = await this.firebase.getFreshIdToken(firebaseUser);
+
 
     // ③ Laravel に交換
     const deviceId = getDeviceId();
