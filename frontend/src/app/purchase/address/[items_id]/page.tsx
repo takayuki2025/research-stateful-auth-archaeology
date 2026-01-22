@@ -4,9 +4,9 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
-import styles from "./W-Mypage.module.css";
+import styles from "./W-Purchase-Address.module.css";
 
 /**
  * /storage/ が二重になるのを防ぐための正規化関数
