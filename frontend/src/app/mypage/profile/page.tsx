@@ -107,8 +107,8 @@ export default function ProfilePage() {
     setSuccessMessage("");
 
     try {
-      const res = await apiClient.get("/mypage/profile");
-      initializeProfile(res?.user ?? null);
+      const res: any = await apiClient.get("/mypage/profile");
+      initializeProfile(res?.user ?? res?.data?.user ?? null);
       setHasFetchedProfile(true);
     } catch (err: any) {
       if (err?.message === "Unauthenticated") {
@@ -135,8 +135,8 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      const res = await apiClient.post("/mypage/profile/image", formData);
-      initializeProfile(res.user);
+      const res: any = await apiClient.post("/mypage/profile/image", formData);
+      initializeProfile(res?.user ?? res?.data?.user ?? null);
       setSuccessMessage("画像を更新しました！");
     } catch (err: any) {
       setImageError(
@@ -162,11 +162,11 @@ export default function ProfilePage() {
     setSuccessMessage("");
 
     try {
-      const res = profileUser
+      const res: any = profileUser
         ? await apiClient.patch("/mypage/profile", form)
         : await apiClient.post("/mypage/profile", form);
 
-      initializeProfile(res.user);
+      initializeProfile(res?.user ?? res?.data?.user ?? null);
       await refresh();
 
       setSuccessMessage(
