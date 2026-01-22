@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AuthContext } from "@/ui/auth/contracts";
 import type { AuthUser } from "@/domain/auth/AuthUser";
@@ -116,14 +116,9 @@ function clearOidcSessionState() {
   }
 }
 
-function clearAuthLocalState() {
-  TokenStorage.clear();
-}
-
 function safeReturnTo(raw: string | null | undefined): string {
-  // open redirect を防ぐ（相対パスだけ許可）
   if (!raw) return "/";
-  if (raw.startsWith("/")) return raw;
+  if (raw.startsWith("/")) return raw; // relative only
   return "/";
 }
 
@@ -154,7 +149,8 @@ export default function IdaasProvider({
   const endpoints = useMemo(() => buildCognitoEndpoints(domain), [domain]);
   const exchangeInFlight = useRef(false);
 
-  const reloadMe = async () => {
+  // ✅ 内部用：AuthUser | null を返す
+  const fetchMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const u = await apiClient.get<AuthUser>("/me");
       setUser(u);
@@ -163,11 +159,13 @@ export default function IdaasProvider({
       setUser(null);
       return null;
     }
-  };
+  }, [apiClient]);
 
-  // ================
-  // Init / Callback
-  // ================
+  // ✅ AuthContext用：Promise<void> に固定
+  const refresh = useCallback(async (): Promise<void> => {
+    await fetchMe();
+  }, [fetchMe]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -176,19 +174,20 @@ export default function IdaasProvider({
         const error = searchParams.get("error");
         const errorDescription = searchParams.get("error_description");
 
-        // OIDC error callback
         if (error) {
-          clearAuthLocalState();
+          TokenStorage.clear();
           clearOidcSessionState();
           setUser(null);
-          // ここはUIで表示するならクエリで渡す設計もできるが、まずはログインへ戻す
           router.replace(
-            `/login?oidc_error=${encodeURIComponent(error)}${errorDescription ? `&oidc_error_description=${encodeURIComponent(errorDescription)}` : ""}`,
+            `/login?oidc_error=${encodeURIComponent(error)}${
+              errorDescription
+                ? `&oidc_error_description=${encodeURIComponent(errorDescription)}`
+                : ""
+            }`,
           );
           return;
         }
 
-        // Callback: code -> token exchange
         if (code && !exchangeInFlight.current) {
           exchangeInFlight.current = true;
 
@@ -203,7 +202,7 @@ export default function IdaasProvider({
           })();
 
           if (!expectedState || state !== expectedState) {
-            clearAuthLocalState();
+            TokenStorage.clear();
             clearOidcSessionState();
             setUser(null);
             router.replace("/login?oidc_error=state_mismatch");
@@ -221,14 +220,13 @@ export default function IdaasProvider({
           })();
 
           if (!verifier) {
-            clearAuthLocalState();
+            TokenStorage.clear();
             clearOidcSessionState();
             setUser(null);
             router.replace("/login?oidc_error=missing_verifier");
             return;
           }
 
-          // token exchange
           const body = new URLSearchParams();
           body.set("grant_type", "authorization_code");
           body.set("client_id", clientId);
@@ -246,13 +244,14 @@ export default function IdaasProvider({
           });
 
           if (!res.ok) {
-            // token exchange failure details
             const text = await res.text().catch(() => "");
-            clearAuthLocalState();
+            TokenStorage.clear();
             clearOidcSessionState();
             setUser(null);
             router.replace(
-              `/login?oidc_error=token_exchange_failed&status=${res.status}${text ? `&detail=${encodeURIComponent(text.slice(0, 200))}` : ""}`,
+              `/login?oidc_error=token_exchange_failed&status=${res.status}${
+                text ? `&detail=${encodeURIComponent(text.slice(0, 200))}` : ""
+              }`,
             );
             return;
           }
@@ -268,25 +267,19 @@ export default function IdaasProvider({
           const refreshToken =
             typeof json?.refresh_token === "string" ? json.refresh_token : "";
 
-          // OCC backend は token_use=id を優先採用（あなたの方針）
           const bearer = idToken ?? accessToken;
           if (!bearer) {
-            clearAuthLocalState();
+            TokenStorage.clear();
             clearOidcSessionState();
             setUser(null);
             router.replace("/login?oidc_error=missing_tokens");
             return;
           }
 
-          TokenStorage.save({
-            accessToken: bearer,
-            refreshToken,
-          });
+          TokenStorage.save({ accessToken: bearer, refreshToken });
 
-          // ここで /me を確定させる
-          const me = await reloadMe();
+          const me = await fetchMe();
 
-          // return_to
           const returnTo = (() => {
             try {
               const v = sessionStorage.getItem(OIDC_RETURN_TO_KEY);
@@ -297,7 +290,6 @@ export default function IdaasProvider({
             }
           })();
 
-          // shop dashboardへ（既存導線）
           if (me) {
             const roles = Array.isArray((me as any)?.shop_roles)
               ? (me as any).shop_roles
@@ -312,10 +304,10 @@ export default function IdaasProvider({
           return;
         }
 
-        // Normal init (already has token)
+        // normal init
         const { accessToken } = TokenStorage.load();
         if (accessToken) {
-          await reloadMe();
+          await fetchMe();
         }
       } finally {
         setIsLoading(false);
@@ -323,11 +315,8 @@ export default function IdaasProvider({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, router, clientId, redirectUri, endpoints.token, fetchMe]);
 
-  // ================
-  // login: PKCE redirect
-  // ================
   const login = async (_args: { email: string; password: string }) => {
     if (!domain || !clientId) {
       throw new Error(
@@ -341,10 +330,9 @@ export default function IdaasProvider({
     try {
       sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
 
-      const state = randomString(32);
-      sessionStorage.setItem(OIDC_STATE_KEY, state);
+      const s = randomString(32);
+      sessionStorage.setItem(OIDC_STATE_KEY, s);
 
-      // return_to: /login 自身なら / にする。そうでなければ現在パスを保存
       const currentPath =
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
@@ -359,21 +347,18 @@ export default function IdaasProvider({
       params.set("scope", scopes);
       params.set("code_challenge", challenge);
       params.set("code_challenge_method", "S256");
-      params.set("state", state);
+      params.set("state", s);
 
       window.location.assign(`${endpoints.authorize}?${params.toString()}`);
     } catch {
-      clearAuthLocalState();
+      TokenStorage.clear();
       clearOidcSessionState();
       throw new Error("oidc_login_start_failed");
     }
   };
 
-  // ================
-  // logout
-  // ================
   const logout = async () => {
-    clearAuthLocalState();
+    TokenStorage.clear();
     clearOidcSessionState();
     setUser(null);
 
@@ -396,12 +381,11 @@ export default function IdaasProvider({
       isAuthenticated: !!user,
       user,
       apiClient,
-
       login,
       logout,
-      refresh: reloadMe,
+      refresh, // ✅ Promise<void> で契約一致
     }),
-    [isLoading, authReady, user, apiClient],
+    [isLoading, authReady, user, apiClient, refresh],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
