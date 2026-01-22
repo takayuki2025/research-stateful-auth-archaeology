@@ -8,16 +8,13 @@ type ReviewSubmit = {
   selected_value: string | null;
   action: "accept" | "reject" | "escalate";
   note?: string;
-  analysis?: unknown; // 元の AnalyzeResponse を添付しても良い
+  analysis?: unknown;
 };
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ReviewSubmit;
-
-    // 本番固定：ここでは副作用を持たない（必要なら backend に転送する設計へ）
-    // ※ 開発中にログが必要なら、環境変数でガードして一時的に出すのが安全
-
+    void body;
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
