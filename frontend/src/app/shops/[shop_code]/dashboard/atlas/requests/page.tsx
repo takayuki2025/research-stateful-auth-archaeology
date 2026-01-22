@@ -777,8 +777,9 @@ function DiffView({ rows }: { rows: AtlasRequestRow[] }) {
               <Card title="After (Diff)">
                 {r.diff ? (
                   (["brand", "condition", "color"] as const).map((k) => {
-                    const d = r.diff?.[k];
+                    const d = r.diff?.[k] ?? { before: null, after: null };
                     const changed = d.before !== d.after;
+
                     return (
                       <div key={k} className="rounded-md border bg-white p-2">
                         <div className="flex items-center justify-between">
@@ -787,6 +788,7 @@ function DiffView({ rows }: { rows: AtlasRequestRow[] }) {
                             {changed ? "changed" : "same"}
                           </Chip>
                         </div>
+
                         <div className="mt-1 text-xs">
                           <span
                             className={clsx(
