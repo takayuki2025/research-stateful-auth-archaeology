@@ -249,7 +249,13 @@ export default function ItemDetailPage() {
     router.push(`/purchase/${resolvedItem.id}`);
   };
 
-const displayBrand = resolvedItem.display?.brand;
+type DisplayBrand = {
+  name: string | null;
+  source?: "ai_provisional" | "human_confirmed";
+  is_latest?: boolean; // 後方互換
+};
+
+const displayBrand = (resolvedItem.display?.brand ??null) as DisplayBrand | null;
 
 const badge =
   displayBrand?.is_latest && displayBrand?.source === "human_confirmed" ? (
