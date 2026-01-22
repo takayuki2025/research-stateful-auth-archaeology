@@ -2,7 +2,22 @@
 
 import { useState } from "react";
 
-export function ReviewDecisionActions({ itemId, analysis }) {
+/**
+ * ✅ 最小の型固定（noImplicitAny 対策）
+ * - analysis の必要部分だけを型に落とす（他は unknown で逃がす）
+ * - 既存機能/デザインは一切変更しない
+ */
+type Props = {
+  itemId: number | string;
+  analysis: {
+    normalization: {
+      brand_entity_id: number | null;
+    };
+    tags: unknown; // 配列/オブジェクトなど何でも来うるので最小で unknown
+  };
+};
+
+export function ReviewDecisionActions({ itemId, analysis }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleApply = async () => {
