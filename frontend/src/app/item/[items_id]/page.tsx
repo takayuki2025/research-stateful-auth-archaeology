@@ -94,7 +94,7 @@ export default function ItemDetailPage() {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   const isAuthenticated = auth.isAuthenticated;
-  const _user = auth.user;
+  // const user = auth.user;
   const { refetchFavorites } = useFavoriteItemsSWR();
 
   /* =========================================================
