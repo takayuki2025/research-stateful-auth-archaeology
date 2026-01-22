@@ -60,7 +60,7 @@ export default function Mypage() {
     if (!apiClient) return;
 
     try {
-      const res = await apiClient.get("/mypage/profile");
+      const res: any = await apiClient.get("/mypage/profile");
       const u = res?.user ?? res?.data?.user ?? null;
       setUser(u);
     } catch (e: any) {
@@ -82,7 +82,7 @@ export default function Mypage() {
     setIsLoading(true);
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
-      const res = await apiClient.get(endpoint);
+      const res: any = await apiClient.get(endpoint);
       const list = res?.items ?? res?.data?.items ?? [];
       setItems(list);
     } finally {
