@@ -8,7 +8,11 @@ export interface ShopRole {
 
 export interface AuthUser {
   id: number;
+
+  // ✅ 互換のため optional にする（Sanctum/JWT/IdaaSで揺れても壊れない）
   name: string;
+  display_name?: string | null;
+
   email: string;
 
   email_verified_at: string | null;
