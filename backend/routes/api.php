@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\Auth;
 |--------------------------------------------------------------------------
 */
 
-
+// AWS healthチェック
+Route::get('/health', function () {
+    return response()->json(['ok' => true], 200);
+});
 
 
 

@@ -16,6 +16,13 @@ use App\Models\User;
 // health check
 Route::get('/health', fn () => ['status' => 'ok']);
 
+
+
+// AWS
+// Route::get('/', function () {
+//     return response('ok', 200);
+// });
+
 /*
 |--------------------------------------------------------------------------
 | Email Verification (Web only)
