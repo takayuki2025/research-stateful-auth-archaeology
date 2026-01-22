@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
-import { useResolveEntities } from "@/ui/atlas/hooks/useResolveEntities";
+// import { useResolveEntities } from "@/ui/atlas/hooks/useResolveEntities";
 import type {
   AtlasTokens,
   ConfidenceMap,
