@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 import type { AuthContext } from "@/ui/auth/contracts";
 
 export const AuthCtx = createContext<AuthContext | null>(null);
