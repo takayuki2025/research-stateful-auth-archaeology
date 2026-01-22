@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { AxiosResponse } from "axios";
-import { useAuth } from "@/ui/auth/useAuth";
+import { useAuth } from "@/ui/auth/AuthProvider";
 
 const shipmentStatusLabel: Record<string, string> = {
   created: "発送準備中",
@@ -28,7 +27,7 @@ type OrderHistoryItem = {
 };
 
 export default function OrderHistoryPage() {
-  const { apiClient } = useAuth();
+  const { apiClient } = useAuth() as any;
   const [orders, setOrders] = useState<OrderHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,8 +36,8 @@ export default function OrderHistoryPage() {
 
     apiClient
       .get("/me/orders")
-      .then((res: AxiosResponse<OrderHistoryItem[]>) => {
-        setOrders(res.data);
+      .then((data: any) => {
+        setOrders(data as OrderHistoryItem[]);
       })
       .finally(() => setLoading(false));
   }, [apiClient]);
