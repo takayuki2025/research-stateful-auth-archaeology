@@ -6,10 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/AuthProvider";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
-import type {
-  ItemDetailResponse,
-  ItemDisplayAttribute,
-} from "@/services/useItemDetailSWR";
+// import type {
+//   ItemDetailResponse,
+//   ItemDisplayAttribute,
+// } from "@/services/useItemDetailSWR";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
 import styles from "./W-ItemDetailView.module.css";
@@ -17,18 +17,18 @@ import styles from "./W-ItemDetailView.module.css";
 /* =========================
    util
 ========================= */
-function toTokenList(input: unknown): string[] {
-  if (!input) return [];
-  if (Array.isArray(input)) {
-    return input.map((v) => String(v ?? "").trim()).filter(Boolean);
-  }
-  const s = String(input).trim();
-  if (!s) return [];
-  return s
-    .split(/[|/,\u3001\u30fb]+/)
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
+// function toTokenList(input: unknown): string[] {
+//   if (!input) return [];
+//   if (Array.isArray(input)) {
+//     return input.map((v) => String(v ?? "").trim()).filter(Boolean);
+//   }
+//   const s = String(input).trim();
+//   if (!s) return [];
+//   return s
+//     .split(/[|/,\u3001\u30fb]+/)
+//     .map((v) => v.trim())
+//     .filter(Boolean);
+// }
 
 function shortenLabel(s: string, max = 14): string {
   const t = s.trim();
