@@ -304,7 +304,8 @@ const badge =
           <div className={styles.imageArea}>
             <img
               src={getImageUrl(resolvedItem.item_image)}
-              onError={(e) => onImageError(e, resolvedItem.name)}
+              onError={onImageError}
+              // onError={(e) => onImageError(e, resolvedItem.name)}
               alt="商品写真"
               className={styles.image}
             />
@@ -461,7 +462,7 @@ const badge =
                           <img
                             src={getImageUrl(
                               comment.user.user_image,
-                              IMAGE_TYPE.USER
+                              IMAGE_TYPE.USER,
                             )}
                             className={styles.commentUserImage}
                             onError={onImageError}
