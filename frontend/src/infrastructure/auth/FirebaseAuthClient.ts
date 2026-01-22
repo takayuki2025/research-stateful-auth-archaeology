@@ -2,7 +2,6 @@
 
 import type { Auth } from "firebase/auth";
 import {
-  getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
