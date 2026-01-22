@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -8,24 +8,21 @@ type ReviewSubmit = {
   selected_value: string | null;
   action: "accept" | "reject" | "escalate";
   note?: string;
-  analysis?: any; // 元の AnalyzeResponse を添付しても良い
+  analysis?: unknown; // 元の AnalyzeResponse を添付しても良い
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ReviewSubmit;
 
-    // 最小実装：サーバーログへ
-    console.log("[REVIEW_SUBMIT]", {
-      ts: new Date().toISOString(),
-      ...body,
-    });
+    // 本番固定：ここでは副作用を持たない（必要なら backend に転送する設計へ）
+    // ※ 開発中にログが必要なら、環境変数でガードして一時的に出すのが安全
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
       { message: e?.message ?? "Review submit failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

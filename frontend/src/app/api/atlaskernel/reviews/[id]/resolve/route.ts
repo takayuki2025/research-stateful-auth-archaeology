@@ -1,15 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: Request, ctx: { params: { id: string } }) {
+type Params = { id: string };
+
+export async function POST(req: NextRequest, ctx: { params: Promise<Params> }) {
+  const { id } = await ctx.params;
+
   const useMock = process.env.ATLAS_USE_MOCK === "1";
   if (useMock) {
     const body = await req.json().catch(() => ({}));
     return NextResponse.json({
       ok: true,
       item: {
-        id: ctx.params.id,
-        decision: body.action === "reject" ? "rejected" : "auto_accept",
-        canonical_value: body.canonical_value ?? null,
+        id,
+        decision:
+          (body as any).action === "reject" ? "rejected" : "auto_accept",
+        canonical_value: (body as any).canonical_value ?? null,
       },
     });
   }
@@ -18,13 +23,13 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   if (!base)
     return NextResponse.json(
       { error: "ATLAS_INTERNAL_URL is not set" },
-      { status: 500 }
+      { status: 500 },
     );
 
   const body = await req.text();
   const upstream = new URL(
-    `/v1/reviews/${encodeURIComponent(ctx.params.id)}/resolve`,
-    base
+    `/v1/reviews/${encodeURIComponent(id)}/resolve`,
+    base,
   );
 
   const res = await fetch(upstream.toString(), {

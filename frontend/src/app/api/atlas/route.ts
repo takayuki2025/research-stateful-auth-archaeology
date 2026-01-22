@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { atlasAnalyze, } from "../../../../lib/atlas";
+import { NextRequest, NextResponse } from "next/server";
+import { atlasAnalyze } from "../../../../lib/atlas";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const data = await atlasAnalyze(body);
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   } catch (e: any) {
     return NextResponse.json(
       { message: e?.message ?? "Analyze failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
