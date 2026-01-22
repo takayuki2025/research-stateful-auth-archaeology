@@ -303,7 +303,7 @@ export default function AtlasReviewPage() {
   );
 
   // 既存 hook は残す（機能維持）。ただし approve で確実にBearerで動くよう resolveBeforeDecide は apiPostJson を使う
-  const { resolve } = useResolveEntities(shop_code, request_id);
+  // const { resolve } = useResolveEntities(shop_code, request_id);
 
   // UI State
   const [note, setNote] = useState("");
