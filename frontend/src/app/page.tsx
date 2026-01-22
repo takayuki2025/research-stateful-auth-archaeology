@@ -25,7 +25,6 @@ export default function Home() {
   const {
     isAuthenticated,
     authReady,
-    isLoading: isAuthLoading,
     apiClient,
   } = useAuth();
 
@@ -98,7 +97,8 @@ export default function Home() {
       } else {
         await apiClient.post(`/favorites/${item.id}`);
       }
-      mutate();
+      await apiClient.delete(`/favorites/${item.id}`);
+      mutate(() => true);
     } catch (e) {
       console.error(e);
     }
