@@ -83,6 +83,7 @@ use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
 use App\Modules\Auth\Infrastructure\Security\MultiProviderJwtVerifier;
 // Firebase
 use App\Modules\Auth\Infrastructure\Security\FirebaseIdTokenVerifier;
+use App\Modules\Auth\Infrastructure\Security\FirebaseJwksTokenVerifier;
 // AWS
 use App\Modules\Auth\Infrastructure\Security\CompositeTokenVerifier;
 use App\Modules\Auth\Infrastructure\Security\CognitoJwksTokenVerifier;
@@ -92,23 +93,15 @@ class AppServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind(TokenVerifierPort::class, function () {
-    $providers = array_values(array_filter(array_map('trim', explode(',', (string) env('JWT_PROVIDERS', 'custom')))));
-
+    $providers = array_filter(array_map('trim', explode(',', env('JWT_PROVIDERS', 'firebase'))));
     $verifiers = [];
 
-    // --- Firebase ---
     if (in_array('firebase', $providers, true)) {
         $projectId = (string) env('FIREBASE_PROJECT_ID', '');
-        $credPath  = (string) env('FIREBASE_CREDENTIALS', '');
-
-        if ($projectId === '' || $credPath === '') {
-            throw new \RuntimeException('FIREBASE_PROJECT_ID / FIREBASE_CREDENTIALS required when JWT_PROVIDERS includes firebase');
+        if ($projectId === '') {
+            throw new \RuntimeException('FIREBASE_PROJECT_ID required when JWT_PROVIDERS includes firebase');
         }
-
-        $verifiers['firebase'] = new FirebaseIdTokenVerifier(
-            projectId: $projectId,
-            credentialsPath: $credPath,
-        );
+        $verifiers['firebase'] = new FirebaseJwksTokenVerifier(projectId: $projectId);
     }
 
     // --- Cognito（今は無効化。必要になったら実装する） ---
@@ -127,6 +120,7 @@ class AppServiceProvider extends ServiceProvider
     // }
 
     return new CompositeTokenVerifier($verifiers, $providers);
+
 });
         // 切り替え
         // $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
