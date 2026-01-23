@@ -5,18 +5,20 @@ export function createFirebaseJwtApiClient(): ApiClient {
   const request = async <T>(
     method: string,
     url: string,
-    body?: unknown
+    body?: unknown,
   ): Promise<T> => {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""; // 例: https://dxxxxx.cloudfront.net
+
     const fullUrl = url.startsWith("http")
       ? url
-      : `/api${url.startsWith("/") ? "" : "/"}${url}`;
-    const { accessToken } = TokenStorage.load();
+      : `${apiBase}/api${url.startsWith("/") ? "" : "/"}${url}`;
 
+    const { accessToken } = TokenStorage.load();
     const isFormData = body instanceof FormData;
 
     const res = await fetch(fullUrl, {
       method,
-      credentials: "include", // 必要なら。JWTだけなら不要だが、混在期は付けても良い
+      credentials: "omit", // ★JWT固定（Cookie排除）
       headers: {
         Accept: "application/json",
         ...(isFormData ? {} : { "Content-Type": "application/json" }),

@@ -17,11 +17,11 @@ const IdaasProvider = dynamic(() => import("./modes/IdaasProvider"), {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const mode =
-    process.env.NEXT_PUBLIC_AUTH_MODE === "firebase_jwt"
-      ? "firebase_jwt"
+    process.env.NEXT_PUBLIC_AUTH_MODE === "sanctum"
+      ? "sanctum"
       : process.env.NEXT_PUBLIC_AUTH_MODE === "idaas"
         ? "idaas"
-        : "sanctum";
+        : "firebase_jwt";
 
   if (mode === "firebase_jwt")
     return <FirebaseJwtProvider>{children}</FirebaseJwtProvider>;

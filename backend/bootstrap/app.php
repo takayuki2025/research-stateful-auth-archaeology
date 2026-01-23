@@ -89,6 +89,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified'          => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'throttle'          => \Illuminate\Routing\Middleware\ThrottleRequests::class,
 
+
             // Occ
             'auth.occ' => \App\Http\Middleware\OccAuthenticate::class,
             'auth.occ.optional' => \App\Http\Middleware\OptionalOccAuth::class,
@@ -120,7 +121,7 @@ return Application::configure(basePath: dirname(__DIR__))
          */
         $middleware->api(
             prepend: [
-                \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+                // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
                 // \App\Http\Middleware\SetAuthPrincipalFromSanctum::class,
             ],
             append: [
