@@ -17,23 +17,27 @@ final class CompositeTokenVerifier implements TokenVerifierPort
     ) {}
 
     public function decode(string $jwt): DecodedToken
-    {
-        $errors = [];
+{
+    $errors = [];
 
-        foreach ($this->order as $provider) {
-            $v = $this->verifiers[$provider] ?? null;
-            if (!$v) continue;
-
-            try {
-                return $v->decode($jwt);
-            } catch (\Throwable $e) {
-                $errors[$provider] = $e->getMessage();
-                continue;
-            }
-        }
-
-        throw new \UnexpectedValueException(
-    'JWT verification failed: ' . json_encode($errors, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR)
-);
+    $order = $this->order;
+    if (empty($order)) {
+        $order = array_keys($this->verifiers);
     }
+
+    foreach ($order as $provider) {
+        $v = $this->verifiers[$provider] ?? null;
+        if (!$v) continue;
+
+        try {
+            return $v->decode($jwt);
+        } catch (\Throwable $e) {
+            $errors[$provider] = $e->getMessage();
+        }
+    }
+
+    throw new \UnexpectedValueException(
+        'JWT verification failed: ' . json_encode($errors, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR)
+    );
+}
 }

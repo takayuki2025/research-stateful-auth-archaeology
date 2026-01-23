@@ -24,6 +24,9 @@ services:
   # 2) PHP-FPM（Laravel）
   # ============================================================
   php:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
     image: research-stateful-auth-archaeology-php:latest
     working_dir: /var/www/backend
     env_file:
