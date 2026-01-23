@@ -14,19 +14,28 @@ final class FirebaseIdTokenVerifier implements TokenVerifierPort
     ) {}
 
     public function decode(string $jwt): DecodedToken
-    {
-        // Firebase Admin SDK で ID Token を検証（署名/iss/aud/exp）
-        $factory = (new Factory)->withServiceAccount($this->credentialsPath);
-        $auth = $factory->createAuth();
+{
+    $factory = (new Factory)->withServiceAccount($this->credentialsPath);
+    $auth = $factory->createAuth();
 
-        $verifiedToken = $auth->verifyIdToken($jwt, $this->projectId);
+    $verifiedToken = $auth->verifyIdToken($jwt);
 
-        // kreait は claims を配列で返せるので object に寄せる
-        $claims = $verifiedToken->claims()->all();
+    $claims = $verifiedToken->claims()->all();
 
-        return new DecodedToken(
-            provider: 'firebase',
-            payload: (object) $claims
-        );
+    $aud = $claims['aud'] ?? null;
+    $iss = $claims['iss'] ?? null;
+
+    if ($aud !== $this->projectId) {
+        throw new \UnexpectedValueException("Firebase aud mismatch: {$aud}");
     }
+    $expectedIss = "https://securetoken.google.com/{$this->projectId}";
+    if ($iss !== $expectedIss) {
+        throw new \UnexpectedValueException("Firebase iss mismatch: {$iss}");
+    }
+
+    return new DecodedToken(
+        provider: 'firebase',
+        payload: (object) $claims
+    );
+}
 }

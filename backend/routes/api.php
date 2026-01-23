@@ -11,10 +11,21 @@ use Illuminate\Support\Facades\Auth;
 | Auth API (SPA + Sanctum)　api.php
 |--------------------------------------------------------------------------
 */
+// 消す
+Route::get('/debug/time', function () {
+    return response()->json([
+        'now' => now()->toIso8601String(),
+        'ts'  => now()->timestamp,
+    ]);
+});
 
 // AWS healthチェック
 Route::get('/health', function () {
-    return response()->json(['ok' => true], 200);
+    return response()->json([
+        'ok'  => true,
+        'now' => now()->toIso8601String(),
+        'ts'  => now()->timestamp,
+    ], 200);
 });
 
 
