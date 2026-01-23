@@ -81,6 +81,8 @@ use App\Modules\Auth\Domain\Port\TokenVerifierPort;
 // JWT
 use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
 use App\Modules\Auth\Infrastructure\Security\MultiProviderJwtVerifier;
+// Firebase
+use App\Modules\Auth\Infrastructure\Security\FirebaseIdTokenVerifier;
 // AWS
 use App\Modules\Auth\Infrastructure\Security\CompositeTokenVerifier;
 use App\Modules\Auth\Infrastructure\Security\CognitoJwksTokenVerifier;
@@ -90,28 +92,42 @@ class AppServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind(TokenVerifierPort::class, function () {
-        $providers = array_filter(array_map('trim', explode(',', env('JWT_PROVIDERS', 'custom'))));
+    $providers = array_values(array_filter(array_map('trim', explode(',', (string) env('JWT_PROVIDERS', 'custom')))));
 
-        $verifiers = [];
+    $verifiers = [];
 
-        if (in_array('cognito', $providers, true)) {
-            $issuer = (string) env('COGNITO_ISSUER', '');
-            $aud    = (string) env('COGNITO_AUDIENCE', '');
-            if ($issuer === '' || $aud === '') {
-                throw new \RuntimeException('COGNITO_ISSUER / COGNITO_AUDIENCE required when JWT_PROVIDERS includes cognito');
-            }
-            $cacheSec = (int) env('COGNITO_JWKS_CACHE_SECONDS', 3600);
+    // --- Firebase ---
+    if (in_array('firebase', $providers, true)) {
+        $projectId = (string) env('FIREBASE_PROJECT_ID', '');
+        $credPath  = (string) env('FIREBASE_CREDENTIALS', '');
 
-            $verifiers['cognito'] = new CognitoJwksTokenVerifier(
-                issuer: $issuer,
-                audience: $aud,
-                jwksCacheSeconds: $cacheSec,
-            );
+        if ($projectId === '' || $credPath === '') {
+            throw new \RuntimeException('FIREBASE_PROJECT_ID / FIREBASE_CREDENTIALS required when JWT_PROVIDERS includes firebase');
         }
 
-        // 既存 custom/fb/auth0 をここに足すのは後でOK（PoCは cognito 単独で十分）
-        return new CompositeTokenVerifier($verifiers, $providers);
-    });
+        $verifiers['firebase'] = new FirebaseIdTokenVerifier(
+            projectId: $projectId,
+            credentialsPath: $credPath,
+        );
+    }
+
+    // --- Cognito（今は無効化。必要になったら実装する） ---
+    // if (in_array('cognito', $providers, true)) {
+    //     $issuer = (string) env('COGNITO_ISSUER', '');
+    //     $aud    = (string) env('COGNITO_AUDIENCE', '');
+    //     if ($issuer === '' || $aud === '') {
+    //         throw new \RuntimeException('COGNITO_ISSUER / COGNITO_AUDIENCE required when JWT_PROVIDERS includes cognito');
+    //     }
+    //     $cacheSec = (int) env('COGNITO_JWKS_CACHE_SECONDS', 3600);
+    //     $verifiers['cognito'] = new CognitoJwksTokenVerifier(
+    //         issuer: $issuer,
+    //         audience: $aud,
+    //         jwksCacheSeconds: $cacheSec,
+    //     );
+    // }
+
+    return new CompositeTokenVerifier($verifiers, $providers);
+});
         // 切り替え
         // $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
         // $this->app->bind(TokenVerifierPort::class, MultiProviderJwtVerifier::class);
