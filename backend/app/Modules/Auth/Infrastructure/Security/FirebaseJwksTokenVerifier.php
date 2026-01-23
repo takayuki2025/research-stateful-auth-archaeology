@@ -11,32 +11,44 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
 {
     private const CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 
+    // 時計ズレ許容（秒）
+    private const LEEWAY_SECONDS = 60;
+
+    // certs 取得タイムアウト（秒）
+    private const FETCH_TIMEOUT_SECONDS = 5;
+
     public function __construct(
-        private string $projectId,
+        private readonly string $projectId,
     ) {}
 
     public function decode(string $jwt): DecodedToken
     {
-        // JWT 形式チェック（2つのドットが必要）
         if (substr_count($jwt, '.') !== 2) {
             throw new \UnexpectedValueException('Firebase token format invalid (must have two dots)');
         }
 
-        [$h64, $p64, $s64] = explode('.', $jwt);
-
+        [$h64] = explode('.', $jwt, 2);
         $header = json_decode($this->b64urlDecode($h64), true);
+
         if (!is_array($header) || empty($header['kid'])) {
             throw new \UnexpectedValueException('Firebase token header missing kid');
         }
         $kid = (string) $header['kid'];
 
-        $certs = $this->fetchCerts();
+        // 1) まず cache から
+        $certs = $this->fetchCerts(forceRefresh: false);
         $certPem = $certs[$kid] ?? null;
+
+        // 2) kid が無ければ 1回だけ強制リフレッシュして再試行
         if (!$certPem) {
-            throw new \UnexpectedValueException('Firebase public key not found for kid');
+            $certs = $this->fetchCerts(forceRefresh: true);
+            $certPem = $certs[$kid] ?? null;
         }
 
-        // x509 cert から公開鍵を作る
+        if (!$certPem) {
+            throw new \UnexpectedValueException("Firebase public key not found for kid: {$kid}");
+        }
+
         $pubKey = openssl_pkey_get_public($certPem);
         if ($pubKey === false) {
             throw new \UnexpectedValueException('Failed to parse Firebase x509 cert');
@@ -46,10 +58,17 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             throw new \UnexpectedValueException('Failed to extract public key');
         }
 
-        // 署名検証（RS256）
-        $payload = JWT::decode($jwt, new Key($details['key'], 'RS256'));
+        // leeway を一時的に設定
+        $prevLeeway = JWT::$leeway ?? 0;
+        JWT::$leeway = self::LEEWAY_SECONDS;
 
-        // iss/aud の検証（Firebase ID token の必須）
+        try {
+            $payload = JWT::decode($jwt, new Key($details['key'], 'RS256'));
+        } finally {
+            JWT::$leeway = $prevLeeway;
+        }
+
+        // iss/aud 検証
         $iss = (string) ($payload->iss ?? '');
         $aud = (string) ($payload->aud ?? '');
         $expectedIss = 'https://securetoken.google.com/' . $this->projectId;
@@ -68,17 +87,15 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
     }
 
     /** @return array<string,string> kid => x509 pem */
-    private function fetchCerts(): array
+    private function fetchCerts(bool $forceRefresh): array
     {
-        // 1時間キャッシュ（Laravel cache が使えるならそれを推奨）
-        $cacheFile = sys_get_temp_dir() . '/firebase_certs.json';
-        if (is_file($cacheFile) && (time() - filemtime($cacheFile) < 3600)) {
+        $cacheFile = sys_get_temp_dir() . '/firebase_certs_' . md5($this->projectId) . '.json';
+        $ttl = 3600;
+
+        if (!$forceRefresh && is_file($cacheFile) && (time() - filemtime($cacheFile) < $ttl)) {
             $json = file_get_contents($cacheFile);
         } else {
-            $json = @file_get_contents(self::CERTS_URL);
-            if ($json === false) {
-                throw new \UnexpectedValueException('Failed to fetch Firebase certs');
-            }
+            $json = $this->httpGet(self::CERTS_URL);
             file_put_contents($cacheFile, $json);
         }
 
@@ -87,6 +104,27 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             throw new \UnexpectedValueException('Invalid certs response');
         }
         return $certs;
+    }
+
+    private function httpGet(string $url): string
+    {
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => self::FETCH_TIMEOUT_SECONDS,
+                'ignore_errors' => true,
+                'header' => "User-Agent: occore-api\r\n",
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $json = @file_get_contents($url, false, $ctx);
+        if ($json === false || $json === '') {
+            throw new \UnexpectedValueException('Failed to fetch Firebase certs (timeout or network)');
+        }
+        return $json;
     }
 
     private function b64urlDecode(string $s): string

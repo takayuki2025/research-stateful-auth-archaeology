@@ -39,7 +39,7 @@ class CreateItemsTable extends Migration
             /* =========================
              * 商品情報（Fact）
              * ========================= */
-            $table->string('name', 20);
+            $table->string('name', 30);
 
             /**
              * 価格（SoT）

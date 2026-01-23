@@ -15,44 +15,51 @@ final class FirebaseAuthController extends Controller
     ) {}
 
     public function loginOrRegister(Request $request)
-    {
-        $data = $request->validate([
-            'id_token' => 'required|string',
-        ]);
+{
+    \Log::info('[login_or_register] start');
 
-        // ✅ JWKS検証（サービスアカウント不要）
-        $decoded = $this->verifier->decode($data['id_token']);
+    $data = $request->validate([
+        'id_token' => 'required|string',
+    ]);
 
-        // providerが firebase であることを要求（混入防止）
-        if ($decoded->provider !== 'firebase') {
-            return response()->json(['message' => 'Invalid token provider'], 401);
-        }
+    \Log::info('[login_or_register] validated', [
+        'token_len' => strlen($data['id_token']),
+    ]);
 
-        $p = $decoded->payload;
+    \Log::info('[login_or_register] decoding...');
+    $decoded = $this->verifier->decode($data['id_token']);
+    \Log::info('[login_or_register] decoded', [
+        'provider' => $decoded->provider ?? null,
+    ]);
 
-        // Firebase securetoken の必要項目
-        $firebaseUid = (string)($p->sub ?? '');
-        $email = $p->email ?? null;
-        $emailVerified = (bool)($p->email_verified ?? false);
-        $displayName = $p->name ?? null;
+    $p = $decoded->payload;
 
-        if ($firebaseUid === '') {
-            return response()->json(['message' => 'Invalid firebase token'], 401);
-        }
+    $firebaseUid = (string)($p->sub ?? '');
+    $email = $p->email ?? null;
+    $emailVerified = (bool)($p->email_verified ?? false);
+    $displayName = $p->name ?? null;
 
-        // ✅ Provisioning（既存の仕組みを活用）
-        $provisioned = $this->provisioning->provisionFromFirebase(
-            firebaseUid: $firebaseUid,
-            email: $email,
-            emailVerified: $emailVerified,
-            displayName: $displayName,
-        );
+    \Log::info('[login_or_register] provisioning...', [
+        'uid' => $firebaseUid,
+        'email' => $email,
+        'verified' => $emailVerified,
+    ]);
 
-        // 最小：フロントはこのid_tokenをそのまま Bearer として使ってよい
-        return response()->json([
-            'token_type' => 'Bearer',
-            'access_token' => $data['id_token'],
-            'user_id' => $provisioned->userId,
-        ]);
-    }
+    $provisioned = $this->provisioning->provisionFromFirebase(
+        firebaseUid: $firebaseUid,
+        email: $email,
+        emailVerified: $emailVerified,
+        displayName: $displayName,
+    );
+
+    \Log::info('[login_or_register] provisioned', [
+        'user_id' => $provisioned->userId ?? null,
+    ]);
+
+    return response()->json([
+        'token_type' => 'Bearer',
+        'access_token' => $data['id_token'],
+        'user_id' => $provisioned->userId,
+    ]);
+}
 }
