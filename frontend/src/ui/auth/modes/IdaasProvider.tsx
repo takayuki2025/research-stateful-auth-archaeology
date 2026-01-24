@@ -36,6 +36,7 @@ function createBearerApiClient(): ApiClient {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "omit", // JWT(Bearer)前提
     });
 
     if (!res.ok) {
@@ -69,7 +70,9 @@ function createBearerApiClient(): ApiClient {
   };
 }
 
-// PKCE helpers
+/* =========================================================
+   PKCE helpers
+========================================================= */
 function randomString(len = 64): string {
   const chars =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
@@ -93,18 +96,9 @@ async function sha256Base64Url(input: string): Promise<string> {
   return base64UrlEncode(digest);
 }
 
-function buildCognitoEndpoints(domain: string) {
-  const d = domain.replace(/\/+$/, "");
-  return {
-    authorize: `${d}/oauth2/authorize`,
-    token: `${d}/oauth2/token`,
-    logout: `${d}/logout`,
-  };
-}
-
-const PKCE_VERIFIER_KEY = "oidc_pkce_verifier_v1";
-const OIDC_STATE_KEY = "oidc_state_v1";
-const OIDC_RETURN_TO_KEY = "oidc_return_to_v1";
+const PKCE_VERIFIER_KEY = "auth0_pkce_verifier_v1";
+const OIDC_STATE_KEY = "auth0_state_v1";
+const OIDC_RETURN_TO_KEY = "auth0_return_to_v1";
 
 function clearOidcSessionState() {
   try {
@@ -118,8 +112,21 @@ function clearOidcSessionState() {
 
 function safeReturnTo(raw: string | null | undefined): string {
   if (!raw) return "/";
-  if (raw.startsWith("/")) return raw; // relative only
+  if (raw.startsWith("/")) return raw;
   return "/";
+}
+
+/* =========================================================
+   Auth0 endpoints
+========================================================= */
+function buildAuth0Endpoints(domain: string) {
+  const d = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const origin = `https://${d}`;
+  return {
+    authorize: `${origin}/authorize`,
+    token: `${origin}/oauth/token`,
+    logout: `${origin}/v2/logout`,
+  };
 }
 
 export default function IdaasProvider({
@@ -136,20 +143,25 @@ export default function IdaasProvider({
 
   const apiClient = useMemo(() => createBearerApiClient(), []);
 
-  const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN ?? "";
-  const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID ?? "";
+  const auth0Domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN ?? "";
+  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID ?? "";
+  const audience = process.env.NEXT_PUBLIC_AUTH0_AUDIENCE ?? "";
+
   const redirectUri =
     process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI ??
-    "http://localhost/oidc/callback";
+    "http://localhost/auth/callback";
   const postLogoutRedirectUri =
     process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI ??
     "http://localhost/login";
-  const scopes = process.env.NEXT_PUBLIC_OIDC_SCOPES ?? "openid email profile";
+  const scopes = process.env.NEXT_PUBLIC_OIDC_SCOPES ?? "openid profile email";
 
-  const endpoints = useMemo(() => buildCognitoEndpoints(domain), [domain]);
+  const endpoints = useMemo(
+    () => buildAuth0Endpoints(auth0Domain),
+    [auth0Domain],
+  );
+
   const exchangeInFlight = useRef(false);
 
-  // ✅ 内部用：AuthUser | null を返す
   const fetchMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const u = await apiClient.get<AuthUser>("/me");
@@ -161,7 +173,6 @@ export default function IdaasProvider({
     }
   }, [apiClient]);
 
-  // ✅ AuthContext用：Promise<void> に固定
   const refresh = useCallback(async (): Promise<void> => {
     await fetchMe();
   }, [fetchMe]);
@@ -188,6 +199,7 @@ export default function IdaasProvider({
           return;
         }
 
+        // callback exchange
         if (code && !exchangeInFlight.current) {
           exchangeInFlight.current = true;
 
@@ -234,6 +246,9 @@ export default function IdaasProvider({
           body.set("redirect_uri", redirectUri);
           body.set("code_verifier", verifier);
 
+          // Auth0でAPI access token を取るには audience が必須
+          if (audience) body.set("audience", audience);
+
           const res = await fetch(endpoints.token, {
             method: "POST",
             headers: {
@@ -258,25 +273,20 @@ export default function IdaasProvider({
 
           const json = (await res.json().catch(() => ({}))) as any;
 
-          const idToken =
-            typeof json?.id_token === "string" ? json.id_token : undefined;
           const accessToken =
-            typeof json?.access_token === "string"
-              ? json.access_token
-              : undefined;
+            typeof json?.access_token === "string" ? json.access_token : "";
           const refreshToken =
             typeof json?.refresh_token === "string" ? json.refresh_token : "";
 
-          const bearer = idToken ?? accessToken;
-          if (!bearer) {
+          if (!accessToken) {
             TokenStorage.clear();
             clearOidcSessionState();
             setUser(null);
-            router.replace("/login?oidc_error=missing_tokens");
+            router.replace("/login?oidc_error=missing_access_token");
             return;
           }
 
-          TokenStorage.save({ accessToken: bearer, refreshToken });
+          TokenStorage.save({ accessToken, refreshToken });
 
           const me = await fetchMe();
 
@@ -315,13 +325,24 @@ export default function IdaasProvider({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router, clientId, redirectUri, endpoints.token, fetchMe]);
+  }, [
+    searchParams,
+    router,
+    clientId,
+    redirectUri,
+    endpoints.token,
+    audience,
+    fetchMe,
+  ]);
 
   const login = async (_args: { email: string; password: string }) => {
-    if (!domain || !clientId) {
+    if (!auth0Domain || !clientId) {
       throw new Error(
-        "OIDC env missing: NEXT_PUBLIC_COGNITO_DOMAIN / NEXT_PUBLIC_COGNITO_CLIENT_ID",
+        "Auth0 env missing: NEXT_PUBLIC_AUTH0_DOMAIN / NEXT_PUBLIC_AUTH0_CLIENT_ID",
       );
+    }
+    if (!audience) {
+      throw new Error("Auth0 env missing: NEXT_PUBLIC_AUTH0_AUDIENCE");
     }
 
     const verifier = randomString(64);
@@ -345,6 +366,7 @@ export default function IdaasProvider({
       params.set("client_id", clientId);
       params.set("redirect_uri", redirectUri);
       params.set("scope", scopes);
+      params.set("audience", audience);
       params.set("code_challenge", challenge);
       params.set("code_challenge_method", "S256");
       params.set("state", s);
@@ -353,7 +375,7 @@ export default function IdaasProvider({
     } catch {
       TokenStorage.clear();
       clearOidcSessionState();
-      throw new Error("oidc_login_start_failed");
+      throw new Error("auth0_login_start_failed");
     }
   };
 
@@ -362,14 +384,15 @@ export default function IdaasProvider({
     clearOidcSessionState();
     setUser(null);
 
-    if (!domain || !clientId) {
+    if (!auth0Domain || !clientId) {
       router.replace("/login");
       return;
     }
 
     const params = new URLSearchParams();
+    // Auth0 logout: returnTo は Allowed Logout URLs に登録が必要
     params.set("client_id", clientId);
-    params.set("logout_uri", postLogoutRedirectUri);
+    params.set("returnTo", postLogoutRedirectUri);
 
     window.location.assign(`${endpoints.logout}?${params.toString()}`);
   };
@@ -383,7 +406,7 @@ export default function IdaasProvider({
       apiClient,
       login,
       logout,
-      refresh, // ✅ Promise<void> で契約一致
+      refresh,
     }),
     [isLoading, authReady, user, apiClient, refresh],
   );

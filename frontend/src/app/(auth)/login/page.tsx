@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const modeLabel = useMemo(() => {
-    if (mode === "idaas") return "IdaaS (Cognito PKCE)";
+    if (mode === "idaas") return "IdaaS (Auth0 PKCE)";
     if (mode === "firebase_jwt") return "Firebase JWT";
     return "Sanctum (Stateful)";
   }, [mode]);
@@ -30,7 +30,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // Idaas は PKCE リダイレクトが本体なので、email/passwordは使わない
+      // Idaas(Auth0) は PKCE リダイレクトが本体なので、email/passwordは使わない
       if (isIdaas) {
         await login({ email: "", password: "" });
         return;
@@ -81,9 +81,6 @@ export default function LoginPage() {
         ログイン
       </h2>
 
-      {/* =========================
-          Dev-only mode info + links
-      ========================= */}
       {isDev && (
         <div className="mb-6 p-3 rounded border bg-gray-50 text-sm">
           <div className="font-semibold">開発用：認証モード</div>
@@ -102,7 +99,7 @@ export default function LoginPage() {
             <ul className="list-disc ml-5 text-xs text-gray-700 space-y-1">
               <li>
                 <span className="font-mono">idaas</span>：この画面の
-                「SSOでログイン」ボタン（PKCEリダイレクト）
+                「SSOでログイン」ボタン（Auth0 PKCEリダイレクト）
               </li>
               <li>
                 <span className="font-mono">sanctum</span> /{" "}
@@ -111,16 +108,15 @@ export default function LoginPage() {
               </li>
             </ul>
 
-            {/* 便利リンク（開発用） */}
             <div className="mt-2 flex flex-wrap gap-2">
               <a className="text-xs underline text-gray-700" href="/login">
                 /login を再表示
               </a>
               <a
                 className="text-xs underline text-gray-700"
-                href="/oidc/callback"
+                href="/auth/callback"
               >
-                /oidc/callback（PKCE受口）
+                /auth/callback（PKCE受口）
               </a>
             </div>
           </div>
@@ -133,9 +129,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* =========================
-          Idaas (Cognito PKCE)
-      ========================= */}
       {isIdaas ? (
         <form onSubmit={handleSubmit} className="space-y-6">
           <button
@@ -143,15 +136,13 @@ export default function LoginPage() {
             disabled={isSubmitting || isLoading}
             className="w-full py-3 bg-black text-white rounded"
           >
-            {isSubmitting ? "リダイレクト中..." : "SSOでログイン（Cognito）"}
+            {isSubmitting ? "リダイレクト中..." : "SSOでログイン（Auth0）"}
           </button>
 
           <p className="text-xs text-gray-600">
-            SSOログインはメール/パスワード入力ではなく、CognitoのHosted
-            UIへリダイレクトします。
+            SSOログインはメール/パスワード入力ではなく、Auth0へリダイレクトします。
           </p>
 
-          {/* 開発用：他モードが必要なときの案内 */}
           {isDev && (
             <p className="text-xs text-gray-500">
               Sanctum / Firebase JWT に戻す場合は{" "}
@@ -161,9 +152,6 @@ export default function LoginPage() {
           )}
         </form>
       ) : (
-        /* =========================
-           email/password login
-        ========================= */
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block mb-1 text-sm">メールアドレス</label>
@@ -199,7 +187,7 @@ export default function LoginPage() {
 
           {isDev && (
             <div className="text-xs text-gray-500">
-              ※ SSO（Cognito PKCE）を使う場合は{" "}
+              ※ SSO（Auth0 PKCE）を使う場合は{" "}
               <span className="font-mono">NEXT_PUBLIC_AUTH_MODE=idaas</span>{" "}
               に変更して再起動してください。
             </div>
