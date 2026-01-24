@@ -53,6 +53,7 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
             ->leftJoin('brand_entities as be', 'be.id', '=', 'ie.brand_entity_id')
 
             ->where('s.shop_code', $shopCode)
+            ->where('i.name', 'not like', 'SEED\_DUMMY\_\_%')
             ->orderByDesc('ar.created_at')
 
             ->select([

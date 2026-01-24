@@ -24,7 +24,7 @@ class LocalUsersSeeder extends Seeder
             [
                 'name' => 'テスト用のユーザ2',
                 'email' => 'taro.y@coachtech.com',
-                'password' => 'testtest2',
+                'password' => 'Testtest2',
                 'post_number' => '222-2222',
                 'address' => '大阪府大阪市阿倍野区阿倍野筋1-1-43',
                 'building' => 'ハイツB',
@@ -34,7 +34,7 @@ class LocalUsersSeeder extends Seeder
             [
                 'name' => 'テスト用のユーザ3',
                 'email' => 'reina.n@coachtech.com',
-                'password' => 'testtest3',
+                'password' => 'Testtest3',
                 'post_number' => '333-3333',
                 'address' => '福岡県福岡市東区香椎照葉6-2-52',
                 'building' => 'エトワールC',
@@ -44,7 +44,7 @@ class LocalUsersSeeder extends Seeder
             [
                 'name' => 'テスト用のユーザ4',
                 'email' => 'tomomi.a@coachtech.com',
-                'password' => 'testtest4',
+                'password' => 'Testtest4',
                 'post_number' => '444-4444',
                 'address' => '北海道札幌市中央区北五条西2丁目',
                 'building' => 'エスポワールD',

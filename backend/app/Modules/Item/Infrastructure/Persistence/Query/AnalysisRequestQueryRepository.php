@@ -28,6 +28,7 @@ LEFT JOIN (
 ) latest ON latest.analysis_request_id = ar.id
 LEFT JOIN review_decisions rd ON rd.id = latest.max_id
 WHERE s.shop_code = ?
+  AND i.name NOT LIKE 'SEED_DUMMY__%'
 ORDER BY ar.created_at DESC
 SQL,
             [$shopCode]

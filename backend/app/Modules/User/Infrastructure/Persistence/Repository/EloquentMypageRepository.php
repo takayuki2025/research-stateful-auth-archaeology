@@ -25,6 +25,9 @@ final class EloquentMypageRepository implements MypageRepository
         ->toArray();
 
     return Item::query()
+
+        ->where('name', 'not like', 'SEED_DUMMY__%')
+
         ->where(function ($q) use ($userId, $shopIds) {
             // 個人出品
             $q->where(function ($q) use ($userId) {
