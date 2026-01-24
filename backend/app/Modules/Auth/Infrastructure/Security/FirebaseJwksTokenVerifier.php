@@ -10,11 +10,7 @@ use Firebase\JWT\Key;
 final class FirebaseJwksTokenVerifier implements TokenVerifierPort
 {
     private const CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
-
-    // 時計ズレ許容（秒）
     private const LEEWAY_SECONDS = 60;
-
-    // certs 取得タイムアウト（秒）
     private const FETCH_TIMEOUT_SECONDS = 5;
 
     public function __construct(
@@ -28,18 +24,24 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
         }
 
         [$h64] = explode('.', $jwt, 2);
-        $header = json_decode($this->b64urlDecode($h64), true);
+        $headerJson = $this->b64urlDecode($h64);
+        if ($headerJson === '') {
+            throw new \UnexpectedValueException('Firebase token header decode failed');
+        }
 
+        $header = json_decode($headerJson, true);
         if (!is_array($header) || empty($header['kid'])) {
             throw new \UnexpectedValueException('Firebase token header missing kid');
         }
+        if (($header['alg'] ?? '') !== 'RS256') {
+            throw new \UnexpectedValueException('Firebase token alg must be RS256');
+        }
+
         $kid = (string) $header['kid'];
 
-        // 1) まず cache から
         $certs = $this->fetchCerts(forceRefresh: false);
         $certPem = $certs[$kid] ?? null;
 
-        // 2) kid が無ければ 1回だけ強制リフレッシュして再試行
         if (!$certPem) {
             $certs = $this->fetchCerts(forceRefresh: true);
             $certPem = $certs[$kid] ?? null;
@@ -58,7 +60,6 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             throw new \UnexpectedValueException('Failed to extract public key');
         }
 
-        // leeway を一時的に設定
         $prevLeeway = JWT::$leeway ?? 0;
         JWT::$leeway = self::LEEWAY_SECONDS;
 
@@ -68,7 +69,6 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             JWT::$leeway = $prevLeeway;
         }
 
-        // iss/aud 検証
         $iss = (string) ($payload->iss ?? '');
         $aud = (string) ($payload->aud ?? '');
         $expectedIss = 'https://securetoken.google.com/' . $this->projectId;
@@ -80,10 +80,7 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             throw new \UnexpectedValueException("Invalid aud: {$aud}");
         }
 
-        return new DecodedToken(
-            provider: 'firebase',
-            payload: $payload
-        );
+        return new DecodedToken(provider: 'firebase', payload: $payload);
     }
 
     /** @return array<string,string> kid => x509 pem */
@@ -96,7 +93,7 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             $json = file_get_contents($cacheFile);
         } else {
             $json = $this->httpGet(self::CERTS_URL);
-            file_put_contents($cacheFile, $json);
+            file_put_contents($cacheFile, $json, LOCK_EX);
         }
 
         $certs = json_decode($json, true);
@@ -120,11 +117,21 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
             ],
         ]);
 
-        $json = @file_get_contents($url, false, $ctx);
-        if ($json === false || $json === '') {
+        $body = @file_get_contents($url, false, $ctx);
+
+        // HTTP status を拾う
+        $statusLine = $http_response_header[0] ?? '';
+        if (!is_string($statusLine) || $statusLine === '') {
+            throw new \UnexpectedValueException('Failed to fetch Firebase certs (no response)');
+        }
+        if (!str_contains($statusLine, ' 200 ')) {
+            throw new \UnexpectedValueException("Failed to fetch Firebase certs ({$statusLine})");
+        }
+
+        if ($body === false || $body === '') {
             throw new \UnexpectedValueException('Failed to fetch Firebase certs (timeout or network)');
         }
-        return $json;
+        return $body;
     }
 
     private function b64urlDecode(string $s): string
@@ -132,6 +139,7 @@ final class FirebaseJwksTokenVerifier implements TokenVerifierPort
         $s = strtr($s, '-_', '+/');
         $pad = strlen($s) % 4;
         if ($pad) $s .= str_repeat('=', 4 - $pad);
-        return base64_decode($s) ?: '';
+        $decoded = base64_decode($s, true);
+        return $decoded === false ? '' : $decoded;
     }
 }

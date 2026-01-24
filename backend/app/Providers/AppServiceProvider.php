@@ -87,6 +87,8 @@ use App\Modules\Auth\Infrastructure\Security\FirebaseJwksTokenVerifier;
 // AWS
 use App\Modules\Auth\Infrastructure\Security\CompositeTokenVerifier;
 use App\Modules\Auth\Infrastructure\Security\CognitoJwksTokenVerifier;
+// Auth O
+use App\Modules\Auth\Infrastructure\Security\Auth0JwksTokenVerifier;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -98,29 +100,25 @@ class AppServiceProvider extends ServiceProvider
 
     if (in_array('firebase', $providers, true)) {
         $projectId = (string) env('FIREBASE_PROJECT_ID', '');
-        if ($projectId === '') {
-            throw new \RuntimeException('FIREBASE_PROJECT_ID required when JWT_PROVIDERS includes firebase');
-        }
+        if ($projectId === '') throw new \RuntimeException('FIREBASE_PROJECT_ID required');
         $verifiers['firebase'] = new FirebaseJwksTokenVerifier(projectId: $projectId);
     }
 
-    // --- Cognito（今は無効化。必要になったら実装する） ---
-    // if (in_array('cognito', $providers, true)) {
-    //     $issuer = (string) env('COGNITO_ISSUER', '');
-    //     $aud    = (string) env('COGNITO_AUDIENCE', '');
-    //     if ($issuer === '' || $aud === '') {
-    //         throw new \RuntimeException('COGNITO_ISSUER / COGNITO_AUDIENCE required when JWT_PROVIDERS includes cognito');
-    //     }
-    //     $cacheSec = (int) env('COGNITO_JWKS_CACHE_SECONDS', 3600);
-    //     $verifiers['cognito'] = new CognitoJwksTokenVerifier(
-    //         issuer: $issuer,
-    //         audience: $aud,
-    //         jwksCacheSeconds: $cacheSec,
-    //     );
-    // }
+    if (in_array('auth0', $providers, true)) {
+        $domain = (string) env('AUTH0_DOMAIN', '');
+        $aud    = (string) env('AUTH0_AUDIENCE', '');
+        $iss    = (string) env('AUTH0_ISSUER', '');
+        if ($domain === '' || $aud === '' || $iss === '') {
+            throw new \RuntimeException('AUTH0_DOMAIN / AUTH0_AUDIENCE / AUTH0_ISSUER required');
+        }
+        $verifiers['auth0'] = new Auth0JwksTokenVerifier(
+            domain: $domain,
+            audience: $aud,
+            issuer: $iss,
+        );
+    }
 
     return new CompositeTokenVerifier($verifiers, $providers);
-
 });
         // 切り替え
         // $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);

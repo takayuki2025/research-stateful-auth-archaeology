@@ -29,4 +29,12 @@ interface UserProvisioningPort
      * ✅ 互換維持（既存JWT: sub=内部user_id）
      */
     public function provisionFromJwt(int $userId): ProvisionedUser;
+
+    public function provisionFromAuth0(
+    string $auth0Sub,
+    ?string $email,
+    bool $emailVerified,
+    ?string $displayName,
+    array $claims = [],
+): ProvisionedUser;
 }

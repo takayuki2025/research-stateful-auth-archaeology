@@ -269,4 +269,21 @@ final class UserProvisioningService implements UserProvisioningPort
             ]
         );
     }
+
+    public function provisionFromAuth0(
+    string $auth0Sub,
+    ?string $email,
+    bool $emailVerified,
+    ?string $displayName,
+    array $claims = [],
+): ProvisionedUser {
+    return $this->provisionFromExternalIdentity(
+        provider: 'auth0',
+        providerUid: $auth0Sub,
+        email: $email,
+        emailVerified: $emailVerified,
+        displayName: $displayName,
+        claims: $claims,
+    );
+}
 }
