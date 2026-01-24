@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { mutate } from "swr";
@@ -22,12 +22,33 @@ export default function Home() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const {
-    isAuthenticated,
-    authReady,
-    apiClient,
-  } = useAuth();
+  const { isAuthenticated, authReady, apiClient, user } = useAuth();
 
+  useEffect(() => {
+    if (!authReady || !isAuthenticated) return;
+
+    const just = sessionStorage.getItem("occore_just_logged_in_v1");
+    if (just !== "1") return;
+
+    // IdaasProvider が保存した shopCode を優先
+    const shopCode = sessionStorage.getItem("occore_owner_shop_code_v1");
+
+    // 取れない場合は user.shop_roles から読む（user が無い場合もあるのでガード）
+    const r0 = (user as any)?.shop_roles?.[0];
+    const fallback = r0?.role === "owner" ? r0?.shop_code : null;
+
+    const code = shopCode || fallback;
+    if (!code) return;
+
+    // ✅ ここではフラグを消さない（useAuthGuard の干渉を避ける）
+    router.replace(`/shops/${code}/dashboard`);
+
+    // ✅ 遷移が開始してからフラグを消す（1回きり）
+    setTimeout(() => {
+      sessionStorage.removeItem("occore_just_logged_in_v1");
+      sessionStorage.removeItem("occore_owner_shop_code_v1"); // 任意：消してOK
+    }, 1500);
+  }, [authReady, isAuthenticated, user, router]);
   /* =========================
      Tab / Search
   ========================= */
@@ -97,7 +118,7 @@ export default function Home() {
       } else {
         await apiClient.post(`/favorites/${item.id}`);
       }
-      await apiClient.delete(`/favorites/${item.id}`);
+      // await apiClient.delete(`/favorites/${item.id}`);
       mutate(() => true);
     } catch (e) {
       console.error(e);

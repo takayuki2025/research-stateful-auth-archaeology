@@ -14,7 +14,7 @@ class LocalUsersSeeder extends Seeder
             [
                 'name' => 'テスト用のユーザ1',
                 'email' => 'valid.email@example.com',
-                'password' => 'testtest1',
+                'password' => 'Testtest1',
                 'post_number' => '111-1111',
                 'address' => '東京都港区芝公園4-2-8',
                 'building' => 'コーポA',
@@ -54,7 +54,7 @@ class LocalUsersSeeder extends Seeder
             [
                 'name' => '川田隆之',
                 'email' => 't.principle.k2024@gmail.com',
-                'password' => 'takayuki',
+                'password' => 'Takayuki',
                 'post_number' => '326-0000',
                 'address' => '栃木県',
                 'building' => '足利 FacilityCenter',

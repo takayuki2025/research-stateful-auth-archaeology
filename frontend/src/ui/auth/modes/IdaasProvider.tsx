@@ -16,7 +16,7 @@ type ApiClient = {
 
 function createBearerApiClient(): ApiClient {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost";
-  const apiBase = `${base}/api`;
+  const apiBase = `${base.replace(/\/+$/, "")}/api`;
 
   const request = async <T,>(
     method: "GET" | "POST" | "PATCH" | "DELETE",
@@ -36,7 +36,8 @@ function createBearerApiClient(): ApiClient {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: "omit", // JWT(Bearer)前提
+      credentials: "omit",
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -96,24 +97,113 @@ async function sha256Base64Url(input: string): Promise<string> {
   return base64UrlEncode(digest);
 }
 
+/* =========================================================
+   Keys
+========================================================= */
 const PKCE_VERIFIER_KEY = "auth0_pkce_verifier_v1";
 const OIDC_STATE_KEY = "auth0_state_v1";
 const OIDC_RETURN_TO_KEY = "auth0_return_to_v1";
+const EXCHANGE_LOCK_KEY = "auth0_exchange_lock_v1";
 
-function clearOidcSessionState() {
-  try {
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-    sessionStorage.removeItem(OIDC_STATE_KEY);
-    sessionStorage.removeItem(OIDC_RETURN_TO_KEY);
-  } catch {
-    // ignore
-  }
+const NAV_LOCK_KEY = "occore_nav_lock_v1";
+const OWNER_REDIRECT_KEY = "occore_owner_shop_code_v1";
+const JUST_LOGGED_IN_KEY = "occore_just_logged_in_v1";
+
+// ✅ StrictMode 二重実行を完全に潰す “グローバルロック”
+const GLOBAL_LOCK_KEY = "__occore_auth0_exchange_lock_v1";
+
+function acquireGlobalLock(): boolean {
+  const g = globalThis as any;
+  if (g[GLOBAL_LOCK_KEY]) return false;
+  g[GLOBAL_LOCK_KEY] = true;
+  return true;
+}
+function releaseGlobalLock(): void {
+  const g = globalThis as any;
+  g[GLOBAL_LOCK_KEY] = false;
 }
 
 function safeReturnTo(raw: string | null | undefined): string {
   if (!raw) return "/";
   if (raw.startsWith("/")) return raw;
   return "/";
+}
+
+/* =========================================================
+   Storage helpers
+   - PKCE (state/verifier) は localStorage
+   - returnTo / locks / app flags は sessionStorage
+========================================================= */
+function getSessionItem(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function setSessionItem(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+function removeSessionItem(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+function getPkceItem(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function setPkceItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+function removePkceItem(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+function clearOidcSessionState() {
+  // PKCE（localStorage）
+  removePkceItem(PKCE_VERIFIER_KEY);
+  removePkceItem(OIDC_STATE_KEY);
+
+  // sessionStorage 側
+  removeSessionItem(OIDC_RETURN_TO_KEY);
+  removeSessionItem(EXCHANGE_LOCK_KEY);
+}
+
+function navOnce(router: ReturnType<typeof useRouter>, to: string) {
+  try {
+    if (sessionStorage.getItem(NAV_LOCK_KEY) === "1") return;
+    sessionStorage.setItem(NAV_LOCK_KEY, "1");
+  } catch {
+    // ignore
+  }
+  router.replace(to);
+}
+
+function clearNavLockSoon() {
+  setTimeout(() => removeSessionItem(NAV_LOCK_KEY), 0);
+}
+
+function clearJustLoggedInSoon() {
+  setTimeout(() => removeSessionItem(JUST_LOGGED_IN_KEY), 1500);
 }
 
 /* =========================================================
@@ -127,6 +217,19 @@ function buildAuth0Endpoints(domain: string) {
     token: `${origin}/oauth/token`,
     logout: `${origin}/v2/logout`,
   };
+}
+
+function normalizeScopes(scopes: string): string {
+  return scopes.trim().replace(/\.$/, "").replace(/\s+/g, " ");
+}
+
+function pickOwnerShopCode(me: any): string | null {
+  const roles = Array.isArray(me?.shop_roles) ? me.shop_roles : [];
+  if (!roles.length) return null;
+  const r0 = roles[0];
+  if (r0?.role === "owner" && r0?.shop_code) return r0.shop_code;
+  if (r0?.shop_code) return r0.shop_code;
+  return null;
 }
 
 export default function IdaasProvider({
@@ -153,7 +256,10 @@ export default function IdaasProvider({
   const postLogoutRedirectUri =
     process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI ??
     "http://localhost/login";
-  const scopes = process.env.NEXT_PUBLIC_OIDC_SCOPES ?? "openid profile email";
+
+  const scopes = normalizeScopes(
+    process.env.NEXT_PUBLIC_OIDC_SCOPES ?? "openid profile email",
+  );
 
   const endpoints = useMemo(
     () => buildAuth0Endpoints(auth0Domain),
@@ -167,13 +273,14 @@ export default function IdaasProvider({
       const u = await apiClient.get<AuthUser>("/me");
       setUser(u);
       return u;
-    } catch {
+    } catch (e: any) {
+      if (e?.status === 401) TokenStorage.clear();
       setUser(null);
       return null;
     }
   }, [apiClient]);
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useCallback(async () => {
     await fetchMe();
   }, [fetchMe]);
 
@@ -185,10 +292,11 @@ export default function IdaasProvider({
         const error = searchParams.get("error");
         const errorDescription = searchParams.get("error_description");
 
+        // Auth0側エラー
         if (error) {
           TokenStorage.clear();
           clearOidcSessionState();
-          setUser(null);
+          releaseGlobalLock();
           router.replace(
             `/login?oidc_error=${encodeURIComponent(error)}${
               errorDescription
@@ -199,42 +307,43 @@ export default function IdaasProvider({
           return;
         }
 
-        // callback exchange
-        if (code && !exchangeInFlight.current) {
+        // ===== callback =====
+        if (code) {
+          // ✅ まず global lock（StrictMode 二重実行をここで殺す）
+          if (!acquireGlobalLock()) return;
+
+          // ✅ session lock（同一tab内の二重実行も抑止）
+          if (getSessionItem(EXCHANGE_LOCK_KEY) === "1") return;
+          setSessionItem(EXCHANGE_LOCK_KEY, "1");
+
+          if (exchangeInFlight.current) return;
           exchangeInFlight.current = true;
 
-          const expectedState = (() => {
-            try {
-              const v = sessionStorage.getItem(OIDC_STATE_KEY);
-              sessionStorage.removeItem(OIDC_STATE_KEY);
-              return v;
-            } catch {
-              return null;
-            }
-          })();
+          if (!auth0Domain || !clientId || !audience) {
+            TokenStorage.clear();
+            removeSessionItem(EXCHANGE_LOCK_KEY);
+            releaseGlobalLock();
+            router.replace("/login?oidc_error=env_missing");
+            return;
+          }
+
+          // ✅ state/verifier は localStorage から読む
+          const expectedState = getPkceItem(OIDC_STATE_KEY);
 
           if (!expectedState || state !== expectedState) {
             TokenStorage.clear();
-            clearOidcSessionState();
-            setUser(null);
+            // 失敗時は lock 解除（再試行可能）
+            removeSessionItem(EXCHANGE_LOCK_KEY);
+            releaseGlobalLock();
             router.replace("/login?oidc_error=state_mismatch");
             return;
           }
 
-          const verifier = (() => {
-            try {
-              const v = sessionStorage.getItem(PKCE_VERIFIER_KEY);
-              sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-              return v;
-            } catch {
-              return null;
-            }
-          })();
-
+          const verifier = getPkceItem(PKCE_VERIFIER_KEY);
           if (!verifier) {
             TokenStorage.clear();
-            clearOidcSessionState();
-            setUser(null);
+            removeSessionItem(EXCHANGE_LOCK_KEY);
+            releaseGlobalLock();
             router.replace("/login?oidc_error=missing_verifier");
             return;
           }
@@ -245,9 +354,7 @@ export default function IdaasProvider({
           body.set("code", code);
           body.set("redirect_uri", redirectUri);
           body.set("code_verifier", verifier);
-
-          // Auth0でAPI access token を取るには audience が必須
-          if (audience) body.set("audience", audience);
+          body.set("audience", audience);
 
           const res = await fetch(endpoints.token, {
             method: "POST",
@@ -256,13 +363,14 @@ export default function IdaasProvider({
               Accept: "application/json",
             },
             body: body.toString(),
+            cache: "no-store",
           });
 
           if (!res.ok) {
             const text = await res.text().catch(() => "");
             TokenStorage.clear();
-            clearOidcSessionState();
-            setUser(null);
+            removeSessionItem(EXCHANGE_LOCK_KEY);
+            releaseGlobalLock();
             router.replace(
               `/login?oidc_error=token_exchange_failed&status=${res.status}${
                 text ? `&detail=${encodeURIComponent(text.slice(0, 200))}` : ""
@@ -271,8 +379,8 @@ export default function IdaasProvider({
             return;
           }
 
-          const json = (await res.json().catch(() => ({}))) as any;
 
+          const json = (await res.json().catch(() => ({}))) as any;
           const accessToken =
             typeof json?.access_token === "string" ? json.access_token : "";
           const refreshToken =
@@ -280,58 +388,64 @@ export default function IdaasProvider({
 
           if (!accessToken) {
             TokenStorage.clear();
-            clearOidcSessionState();
-            setUser(null);
+            removeSessionItem(EXCHANGE_LOCK_KEY);
+            releaseGlobalLock();
             router.replace("/login?oidc_error=missing_access_token");
             return;
           }
 
           TokenStorage.save({ accessToken, refreshToken });
 
+          // ✅ 成功後に PKCE（localStorage）を消す
+          removePkceItem(OIDC_STATE_KEY);
+          removePkceItem(PKCE_VERIFIER_KEY);
+
+          // ✅ session lock解除
+          removeSessionItem(EXCHANGE_LOCK_KEY);
+          releaseGlobalLock();
+
           const me = await fetchMe();
+          const shopCode = pickOwnerShopCode(me as any);
 
-          const returnTo = (() => {
-            try {
-              const v = sessionStorage.getItem(OIDC_RETURN_TO_KEY);
-              sessionStorage.removeItem(OIDC_RETURN_TO_KEY);
-              return v;
-            } catch {
-              return null;
-            }
-          })();
+          // owner は必ず dashboard
+          if (shopCode) {
+            setSessionItem(JUST_LOGGED_IN_KEY, "1");
+            setSessionItem(OWNER_REDIRECT_KEY, shopCode);
 
-          if (me) {
-            const roles = Array.isArray((me as any)?.shop_roles)
-              ? (me as any).shop_roles
-              : [];
-            if (roles.length > 0 && roles[0]?.shop_code) {
-              router.replace(`/shops/${roles[0].shop_code}/dashboard`);
-              return;
-            }
+            window.location.assign(`/shops/${shopCode}/dashboard`);
+            return;
           }
 
-          router.replace(safeReturnTo(returnTo));
+          // owner以外はトップ
+          navOnce(router, "/");
+          clearNavLockSoon();
+          clearJustLoggedInSoon();
           return;
         }
 
-        // normal init
+        // ===== normal init =====
         const { accessToken } = TokenStorage.load();
         if (accessToken) {
-          await fetchMe();
+          const me = await fetchMe();
+          console.log("[🔥IdaasProvider] after fetchMe", {
+            shopCode: pickOwnerShopCode(me as any),
+            origin: window.location.origin,
+            href: window.location.href,
+          });
         }
       } finally {
         setIsLoading(false);
         setAuthReady(true);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     searchParams,
     router,
+    auth0Domain,
     clientId,
+    audience,
     redirectUri,
     endpoints.token,
-    audience,
     fetchMe,
   ]);
 
@@ -349,17 +463,26 @@ export default function IdaasProvider({
     const challenge = await sha256Base64Url(verifier);
 
     try {
-      sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+      // ログイン開始：古いロック/フラグを掃除
+      removeSessionItem(EXCHANGE_LOCK_KEY);
+      releaseGlobalLock();
+      removeSessionItem(NAV_LOCK_KEY);
+      removeSessionItem(OWNER_REDIRECT_KEY);
+      removeSessionItem(JUST_LOGGED_IN_KEY);
+
+      // ✅ PKCE (localStorage)
+      setPkceItem(PKCE_VERIFIER_KEY, verifier);
 
       const s = randomString(32);
-      sessionStorage.setItem(OIDC_STATE_KEY, s);
+      setPkceItem(OIDC_STATE_KEY, s);
 
+      // returnTo は sessionStorage のまま
       const currentPath =
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : "/";
       const returnTo = currentPath.startsWith("/login") ? "/" : currentPath;
-      sessionStorage.setItem(OIDC_RETURN_TO_KEY, returnTo);
+      setSessionItem(OIDC_RETURN_TO_KEY, returnTo);
 
       const params = new URLSearchParams();
       params.set("response_type", "code");
@@ -375,6 +498,7 @@ export default function IdaasProvider({
     } catch {
       TokenStorage.clear();
       clearOidcSessionState();
+      releaseGlobalLock();
       throw new Error("auth0_login_start_failed");
     }
   };
@@ -382,7 +506,12 @@ export default function IdaasProvider({
   const logout = async () => {
     TokenStorage.clear();
     clearOidcSessionState();
+    releaseGlobalLock();
     setUser(null);
+
+    removeSessionItem(NAV_LOCK_KEY);
+    removeSessionItem(OWNER_REDIRECT_KEY);
+    removeSessionItem(JUST_LOGGED_IN_KEY);
 
     if (!auth0Domain || !clientId) {
       router.replace("/login");
@@ -390,7 +519,6 @@ export default function IdaasProvider({
     }
 
     const params = new URLSearchParams();
-    // Auth0 logout: returnTo は Allowed Logout URLs に登録が必要
     params.set("client_id", clientId);
     params.set("returnTo", postLogoutRedirectUri);
 
