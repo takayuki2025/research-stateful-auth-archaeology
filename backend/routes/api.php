@@ -29,7 +29,6 @@ Route::get('/health', function () {
 });
 
 
-
 use App\Modules\Auth\Presentation\Http\Controllers\MeController;
 use App\Modules\Auth\Presentation\Http\Controllers\ConfirmFirstLoginController;
 use App\Modules\Auth\Presentation\Http\Controllers\RegisterController;
