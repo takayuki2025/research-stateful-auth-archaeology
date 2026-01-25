@@ -136,4 +136,14 @@ return AnalysisResult::reconstruct(
 );
 
     }
+
+    public function markRejectedByRequestId(int $requestId): void
+{
+    DB::table('analysis_results')
+        ->where('analysis_request_id', $requestId)
+        ->update([
+            'status' => 'rejected',
+            'updated_at' => now(),
+        ]);
+}
 }

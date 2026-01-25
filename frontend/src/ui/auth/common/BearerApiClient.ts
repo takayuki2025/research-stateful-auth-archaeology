@@ -42,12 +42,26 @@ export function createBearerApiClient(
 
     const headers: Record<string, string> = { Accept: accept };
     if (token) headers.Authorization = `Bearer ${token}`;
-    if (method !== "GET") headers["Content-Type"] = "application/json";
+
+    const isFormData =
+      typeof FormData !== "undefined" && body instanceof FormData;
+
+    // ✅ FormData 以外のときだけ JSON Header
+    if (method !== "GET" && !isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
 
     const res = await fetch(fullUrl, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        method === "GET"
+          ? undefined
+          : body === undefined
+            ? undefined
+            : isFormData
+              ? (body as FormData)
+              : JSON.stringify(body),
       cache: "no-store",
       credentials: "omit", // ✅ JWT/Bearer統一：Cookie送らない
     });
@@ -77,7 +91,6 @@ export function createBearerApiClient(
     const ct = res.headers.get("content-type") || "";
     if (!ct.includes("application/json")) {
       const t = await res.text().catch(() => "");
-      // ここは「許容する」より「検知して落とす」方が運用が安定する
       const e: any = new Error(`Non-JSON response: ${t.slice(0, 200)}`);
       e.status = 500;
       throw e;

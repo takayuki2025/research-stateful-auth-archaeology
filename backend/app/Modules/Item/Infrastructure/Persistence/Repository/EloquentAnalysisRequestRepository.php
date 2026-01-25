@@ -51,6 +51,8 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
                      ->where('ie.is_latest', true);
             })
             ->leftJoin('brand_entities as be', 'be.id', '=', 'ie.brand_entity_id')
+            ->leftJoin('condition_entities as ce', 'ce.id', '=', 'ie.condition_entity_id')
+            ->leftJoin('color_entities as coe', 'coe.id', '=', 'ie.color_entity_id')
 
             ->where('s.shop_code', $shopCode)
             ->where('i.name', 'not like', 'SEED\_DUMMY\_\_%')
@@ -100,16 +102,30 @@ final class EloquentAnalysisRequestRepository implements AnalysisRequestReposito
                 'u.name as user_name',
 
                 // ===== Diff =====
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.brand.name')) as diff_brand_before"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.brand.name')) as diff_brand_after"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.condition.name')) as diff_condition_before"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.condition.name')) as diff_condition_after"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.color.name')) as diff_color_before"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.color.name')) as diff_color_after"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.brand.value')) as diff_brand_before"),
+DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.brand.value')) as diff_brand_after"),
+DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.condition.value')) as diff_condition_before"),
+DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.condition.value')) as diff_condition_after"),
+DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.before_snapshot, '$.color.value')) as diff_color_before"),
+DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rd.after_snapshot,  '$.color.value')) as diff_color_after"),
 
                 // ===== Final =====
                 'be.canonical_name as final_brand',
                 'ie.source as final_source',
+                'ce.canonical_name as final_condition',
+                'coe.canonical_name as final_color',
+
+                // ===== Final Confidence (from latest decision after_snapshot) =====
+DB::raw("CAST(JSON_EXTRACT(rd.after_snapshot, '$.brand.confidence') AS DECIMAL(10,4)) as final_brand_confidence"),
+DB::raw("CAST(JSON_EXTRACT(rd.after_snapshot, '$.condition.confidence') AS DECIMAL(10,4)) as final_condition_confidence"),
+DB::raw("CAST(JSON_EXTRACT(rd.after_snapshot, '$.color.confidence') AS DECIMAL(10,4)) as final_color_confidence"),
+DB::raw("
+  GREATEST(
+    COALESCE(CAST(JSON_EXTRACT(rd.after_snapshot, '$.brand.confidence') AS DECIMAL(10,4)), 0),
+    COALESCE(CAST(JSON_EXTRACT(rd.after_snapshot, '$.condition.confidence') AS DECIMAL(10,4)), 0),
+    COALESCE(CAST(JSON_EXTRACT(rd.after_snapshot, '$.color.confidence') AS DECIMAL(10,4)), 0)
+  ) as final_max_confidence
+"),
             ])
             ->get()
             ->all();

@@ -75,7 +75,10 @@ type AtlasRequestRow = {
 
   final: {
     brand: string | null;
+    condition?: string | null;
+    color?: string | null;
     source: string | null;
+    max_confidence?: number | null;
   } | null;
 };
 
@@ -708,6 +711,19 @@ function TimelineView({ rows }: { rows: AtlasRequestRow[] }) {
                     {r.final?.brand ? (
                       <>
                         <Line label="Final Brand" value={safe(r.final.brand)} />
+                        <Line
+                          label="Final Condition"
+                          value={safe(r.final.condition)}
+                        />
+                        <Line label="Final Color" value={safe(r.final.color)} />
+                        <Line
+                          label="Final Confidence"
+                          value={
+                            r.final.max_confidence != null
+                              ? `${pct(r.final.max_confidence)}%`
+                              : "-"
+                          }
+                        />
                         <Line
                           label="Final Source"
                           value={safe(r.final.source)}

@@ -9,4 +9,5 @@ interface AnalysisResultRepository
     public function saveByRequestId(int $requestId, array $payload): void;
     public function supersedeByItem(int $itemId): void;
     public function findByRequestId(int $analysisRequestId): ?AnalysisResult;
+    public function markRejectedByRequestId(int $requestId): void;
 }

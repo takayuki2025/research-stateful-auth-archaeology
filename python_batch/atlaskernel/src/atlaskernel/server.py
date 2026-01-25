@@ -1,14 +1,16 @@
 from fastapi import FastAPI
 from sqlalchemy import text
+
 from atlaskernel.db.session import engine
 from atlaskernel.api.routes.reviews import router as review_router
+from atlaskernel.api.routes.analyze import router as analyze_router  # ✅ 追加
 
-app = FastAPI(title="AtlasKernel API")
+app = FastAPI(title="AtlasKernel API", version="0.3.1")
 
 # API routes
-app.include_router(review_router)
+app.include_router(review_router)    # /v1/reviews/...
+app.include_router(analyze_router)   # /v1/analyze ✅
 
-# Health check
 @app.get("/health")
 def health():
     try:

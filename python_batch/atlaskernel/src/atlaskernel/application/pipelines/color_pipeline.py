@@ -5,6 +5,7 @@ from atlaskernel.services.similarity import similarity
 from atlaskernel.adapters.assets_loader import load_assets
 from atlaskernel.domain.candidate import Candidate
 from atlaskernel.domain.result import AnalysisResult
+# from atlaskernel.domain.result import Candidate as ResultCandidate
 from atlaskernel.version import VERSION
 
 
@@ -75,7 +76,7 @@ def _load_alias_map(ref: str) -> Dict[str, str]:
     return m
 
 
-def analyze_color(request, policy_engine):
+def analyze_color(request, policy_engine, ctx=None):
     norm = normalize(request.raw_value)
 
     # ---- 0) load canon defs (SoT) ----
@@ -137,14 +138,17 @@ def analyze_color(request, policy_engine):
             "queue": "entity_review.color",
         }
 
+    rule_id = (trace.get("rule_id") if isinstance(trace, dict) else None) or "policy"
+
     return AnalysisResult(
         entity_type="color",
         raw_value=request.raw_value,
         canonical_value=top.value,   # ★ always canonical (e.g., ブルー)
         confidence=top.score,
         decision=decision,
+        rule_id=rule_id,
         explanation=explanation,
-        candidates=candidates[:5],
+        candidates=[{"value": c.value, "score": float(c.score)} for c in candidates[:5]],
         engine_version=VERSION,
         extensions=extensions,
     )

@@ -171,6 +171,7 @@ export default function ItemSellPage() {
 
       // 3. Publish
       await apiClient.post(`/items/drafts/${draftId}/publish`, {
+        item_origin: itemOrigin,
         shop_id: selectedShopId,
       });
 

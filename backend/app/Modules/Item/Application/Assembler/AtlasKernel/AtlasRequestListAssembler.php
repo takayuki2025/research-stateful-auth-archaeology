@@ -94,10 +94,15 @@ final class AtlasRequestListAssembler
             ] : null,
 
             /* ===== Final ===== */
-            'final' => $r->final_brand ? [
-                'brand'  => $r->final_brand,
-                'source' => $r->final_source,
-            ] : null,
+            'final' => [
+    'brand' => $r->final_brand ?? null,
+    'condition' => $r->final_condition ?? null,
+    'color' => $r->final_color ?? null,
+    'source' => $r->final_source ?? null,
+    'max_confidence' => property_exists($r, 'final_max_confidence') && $r->final_max_confidence !== null
+        ? (float) $r->final_max_confidence
+        : null,
+],
         ];
     }
 }

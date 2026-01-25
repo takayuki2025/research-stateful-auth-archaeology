@@ -15,18 +15,15 @@ use App\Modules\Item\Domain\Repository\AnalysisRequestRepository;
 use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Application\UseCase\AtlasKernel\ApplyProvisionalAnalysisUseCase;
 use App\Models\Item;
+use Illuminate\Support\Facades\DB;
 
 final class AnalyzeItemForReviewJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * v3 固定：
-     * Job は analysisRequestId だけを主語にする
-     */
     public function __construct(
         private int $analysisRequestId,
-        private string $source = 'initial', // initial | replay | system
+        private string $source = 'initial',
     ) {}
 
     public function handle(
@@ -35,88 +32,82 @@ final class AnalyzeItemForReviewJob implements ShouldQueue
         AnalysisResultRepository $resultRepo,
         ApplyProvisionalAnalysisUseCase $applyUseCase,
     ): void {
-
-        /**
-         * ① Request を SoT として取得（唯一の主語）
-         */
+        // ① Request を取得（SoT）
         $request = $requestRepo->findOrFail($this->analysisRequestId);
 
-        /**
-         * ② 冪等ガード（すでに done なら何もしない）
-         */
+        // ② 冪等ガード
         if ($request->isDone()) {
             return;
         }
 
-        /**
-         * ③ 入力は request からのみ取得
-         */
-        $itemId   = $request->itemId();
-        $tenantId = $request->tenantId();
-        $rawText  = $request->rawText();
+        try {
+            // ③ 入力情報の取得（requestId主語）
+            $itemId   = $request->itemId();
+            $tenantId = $request->tenantId();
+            $rawText  = $request->rawText();
 
-        /**
-         * ④ AtlasKernel へ解析依頼
-         * ※ v3 方針：named argument を使わない
-         */
-        $analysis = $atlasKernel->requestAnalysis(
-            $itemId,
-            $rawText,
-            $tenantId,
-        );
+            // ✅ draft.brand（attributes入力）を brand_text として優先注入
+            $brandText = null;
+            $draftId = $request->itemDraftId(); // nullable想定
 
-        /**
-         * ⑤ UX fallback 用 Item（安全参照）
-         */
-        $item = Item::find($itemId);
+            if ($draftId) {
+                $brandText = DB::table('item_drafts')
+                    ->where('id', $draftId)
+                    ->value('brand');
+            }
 
-        /**
-         * ⑥ analysis_results 保存 payload（requestId 主語）
-         */
-        $persistPayload = [
-            'analysis_request_id' => $request->id(),
+            // ④ AtlasKernel への解析依頼（context付き）
+            $analysis = $atlasKernel->requestAnalysis(
+                $itemId,
+                $rawText,
+                $tenantId,
+                [
+                    'brand_text' => $brandText, // ★ここが効く
+                ]
+            );
 
-            // 参照用途（SoT ではない）
-            'item_id' => $itemId,
+            // ⑤ UX fallback 用 Item（安全参照）
+            $item = Item::find($itemId);
 
-            'brand_name' => data_get($analysis, 'brand.name')
-                ?? $item?->brand,
+            // ⑥ persistPayload 作成（元のロジック維持）
+            $persistPayload = [
+                'analysis_request_id' => $request->id(),
+                'item_id'             => $itemId,
 
-            'condition_name' => data_get($analysis, 'condition.name'),
-            'color_name'     => data_get($analysis, 'color.name'),
+                'brand_name'          => data_get($analysis, 'brand.name') ?? $item?->brand,
+                'condition_name'      => data_get($analysis, 'condition.name'),
+                'color_name'          => data_get($analysis, 'color.name'),
 
-            'classified_tokens' => [
-                'brand'     => data_get($analysis, 'tokens.brand', []),
-                'condition' => data_get($analysis, 'tokens.condition', []),
-                'color'     => data_get($analysis, 'tokens.color', []),
-            ],
+                'classified_tokens'   => [
+                    'brand'     => data_get($analysis, 'tokens.brand', []),
+                    'condition' => data_get($analysis, 'tokens.condition', []),
+                    'color'     => data_get($analysis, 'tokens.color', []),
+                ],
 
-            'confidence_map' => $analysis['confidence_map'] ?? [
-                'brand'     => 0.0,
-                'condition' => 0.0,
-                'color'     => 0.0,
-            ],
+                'confidence_map'      => $analysis['confidence_map'] ?? [
+                    'brand'     => 0.0,
+                    'condition' => 0.0,
+                    'color'     => 0.0,
+                ],
 
-            'overall_confidence' => $analysis['overall_confidence'] ?? 0.0,
+                'overall_confidence'  => $analysis['overall_confidence'] ?? 0.0,
+                'source'              => 'ai_provisional',
+                'status'              => 'active',
+            ];
 
-            'source' => 'ai_provisional',
-            'status' => 'active',
-        ];
+            // ⑦ 保存
+            $resultRepo->saveByRequestId($request->id(), $persistPayload);
 
-        /**
-         * ⑦ 保存（requestId 主語）
-         */
-        $resultRepo->saveByRequestId(
-            $request->id(),
-            $persistPayload,
-        );
+            // ⑧ 正常終了マーク
+            $requestRepo->markDone($request->id());
 
-        /**
-         * ⑧ request を done にする
-         */
-        $requestRepo->markDone($request->id());
-
-        // v3 Aフェーズでは SoT 反映しない
-        // $applyUseCase->handle($request->id(), $analysis);
+        } catch (\Throwable $e) {
+            $requestRepo->markFailed(
+                $request->id(),
+                'ATLAS_ANALYZE_FAILED',
+                $e->getMessage()
+            );
+            throw $e;
+        }
     }
 }

@@ -8,95 +8,90 @@ from atlaskernel.application.pipelines.brand_pipeline import analyze_brand
 from atlaskernel.application.pipelines.condition_pipeline import analyze_condition
 from atlaskernel.application.pipelines.color_pipeline import analyze_color
 
-from atlaskernel.services.policy_engine import PolicyEngine          # v1
-from atlaskernel.services.policy_engine_v2 import PolicyEngineV2    # v2
+from atlaskernel.services.policy_engine import PolicyEngine
+from atlaskernel.services.policy_engine_v2 import PolicyEngineV2
 
 from atlaskernel.services.context_builder import ContextBuilder
 from atlaskernel.domain.request import AnalysisRequest
 from atlaskernel.domain.context import Context
-from atlaskernel.domain.multimodal import MultimodalRef
 
 
 def analyze(request: AnalysisRequest) -> List[Dict[str, Any]]:
-    """
-    AtlasKernel v0.2.0
-    - PolicyEngine v1 / v2 切替対応
-    - Context / Multimodal 拡張前提
-    - brand / condition / color 自動解析（人手レビュー余地あり）
-    """
-
-    # ==========================================================
-    # 0. PolicyEngine 選択（env で切替）
-    # ==========================================================
+    # 0) policy
     engine_name = os.getenv("ATLAS_POLICY_ENGINE", "v1")
+    policy = PolicyEngineV2() if engine_name == "v2" else PolicyEngine()
 
-    if engine_name == "v2":
-        policy = PolicyEngineV2()
-    else:
-        policy = PolicyEngine()
+    # 1) context
+    ctx: Context = ContextBuilder().build(base={}, multimodal=None)
 
-    # ==========================================================
-    # 1. Context 構築（今は空でもOK）
-    # ==========================================================
-    context_builder = ContextBuilder()
-
-    # 将来：request.context / request.multimodal をここに足す
-    ctx: Context = context_builder.build(
-        base={},                    # locale / category / shop_id 等
-        multimodal=None             # MultimodalRef（画像・音）
-    )
-
-    # ==========================================================
-    # 2. トークン分解
-    # ==========================================================
-    parts = split_entities(request.raw_value)
+    # 2) raw_text 側（brandは作らない）
+    parts = split_entities(request.raw_value, mode="raw")
     print("[DEBUG parts]", parts)
+
+    # 3) brand_text 優先（attributesモード）
+    req_ctx = getattr(request, "context", {}) or {}
+    brand_text = req_ctx.get("brand_text") or req_ctx.get("attributes_text")
+    print("[DEBUG brand_text]", brand_text)
+
+    hint_parts = (
+        split_entities(brand_text, mode="attributes")
+        if brand_text
+        else {"brand": "", "condition": "", "color": "", "rest": ""}
+    )
+    print("[DEBUG hint_parts]", hint_parts)
 
     results: List[Dict[str, Any]] = []
 
-    # ==========================================================
-    # 3. brand
-    # ==========================================================
-    brand_input = parts["brand"] or parts["rest"]
-    if brand_input:
+    # ----------------------------------------------------------
+    # brand
+    # ----------------------------------------------------------
+    brand_input = (hint_parts.get("brand") or hint_parts.get("rest")) if brand_text else parts.get("brand")
+    print("[DEBUG brand_input]", brand_input)
+
+    if brand_input and str(brand_input).strip():
         results.append(
             analyze_brand(
                 AnalysisRequest(
                     entity_type="brand",
-                    raw_value=brand_input,
+                    raw_value=str(brand_input),
                     known_assets_ref="brands_v1",
-                ),
-                policy,
-                ctx,            # ← ★ v2 用拡張（v1 は無視）
-            )
-        )
-
-    # ==========================================================
-    # 4. condition
-    # ==========================================================
-    if parts["condition"]:
-        results.append(
-            analyze_condition(
-                AnalysisRequest(
-                    entity_type="condition",
-                    raw_value=parts["condition"],
-                    known_assets_ref="conditions_v1",
+                    context=req_ctx,
                 ),
                 policy,
                 ctx,
             )
         )
 
-    # ==========================================================
-    # 5. color
-    # ==========================================================
-    if parts["color"]:
+    # ----------------------------------------------------------
+    # condition
+    # ----------------------------------------------------------
+    condition_input = hint_parts.get("condition") if brand_text else parts.get("condition")
+    if condition_input and str(condition_input).strip():
+        results.append(
+            analyze_condition(
+                AnalysisRequest(
+                    entity_type="condition",
+                    raw_value=str(condition_input),
+                    known_assets_ref="conditions_v1",
+                    context=req_ctx,
+                ),
+                policy,
+                ctx,
+            )
+        )
+
+    # ----------------------------------------------------------
+    # color
+    # ----------------------------------------------------------
+    color_input = hint_parts.get("color") if brand_text else parts.get("color")
+    if color_input and str(color_input).strip():
         results.append(
             analyze_color(
                 AnalysisRequest(
                     entity_type="color",
-                    raw_value=parts["color"],
+                    raw_value=str(color_input),
                     known_assets_ref="colors_v1",
+                    context=req_ctx,
                 ),
                 policy,
                 ctx,

@@ -15,6 +15,7 @@ use App\Modules\Item\Domain\Repository\BrandEntityQueryRepository;
 use App\Modules\Item\Domain\Repository\ConditionEntityQueryRepository;
 use App\Modules\Item\Domain\Repository\ColorEntityQueryRepository;
 use App\Modules\Item\Infrastructure\Persistence\Query\AnalysisResultReadRepository;
+use App\Modules\Item\Domain\Repository\AnalysisResultRepository;
 use App\Modules\Item\Domain\Service\EntityFactory;
 
 final class DecideUseCase
@@ -29,6 +30,7 @@ final class DecideUseCase
         private ColorEntityQueryRepository       $colorQuery,
         private EntityFactory                    $entityFactory,
         private AnalysisResultReadRepository     $analysisRepo,
+        private AnalysisResultRepository         $results,
     ) {}
 
     public function handle(
@@ -207,8 +209,31 @@ final class DecideUseCase
                reject（何も resolve しない／SoT 反映もしない）
             ========================================================= */
             if ($decisionType === 'reject') {
-                return;
-            }
+
+    // 監査：何を棄却したか残す（AI結果を before_snapshot に）
+    $analysis = $this->analysisRepo->findLatestActiveByRequestId($analysisRequestId);
+    if (!is_array($analysis)) {
+        // AI結果が無いなら snapshot は入れずに reject だけ残す
+        $this->results->markRejectedByRequestId($analysisRequestId);
+        return;
+    }
+
+    $beforeSnapshot = [
+        'brand'     => $analysis['brand'] ?? null,
+        'condition' => $analysis['condition'] ?? null,
+        'color'     => $analysis['color'] ?? null,
+    ];
+
+    // 採用：reject は「解析前入力を採用」なので after_snapshot は beforeParsed を使う
+    $afterSnapshot = $this->buildBeforeSnapshotFromBeforeParsed($before);
+
+    $this->decisions->updateSnapshots($decisionId, $beforeSnapshot, $afterSnapshot);
+
+    // ✅ 最重要：AI表示を無効化（ItemDetail は active/provisional を見ている前提）
+    $this->results->markRejectedByRequestId($analysisRequestId);
+
+    return;
+}
 
             if ($this->hasNoResolvedEntity($resolved)) {
                 Log::warning('[DecideUseCase] no resolved entity', [
@@ -275,7 +300,7 @@ final class DecideUseCase
                 $out[$k] = [
                     'value' => $v,
                     'source' => 'manual',
-                    'confidence' => null,
+                    'confidence' => 1.0,
                 ];
             }
         }

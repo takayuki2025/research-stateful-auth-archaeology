@@ -28,14 +28,29 @@ function createBearerApiClient(): ApiClient {
       : `${apiBase}${url.startsWith("/") ? "" : "/"}${url}`;
 
     const { accessToken } = TokenStorage.load();
+
     const headers: Record<string, string> = { Accept: "application/json" };
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    if (method !== "GET") headers["Content-Type"] = "application/json";
+
+    const isFormData =
+      typeof FormData !== "undefined" && body instanceof FormData;
+
+    // ✅ FormDataのときは Content-Type を付けない（boundary を壊さない）
+    if (method !== "GET" && !isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
 
     const res = await fetch(fullUrl, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        method === "GET"
+          ? undefined
+          : body === undefined
+            ? undefined
+            : isFormData
+              ? (body as FormData)
+              : JSON.stringify(body),
       credentials: "omit",
       cache: "no-store",
     });
@@ -60,6 +75,15 @@ function createBearerApiClient(): ApiClient {
     }
 
     if (res.status === 204) return undefined as unknown as T;
+
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      const t = await res.text().catch(() => "");
+      const e: any = new Error(`Non-JSON response: ${t.slice(0, 200)}`);
+      e.status = 500;
+      throw e;
+    }
+
     return (await res.json()) as T;
   };
 
