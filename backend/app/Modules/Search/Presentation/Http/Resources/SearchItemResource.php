@@ -24,6 +24,7 @@ final class SearchItemResource extends JsonResource
             'id' => $id,
             'shop_id' => $shopId,
             'name' => $name,
+            'item_image_path' => $this->resource['item_image_path'],
             'price' => [
                 'amount' => $priceAmount,
                 'currency' => $priceCurrency,

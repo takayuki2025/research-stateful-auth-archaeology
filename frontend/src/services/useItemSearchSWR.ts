@@ -12,9 +12,7 @@ export const useItemSearchSWR = (query: string) => {
   const authed = useAuthedFetcher();
 
   const shouldFetch =
-    !isLoading && // ✅ Auth 初期化完了
-    authed.isLoading && // apiClient ready
-    query.trim().length > 0;
+    !isLoading && !authed.isLoading && query.trim().length > 0;
 
   const swrKey = shouldFetch ? ["search-items", query] : null;
 

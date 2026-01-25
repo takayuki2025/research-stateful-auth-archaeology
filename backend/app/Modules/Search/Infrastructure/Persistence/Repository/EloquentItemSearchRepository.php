@@ -55,6 +55,7 @@ final class EloquentItemSearchRepository implements ItemSearchRepository
             'items.name',
             'items.price',
             'items.price_currency',
+            'items.item_image',
             'items.created_at',
         ]);
 
@@ -72,6 +73,7 @@ final class EloquentItemSearchRepository implements ItemSearchRepository
             'name'           => (string) $r->name,
             'price_amount'   => (int) $r->price,
             'price_currency' => (string) $r->price_currency,
+            'item_image_path' => $r->item_image,
             'created_at'     => $r->created_at,
         ])->all();
 

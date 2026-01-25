@@ -88,11 +88,17 @@ export default function Home() {
           ? searchResult.items
           : listResult.items;
 
-    return raw.map((item) => ({
+    return raw.map((item: any) => ({
+      // 型を一時的に any にしてアクセスを許容
       id: item.id,
       name: item.name,
-      price: item.price ?? null,
-      itemImagePath: item.itemImagePath ?? null,
+      // 検索APIでは price がオブジェクト（{amount: 5000}）なので対応させる
+      price:
+        typeof item.price === "object"
+          ? item.price?.amount
+          : (item.price ?? null),
+      // スネークケース（item_image_path）とキャメルケース（itemImagePath）の両方に対応
+      itemImagePath: item.item_image_path ?? item.itemImagePath ?? null,
       displayType: item.displayType ?? null,
       isFavorited: Boolean(item.isFavorited),
     }));
