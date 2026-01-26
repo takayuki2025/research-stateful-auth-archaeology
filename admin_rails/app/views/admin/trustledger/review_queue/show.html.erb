@@ -27,24 +27,43 @@
   <h2 style="margin-top:24px; color:#1e293b;">Summary (Proposed Changes)</h2>
   <pre style="white-space:pre-wrap; background:#f8fafc; border:1px solid #e2e8f0; padding:12px; font-size:13px;"><%= JSON.pretty_generate(@item["summary"] || {}) %></pre>
 
-  <% if @diff %>
-    <h2 style="margin-top:24px; color:#0f172a;">Diff Summary</h2>
-    <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
-      <strong>Before ID:</strong> <%= @diff["before_document_id"] %> /
-      <strong>After ID:</strong> <%= @diff["after_document_id"] %> /
-      <strong>Created At:</strong> <%= @diff["created_at"] %>
-    </div>
 
-    <pre style="white-space:pre-wrap; background:#f1f5f9; border:1px solid #cbd5e1; padding:12px; font-family: monospace; font-size: 13px;"><%=
-      begin
-        diff_data = @diff["diff_summary_json"]
-        parsed = diff_data.is_a?(String) ? JSON.parse(diff_data) : diff_data
-        JSON.pretty_generate(parsed || {})
-      rescue
-        JSON.pretty_generate(@diff["diff_summary_json"] || {})
-      end
-    %></pre>
+  <% if @diff %>
+  <h2 style="margin-top:24px; color:#0f172a;">Diff Summary</h2>
+  <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
+    <strong>Before ID:</strong> <%= @diff["before_document_id"] %> /
+    <strong>After ID:</strong> <%= @diff["after_document_id"] %> /
+    <strong>Created At:</strong> <%= @diff["created_at"] %>
+  </div>
+
+  <% diff_json = @diff["diff_summary_json"] %>
+  <% parsed = nil %>
+  <% begin %>
+    <% parsed = diff_json.is_a?(String) ? JSON.parse(diff_json) : diff_json %>
+  <% rescue %>
+    <% parsed = diff_json %>
   <% end %>
+  <% parsed ||= {} %>
+
+  <% before_lines = parsed["before_line_count"] %>
+  <% after_lines  = parsed["after_line_count"] %>
+
+  <div style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; font-size:13px;">
+    <div><strong>Line Count:</strong> before=<%= before_lines %> / after=<%= after_lines %></div>
+    <% if parsed["summary"] %>
+      <div style="margin-top:6px;"><strong>Summary:</strong> <%= parsed["summary"] %></div>
+    <% end %>
+  </div>
+
+  <details style="margin-top:10px;">
+    <summary>Show heads (before_head / after_head)</summary>
+    <pre style="white-space:pre-wrap; background:#f1f5f9; border:1px solid #cbd5e1; padding:12px; font-family: monospace; font-size: 13px; max-height:360px; overflow:auto;"><%= JSON.pretty_generate({
+      "before_head" => parsed["before_head"],
+      "after_head"  => parsed["after_head"],
+    }) %></pre>
+  </details>
+<% end %>
+
 
   <% if @doc %>
     <h2 style="margin-top:24px; color:#2563eb; border-left:4px solid #2563eb; padding-left:12px;">Extracted Document (Evidence)</h2>

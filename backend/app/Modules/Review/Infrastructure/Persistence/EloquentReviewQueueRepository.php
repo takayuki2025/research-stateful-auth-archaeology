@@ -3,6 +3,7 @@
 namespace App\Modules\Review\Infrastructure\Persistence;
 
 use App\Modules\Review\Domain\Repository\ReviewQueueRepository;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 final class EloquentReviewQueueRepository implements ReviewQueueRepository
@@ -106,12 +107,20 @@ final class EloquentReviewQueueRepository implements ReviewQueueRepository
 
 public function updateStatus(int $id, string $status): void
 {
-    DB::table('review_queue_items')
-        ->where('id', $id)
-        ->update([
-            'status' => $status,
-            'updated_at' => now(),
-        ]);
+    try {
+        DB::table('review_queue_items')
+            ->where('id', $id)
+            ->update([
+                'status' => $status,
+                'updated_at' => now(),
+            ]);
+    } catch (UniqueConstraintViolationException $e) {
+        // ✅ in_review 競合は「すでに誰かが in_review を確保した」だけなので握る
+        if ($status === 'in_review') {
+            return;
+        }
+        throw $e;
+    }
 }
 
 public function clearDecision(int $id): void
@@ -136,8 +145,8 @@ public function closeInReviewForSameRef(string $queueType, string $refType, int 
         ->where('status', 'in_review')
         ->where('id', '<>', $excludeId)
         ->update([
-            // ✅ 「審査中」を閉じる（decidedに落とすのが最小）
-            'status' => 'decided',
+            // ✅ superseded は decided ではなく archived に落とす（decided重複を避ける）
+            'status' => 'archived',
             'decided_action' => 'superseded',
             'decided_at' => now(),
             'updated_at' => now(),
