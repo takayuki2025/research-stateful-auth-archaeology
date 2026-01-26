@@ -64,13 +64,13 @@ final class PaymentServiceProvider extends ServiceProvider
     {
         // ✅ v2-5.1: PostLedgerPort は 1回だけ bind（feature flag 有効化）
         $this->app->bind(PostLedgerPort::class, function ($app) {
-            $driver = config('trustledger.ledger.driver', 'local');
+    $driver = env('LEDGER_POST_DRIVER', config('trustledger.ledger.driver', 'local'));
 
-            return match ($driver) {
-                'http' => $app->make(HttpPostLedgerPort::class),
-                default => $app->make(LocalPostLedgerPort::class),
-            };
-        });
+    return match ($driver) {
+        'http' => $app->make(HttpPostLedgerPort::class),
+        default => $app->make(LocalPostLedgerPort::class),
+    };
+});
 
         $this->app->bind(PaymentMethodVault::class, StripePaymentMethodVault::class);
 

@@ -1,0 +1,71 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>New Catalog Source</h1>
+
+<% if @error %>
+  <div style="padding:12px; border:1px solid #f00; margin:12px 0;">
+    <strong>API Error</strong><br>
+    status: <%= @error.status %><br>
+    <pre style="white-space:pre-wrap;"><%= @error.body %></pre>
+  </div>
+<% end %>
+
+<form method="post" action="/admin/dashboard/trustledger/providerintel/sources">
+  <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+
+  <div style="margin: 12px 0;">
+    <label>project_id (optional):
+      <input name="project_id" value="<%= params[:project_id] %>" style="width:180px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>provider_id:
+      <input name="provider_id" required value="<%= params[:provider_id] %>" style="width:180px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>source_type:
+      <select name="source_type" required>
+        <option value="html">html</option>
+        <option value="pdf">pdf</option>
+        <option value="manual">manual</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>source_url:
+      <input name="source_url" value="<%= params[:source_url] %>" style="width:640px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>update_frequency:
+      <select name="update_frequency" required>
+        <option value="daily">daily</option>
+        <option value="weekly" selected>weekly</option>
+        <option value="monthly">monthly</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>status:
+      <select name="status" required>
+        <option value="active" selected>active</option>
+        <option value="inactive">inactive</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>notes:
+      <textarea name="notes" rows="4" style="width:640px;"><%= params[:notes] %></textarea>
+    </label>
+  </div>
+
+  <button type="submit">Save</button>
+  <a href="/admin/dashboard/trustledger/providerintel/sources" style="margin-left:12px;">Back</a>
+</form>

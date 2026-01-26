@@ -18,6 +18,10 @@ export default function LoginPage() {
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const adminBase =
+    process.env.NEXT_PUBLIC_ADMIN_RAILS_BASE_URL ?? "http://localhost:3001";
+  const adminDashboardUrl = `${adminBase}/admin/dashboard`;
+
   const modeLabel = useMemo(() => {
     if (mode === "idaas") return "IdaaS (Auth0 PKCE)";
     if (mode === "firebase_jwt") return "Firebase JWT";
@@ -201,10 +205,12 @@ export default function LoginPage() {
         </Link>
 
         <a
-          href="http://localhost:3001/admin/trustledger/kpis/global"
+          href={adminDashboardUrl}
           className="text-gray-600 text-xs underline block"
+          target="_blank"
+          rel="noreferrer"
         >
-          管理者/開発者コンソールへ（TrustLedger）（開発用）
+          管理者/開発者コンソールへ（admin/dashboard）（開発用）
         </a>
       </div>
     </div>

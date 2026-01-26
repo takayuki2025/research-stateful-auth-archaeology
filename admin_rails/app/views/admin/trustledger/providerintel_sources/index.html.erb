@@ -1,0 +1,84 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>ProviderIntel - Catalog Sources</h1>
+
+<% if @error %>
+  <div style="padding:12px; border:1px solid #f00; margin:12px 0;">
+    <strong>API Error</strong><br>
+    status: <%= @error.status %><br>
+    <pre style="white-space:pre-wrap;"><%= @error.body %></pre>
+  </div>
+<% end %>
+
+<div style="margin: 12px 0;">
+  <a href="/admin/dashboard/trustledger/providerintel/sources/new" style="display:inline-block; padding: 6px 12px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 4px;">+ New Source</a>
+</div>
+
+<form method="get" style="margin: 20px 0; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0;">
+  <label>Provider ID:
+    <input name="provider_id" value="<%= params[:provider_id] %>" style="width:120px;">
+  </label>
+  <label style="margin-left:12px;">Status:
+    <select name="status">
+      <option value=""></option>
+      <option value="active" <%= "selected" if params[:status] == "active" %>>active</option>
+      <option value="inactive" <%= "selected" if params[:status] == "inactive" %>>inactive</option>
+    </select>
+  </label>
+  <label style="margin-left:12px;">Limit:
+    <input name="limit" value="<%= params[:limit] || 50 %>" style="width:60px;">
+  </label>
+  <button type="submit" style="margin-left:12px; cursor:pointer;">Filter</button>
+</form>
+
+<table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; border: 1px solid #cbd5e1;">
+  <thead style="background: #f1f5f9;">
+    <tr>
+      <th>ID</th>
+      <th>Provider</th>
+      <th>Type</th>
+      <th>URL</th>
+      <th>Freq</th>
+      <th>Status</th>
+      <th>Last Hash</th>
+      <th>Last Fetched</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  <% @items.each do |it| %>
+    <tr style="border-bottom: 1px solid #e2e8f0;">
+      <td style="font-weight: bold;">
+        <a href="/admin/dashboard/trustledger/providerintel/sources/<%= it["id"] %>" style="color: #2563eb; text-decoration: underline;">
+          <%= it["id"] %>
+        </a>
+      </td>
+      
+      <td><%= it["provider_id"] %></td>
+      <td><span style="font-size: 0.9em; background: #f1f5f9; padding: 2px 4px;"><%= it["source_type"] %></span></td>
+      <td style="max-width:420px; word-break:break-all; font-size: 0.85em; color: #64748b;">
+        <%= it["source_url"] %>
+      </td>
+      <td><%= it["update_frequency"] %></td>
+      <td>
+        <span style="color: <%= it["status"] == 'active' ? '#16a34a' : '#94a3b8' %>;">
+          ● <%= it["status"] %>
+        </span>
+      </td>
+      
+      <td style="max-width:220px; word-break:break-all; font-family: monospace; font-size: 0.8em; color: #64748b;">
+        <%= it["last_hash"] %>
+      </td>
+      
+      <td style="font-size: 0.85em;"><%= it["last_fetched_at"] %></td>
+      
+      <td>
+        <form method="post" action="/admin/dashboard/trustledger/providerintel/sources/<%= it["id"] %>/run" style="display:inline;" onsubmit="return confirm('本当に今すぐ実行しますか？');">
+          <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+          <button type="submit" style="cursor:pointer; padding: 4px 8px;">Run Now</button>
+        </form>
+      </td>
+    </tr>
+  <% end %>
+  </tbody>
+</table>

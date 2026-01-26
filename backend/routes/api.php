@@ -597,3 +597,21 @@ Route::middleware(['admin.fixed_or_key'])
         Route::get('webhooks/events/{eventId}', GetWebhookEventDetailController::class);
         Route::post('webhooks/events/{eventId}/replay', ReplayWebhookEventController::class);
     });
+
+
+
+use App\Modules\ProviderIntel\Presentation\Http\Controllers\Admin\CatalogSource\{
+    ListCatalogSourcesController,
+    GetCatalogSourceController,
+    UpsertCatalogSourceController,
+    RunCatalogSourceController
+};
+
+Route::middleware(['admin.fixed_or_key'])
+    ->prefix('admin/providerintel')
+    ->group(function () {
+        Route::get('sources', ListCatalogSourcesController::class);
+        Route::get('sources/{sourceId}', GetCatalogSourceController::class)->whereNumber('sourceId');
+        Route::post('sources', UpsertCatalogSourceController::class);
+        Route::post('sources/{sourceId}/run', RunCatalogSourceController::class)->whereNumber('sourceId');
+    });

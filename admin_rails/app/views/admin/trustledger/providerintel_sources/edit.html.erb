@@ -1,0 +1,76 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>Edit Catalog Source</h1>
+
+<% if @error %>
+  <div style="padding:12px; border:1px solid #f00; margin:12px 0;">
+    <strong>API Error</strong><br>
+    status: <%= @error.status %><br>
+    <pre style="white-space:pre-wrap;"><%= @error.body %></pre>
+  </div>
+<% end %>
+
+<% id = @item.is_a?(Hash) ? (@item["id"] || @item[:id]) : params[:source_id] %>
+
+<form method="post" action="/admin/dashboard/trustledger/providerintel/sources/<%= id %>">
+  <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+
+  <div style="margin: 12px 0;">
+    <label>project_id (optional):
+      <input name="project_id" value="<%= @item&.dig("project_id") %>" style="width:180px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>provider_id:
+      <input name="provider_id" required value="<%= @item&.dig("provider_id") %>" style="width:180px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>source_type:
+      <select name="source_type" required>
+        <% st = @item&.dig("source_type") %>
+        <option value="html"   <%= "selected" if st == "html" %>>html</option>
+        <option value="pdf"    <%= "selected" if st == "pdf" %>>pdf</option>
+        <option value="manual" <%= "selected" if st == "manual" %>>manual</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>source_url:
+      <input name="source_url" value="<%= @item&.dig("source_url") %>" style="width:640px;">
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>update_frequency:
+      <% uf = @item&.dig("update_frequency") %>
+      <select name="update_frequency" required>
+        <option value="daily"   <%= "selected" if uf == "daily" %>>daily</option>
+        <option value="weekly"  <%= "selected" if uf == "weekly" %>>weekly</option>
+        <option value="monthly" <%= "selected" if uf == "monthly" %>>monthly</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>status:
+      <% ss = @item&.dig("status") %>
+      <select name="status" required>
+        <option value="active"   <%= "selected" if ss == "active" %>>active</option>
+        <option value="inactive" <%= "selected" if ss == "inactive" %>>inactive</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="margin: 12px 0;">
+    <label>notes:
+      <textarea name="notes" rows="4" style="width:640px;"><%= @item&.dig("notes") %></textarea>
+    </label>
+  </div>
+
+  <button type="submit">Update</button>
+  <a href="/admin/dashboard/trustledger/providerintel/sources/<%= id %>" style="margin-left:12px;">Cancel</a>
+</form>
