@@ -153,6 +153,12 @@ def decide_review_queue_item(id, payload)
   post_json("/api/admin/review-queue/#{id}/decide", payload)
 end
 
+
+def get_providerintel_document(id)
+  get_json("/api/admin/providerintel/documents/#{id}")
+end
+
+
       # =========================================================
       # Internal HTTP helpers
       # =========================================================

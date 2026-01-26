@@ -11,11 +11,11 @@
 <% end %>
 
 <% if @item %>
-  <p><a href="/admin/dashboard/trustledger/review-queue">Back</a></p>
+  <p><a href="/admin/dashboard/trustledger/review-queue" style="text-decoration:none;">← Back to List</a></p>
 
-  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
-    <tr><th>ID</th><td><%= @item["id"] %></td></tr>
-    <tr><th>queue_type</th><td><%= @item["queue_type"] %></td></tr>
+  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; max-width:800px;">
+    <tr style="background:#f1f5f9;"><th>ID</th><td><%= @item["id"] %></td></tr>
+    <tr><th>queue_type</th><td><strong><%= @item["queue_type"] %></strong></td></tr>
     <tr><th>ref</th><td><%= @item["ref_type"] %>#<%= @item["ref_id"] %></td></tr>
     <tr><th>status</th><td><%= @item["status"] %></td></tr>
     <tr><th>priority</th><td><%= @item["priority"] %></td></tr>
@@ -24,69 +24,100 @@
     <tr><th>note</th><td><%= @item["note"] %></td></tr>
   </table>
 
-  <h2 style="margin-top:16px;">Summary</h2>
-  <pre style="white-space:pre-wrap; background:#f6f6f6; padding:12px;"><%= JSON.pretty_generate(@item["summary"] || {}) %></pre>
+  <h2 style="margin-top:24px; color:#1e293b;">Summary (Proposed Changes)</h2>
+  <pre style="white-space:pre-wrap; background:#f8fafc; border:1px solid #e2e8f0; padding:12px; font-size:13px;"><%= JSON.pretty_generate(@item["summary"] || {}) %></pre>
 
-  <h2 style="margin-top:16px;">Requests for Info</h2>
+  <% if @doc %>
+    <h2 style="margin-top:24px; color:#2563eb; border-left:4px solid #2563eb; padding-left:12px;">Extracted Document (Evidence)</h2>
+    <div style="font-size:12px; color:#64748b; margin-bottom:8px; padding: 8px; background:#eff6ff;">
+      <strong>Source URL:</strong> <a href="<%= @doc["source_url"] %>" target="_blank" style="color:#2563eb;"><%= @doc["source_url"] %></a><br>
+      <strong>Extracted At:</strong> <%= @doc["extracted_at"] %>
+    </div>
+    <div style="position:relative;">
+      <pre style="white-space:pre-wrap; background:#ffffff; border:1px solid #cbd5e1; padding:15px; max-height:400px; overflow:auto; font-family: monospace; font-size: 13px; line-height:1.5;"><%= @doc["content_text"] %></pre>
+      <div style="position:absolute; top:0; right:0; background:#cbd5e1; font-size:10px; padding:2px 6px; color:#334155;">RAW TEXT</div>
+    </div>
+  <% else %>
+    <div style="margin-top:16px; padding:12px; background:#fff7ed; border:1px solid #ffedd5; color:#9a3412; font-size:13px;">
+      ⚠️ この項目には直接紐付く証拠ドキュメント (after_document_id) が見つかりませんでした。
+    </div>
+  <% end %>
+
+  <h2 style="margin-top:32px; color:#1e293b;">Requests for Info</h2>
   <% rfi = @item["requests_for_info"] || [] %>
   <% if rfi.empty? %>
-    <p style="color:#666;">(none)</p>
+    <p style="color:#666; font-style:italic;">(none)</p>
   <% else %>
     <% rfi.each do |row| %>
-      <div style="border:1px solid #ddd; padding:12px; margin:12px 0;">
-        <div><strong>ID:</strong> <%= row["id"] %> / <strong>status:</strong> <%= row["status"] %></div>
+      <div style="border:1px solid #ddd; padding:12px; margin:12px 0; background:#fff;">
+        <div><strong>ID:</strong> <%= row["id"] %> / <strong>status:</strong> <span style="font-weight:bold; color:#2563eb;"><%= row["status"] %></span></div>
         <div><strong>requested_at:</strong> <%= row["requested_at"] %></div>
         <div style="margin-top:8px;">
           <strong>checklist</strong>
-          <pre style="white-space:pre-wrap; background:#fafafa; padding:12px;"><%= JSON.pretty_generate(row["checklist"] || {}) %></pre>
+          <pre style="white-space:pre-wrap; background:#fafafa; padding:12px; font-size:12px;"><%= JSON.pretty_generate(row["checklist"] || {}) %></pre>
         </div>
       </div>
     <% end %>
   <% end %>
 
-  <h2 style="margin-top:16px;">Decide</h2>
+  <hr style="margin:40px 0; border:0; border-top:1px solid #cbd5e1;">
 
-  <!-- ✅ Approve -->
-  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
-    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-    <input type="hidden" name="action" value="approve">
-    <label>note:<br>
-      <textarea name="note" rows="2" style="width:720px;"></textarea>
-    </label><br>
-    <button type="submit" style="margin-top:8px;">Approve</button>
-  </form>
+  <h2 style="margin-top:16px; color:#1e293b;">Decide (Actions)</h2>
 
-  <!-- ✅ Reject -->
-  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
-    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-    <input type="hidden" name="action" value="reject">
-    <label>note:<br>
-      <textarea name="note" rows="2" style="width:720px;"></textarea>
-    </label><br>
-    <button type="submit" style="margin-top:8px;">Reject</button>
-  </form>
-
-  <!-- ✅ Request More Info -->
-  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
-    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-    <input type="hidden" name="action" value="request_more_info">
-    <label>note:<br>
-      <textarea name="note" rows="2" style="width:720px;">need evidence</textarea>
-    </label>
-
-    <div style="margin-top:8px;">
-      <label>extra.checklist (JSON, optional):<br>
-        <textarea name="extra_checklist_json" rows="10" style="width:720px;" placeholder='{"type":"providerintel","message":"...","items":[...]}'></textarea>
-      </label>
-      <div style="font-size:12px; color:#666; margin-top:6px;">
-        空ならLaravel側で自動生成します。ここにJSONを入れると上書きできます。
-      </div>
+  <div style="display:flex; gap:20px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:300px; padding:15px; border:1px solid #bbf7d0; background:#f0fdf4;">
+      <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide">
+        <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+        <input type="hidden" name="action" value="approve">
+        <strong>Approve</strong>
+        <p style="font-size:12px; color:#166534;">内容を確定させ、 SoT に反映します。</p>
+        <label>note:<br>
+          <textarea name="note" rows="2" style="width:100%; box-sizing:border-box;"></textarea>
+        </label><br>
+        <button type="submit" style="margin-top:8px; background:#16a34a; color:#fff; border:none; padding:8px 16px; cursor:pointer;" onclick="return confirm('本当に承認しますか？');">Confirm Approve</button>
+      </form>
     </div>
 
-    <button type="submit" style="margin-top:8px;">Request More Info</button>
-  </form>
+    <div style="flex:1; min-width:300px; padding:15px; border:1px solid #fecaca; background:#fef2f2;">
+      <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide">
+        <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+        <input type="hidden" name="action" value="reject">
+        <strong>Reject</strong>
+        <p style="font-size:12px; color:#991b1b;">変更を却下し、現在の状態を維持します。</p>
+        <label>note:<br>
+          <textarea name="note" rows="2" style="width:100%; box-sizing:border-box;"></textarea>
+        </label><br>
+        <button type="submit" style="margin-top:8px; background:#dc2626; color:#fff; border:none; padding:8px 16px; cursor:pointer;" onclick="return confirm('本当に却下しますか？');">Confirm Reject</button>
+      </form>
+    </div>
+  </div>
+
+  <div style="margin-top:20px; padding:15px; border:1px solid #bae6fd; background:#f0f9ff;">
+    <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide">
+      <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+      <input type="hidden" name="action" value="request_more_info">
+      <strong>Request More Info</strong>
+      <p style="font-size:12px; color:#075985;">追加の証拠（別のURL等）が必要な場合に使用します。</p>
+      <label>note:<br>
+        <textarea name="note" rows="2" style="width:720px; max-width:100%;">need evidence</textarea>
+      </label>
+
+      <div style="margin-top:8px;">
+        <label>extra.checklist (JSON, optional):<br>
+          <textarea name="extra_checklist_json" rows="6" style="width:720px; max-width:100%; font-family:monospace;" placeholder='{"type":"providerintel","message":"...","items":[...]}'></textarea>
+        </label>
+        <div style="font-size:11px; color:#64748b; margin-top:4px;">
+          空ならLaravel側で自動生成されます。特定のフィールドを詳しく調査させたい場合にJSONを入力してください。
+        </div>
+      </div>
+
+      <button type="submit" style="margin-top:12px; background:#0ea5e9; color:#fff; border:none; padding:8px 20px; cursor:pointer;">Send Request</button>
+    </form>
+  </div>
 
 <% else %>
-  <p>Not found.</p>
-  <a href="/admin/dashboard/trustledger/review-queue">Back</a>
+  <div style="text-align:center; padding:40px;">
+    <p style="font-size:18px; color:#64748b;">Not found.</p>
+    <a href="/admin/dashboard/trustledger/review-queue">Back to List</a>
+  </div>
 <% end %>

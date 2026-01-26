@@ -18,12 +18,24 @@ module Admin
       end
 
       def show
-        client = TrustLedger::AdminApi::Client.new
-        @item = client.get_review_queue_item(params.require(:id))
-      rescue TrustLedger::AdminApi::Error => e
-        @error = e
-        @item = nil
-      end
+  client = TrustLedger::AdminApi::Client.new
+  # 1. まず、レビューキュー自体の詳細（どんな変更か）を取る
+  @item = client.get_review_queue_item(params.require(:id))
+
+  # 2. もしデータの中に「証拠ドキュメントID」が含まれていれば、その詳細も取得する
+  @doc = nil
+  if @item && @item["summary"].is_a?(Hash) && @item["summary"]["after_document_id"]
+    begin
+      # 証拠となるドキュメント（カタログや規約のRAWデータ）を取得
+      @doc = client.get_providerintel_document(@item["summary"]["after_document_id"])
+    rescue TrustLedger::AdminApi::Error
+      @doc = nil # 取得できなくても詳細画面自体は出すためにエラーは握りつぶす
+    end
+  end
+rescue TrustLedger::AdminApi::Error => e
+  @error = e
+  @item = nil
+end
 
       def decide
   client = TrustLedger::AdminApi::Client.new

@@ -631,3 +631,13 @@ Route::middleware(['admin.fixed_or_key'])
         Route::get('{id}', GetReviewQueueController::class)->whereNumber('id');
         Route::post('{id}/decide', DecideReviewQueueController::class)->whereNumber('id');
     });
+
+
+
+    use App\Modules\ProviderIntel\Presentation\Http\Controllers\Admin\Documents\GetExtractedDocumentController;
+
+Route::middleware(['admin.fixed_or_key'])
+  ->prefix('admin/providerintel')
+  ->group(function () {
+      Route::get('documents/{id}', GetExtractedDocumentController::class)->whereNumber('id');
+  });
