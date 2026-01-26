@@ -1,162 +1,149 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from pdfminer.high_level import extract_text as pdf_extract_text
+from atlaskernel.application.extract.ocr_router import (
+    OcrRouter,
+    decode_and_verify,
+    parse_options,
+    OcrOptions,
+    ExtractResult,
+)
 
 router = APIRouter(tags=["extract"])
 
 
-class PdfTextExtractRequest(BaseModel):
+# =========================
+# Request / Response Models
+# =========================
+
+class PdfExtractBaseRequest(BaseModel):
     content_b64: str
     content_sha256: str
     source_url: Optional[str] = None
     options: dict[str, Any] = {}
 
 
-class PdfTextExtractResponse(BaseModel):
+class PdfExtractResponse(BaseModel):
     text: str
     meta: dict[str, Any]
 
 
-def _decode_and_verify(req: PdfTextExtractRequest) -> bytes:
-    try:
-        pdf_bytes = base64.b64decode(req.content_b64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_b64 decode failed")
+# =========================
+# Internal helpers
+# =========================
 
-    sha = hashlib.sha256(pdf_bytes).hexdigest()
-    if sha != req.content_sha256:
-        raise HTTPException(status_code=400, detail="content_sha256 mismatch")
-
-    return pdf_bytes
-
-
-def _normalize_text(text: str) -> str:
-    return (
-        (text or "")
-        .replace("\r\n", "\n")
-        .replace("\r", "\n")
-        .strip()
-    )
+def _to_http_error(e: Exception) -> HTTPException:
+    """
+    Convert internal errors to HTTPException.
+    We keep messages short to avoid leaking internals; full detail should be logged if needed.
+    """
+    msg = str(e) or e.__class__.__name__
+    if "content_b64 decode failed" in msg or "content_sha256 mismatch" in msg:
+        return HTTPException(status_code=400, detail=msg)
+    return HTTPException(status_code=500, detail=msg)
 
 
-@router.post("/v1/extract/pdf_text", response_model=PdfTextExtractResponse)
-def extract_pdf_text(req: PdfTextExtractRequest) -> PdfTextExtractResponse:
-    pdf_bytes = _decode_and_verify(req)
+def _run_router(
+    *,
+    pdf_bytes: bytes,
+    source_url: Optional[str],
+    opt: OcrOptions,
+    mode_override: Optional[str] = None,   # "force_ocr" | None
+) -> ExtractResult:
+    """
+    Single entry to Router, allowing endpoint-specific mode override.
+    """
+    router_impl = OcrRouter()
 
-    try:
-        text = pdf_extract_text(io.BytesIO(pdf_bytes)) or ""
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"pdf extract failed: {e}")
+    if mode_override is not None:
+        # Create a new options with overridden mode (dataclass is frozen, so replace via model_dump-like construction)
+        opt = OcrOptions(
+            engine=opt.engine,
+            mode=mode_override,  # type: ignore[arg-type]
+            lang=opt.lang,
+            dpi=opt.dpi,
+            max_pages=opt.max_pages,
+            min_length_for_no_ocr=opt.min_length_for_no_ocr,
+            min_confidence=opt.min_confidence,
+            budget=opt.budget,
+        )
 
-    text = _normalize_text(text)
-
-    meta: dict[str, Any] = {
-        "method": "pdfminer.six",
-        "length": len(text),
-        "source_url": req.source_url,
-    }
-
-    # v4.2へ繋ぐための「OCR推奨」フラグ
-    meta["ocr_recommended"] = len(text) < int(req.options.get("min_length_for_no_ocr", 200))
-
-    return PdfTextExtractResponse(text=text, meta=meta)
+    return router_impl.route(pdf_bytes, source_url, opt)
 
 
 # =========================
-# v4.2: OCR fallback endpoint
+# Endpoints (v4.2)
 # =========================
 
-class PdfOcrExtractRequest(BaseModel):
-    content_b64: str
-    content_sha256: str
-    source_url: Optional[str] = None
-    options: dict[str, Any] = {}
-
-
-class PdfOcrExtractResponse(BaseModel):
-    text: str
-    meta: dict[str, Any]
-
-
-@router.post("/v1/extract/pdf_ocr", response_model=PdfOcrExtractResponse)
-def extract_pdf_ocr(req: PdfOcrExtractRequest) -> PdfOcrExtractResponse:
-    pdf_bytes = _decode_and_verify(PdfTextExtractRequest(**req.model_dump()))
-
-    # options
-    lang = (req.options.get("language") or "jpn+eng").strip()
-    dpi = int(req.options.get("dpi") or 200)
-    max_pages = int(req.options.get("max_pages") or 10)
-
+@router.post("/v1/extract/pdf_text", response_model=PdfExtractResponse)
+def extract_pdf_text(req: PdfExtractBaseRequest) -> PdfExtractResponse:
+    """
+    v4.2: pdf_text endpoint (cheap)
+    - Always runs Router.extract_pdf_text (no OCR)
+    - Returns meta.ocr_recommended that Laravel can use for conditional fallback
+    """
     try:
-        # pdf -> images
-        from pdf2image import convert_from_bytes
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
+        pdf_bytes = decode_and_verify(req.content_b64, req.content_sha256)
+        opt = parse_options(req.options or {})
+        r = OcrRouter().extract_pdf_text(pdf_bytes, req.source_url, opt)
+        # Ensure audit fixed fields exist (these are helpful even for pdf_text-only)
+        meta = dict(r.meta)
+        meta.setdefault("engine_requested", opt.engine)
+        meta.setdefault("mode", opt.mode)
+        meta.setdefault("lang", opt.lang)
+        meta.setdefault("min_confidence", opt.min_confidence)
+        meta.setdefault("budget", {"max_ms": opt.budget.max_ms, "max_cost_usd": opt.budget.max_cost_usd})
+        meta.setdefault("pipeline", "pdf_text_only")
+        meta.setdefault("fallback_chain", ["pdf_text"])
+        # decision is optional here; Laravel will decide whether to OCR or not
+        return PdfExtractResponse(text=r.text, meta=meta)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"pdf->image failed: {e}")
+        raise _to_http_error(e)
 
-    if not images:
-        return PdfOcrExtractResponse(text="", meta={
-            "method": "tesseract",
-            "language": lang,
-            "pages": 0,
-            "length": 0,
-            "source_url": req.source_url,
-        })
 
-    # limit pages (safety)
-    images = images[:max_pages]
-
+@router.post("/v1/extract/pdf_ocr", response_model=PdfExtractResponse)
+def extract_pdf_ocr(req: PdfExtractBaseRequest) -> PdfExtractResponse:
+    """
+    v4.2: OCR endpoint (explicit)
+    - Treat as "force_ocr" at API boundary
+    - Keeps meta.pipeline/pdf_ocr_only etc. stable
+    """
     try:
-        import pytesseract
+        pdf_bytes = decode_and_verify(req.content_b64, req.content_sha256)
+        opt = parse_options(req.options or {})
+        r = _run_router(pdf_bytes=pdf_bytes, source_url=req.source_url, opt=opt, mode_override="force_ocr")
+
+        meta = dict(r.meta)
+        # Hard audit guarantees (even if Router changes later)
+        meta.setdefault("pipeline", "pdf_ocr_only")
+        meta.setdefault("fallback_chain", ["pdf_ocr"])
+        meta.setdefault("engine_requested", opt.engine)
+        meta.setdefault("mode", "force_ocr")
+        meta.setdefault("lang", opt.lang)
+        meta.setdefault("min_confidence", opt.min_confidence)
+        meta.setdefault("budget", {"max_ms": opt.budget.max_ms, "max_cost_usd": opt.budget.max_cost_usd})
+
+        return PdfExtractResponse(text=r.text, meta=meta)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"pytesseract import failed: {e}")
+        raise _to_http_error(e)
 
-    texts: list[str] = []
-    confs: list[float] = []
 
-    for img in images:
-        # text
-        try:
-            t = pytesseract.image_to_string(img, lang=lang) or ""
-            texts.append(t)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"ocr text failed: {e}")
-
-        # confidence (optional)
-        try:
-            data = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.DICT)
-            for c in data.get("conf", []) or []:
-                try:
-                    v = float(c)
-                    if v >= 0:
-                        confs.append(v)
-                except Exception:
-                    pass
-        except Exception:
-            # ignore confidence errors
-            pass
-
-    text = _normalize_text("\n\n".join(texts))
-
-    avg_conf = (sum(confs) / len(confs)) if confs else None
-
-    meta: dict[str, Any] = {
-        "method": "tesseract",
-        "language": lang,
-        "dpi": dpi,
-        "pages": len(images),
-        "length": len(text),
-        "avg_confidence": avg_conf,
-        "source_url": req.source_url,
-        "ocr_recommended": False,  # OCRを実施した時点でfalse
-    }
-
-    return PdfOcrExtractResponse(text=text, meta=meta)
+@router.post("/v1/extract/pdf_extract", response_model=PdfExtractResponse)
+def extract_pdf_extract(req: PdfExtractBaseRequest) -> PdfExtractResponse:
+    """
+    v4.2 (recommended): Auto Router endpoint
+    - Runs Router.route with opt.mode
+    - This is the clean "engine router" entrypoint for future (PaddleOCR/DocTR/Textract).
+    - Laravel can call this single endpoint if you want to simplify client logic later.
+    """
+    try:
+        pdf_bytes = decode_and_verify(req.content_b64, req.content_sha256)
+        opt = parse_options(req.options or {})
+        r = _run_router(pdf_bytes=pdf_bytes, source_url=req.source_url, opt=opt, mode_override=None)
+        return PdfExtractResponse(text=r.text, meta=dict(r.meta))
+    except Exception as e:
+        raise _to_http_error(e)

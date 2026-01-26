@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y \
     poppler-utils \
     tesseract-ocr \
     tesseract-ocr-jpn \
+    tesseract-ocr-jpn-vert \
  && rm -rf /var/lib/apt/lists/*
+
+# ✅ Debian系のtessdataパス（あなたのログのパスと一致）
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 RUN pip install --upgrade pip
 

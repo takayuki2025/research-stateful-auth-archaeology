@@ -28,8 +28,21 @@ final class RunCatalogSourceUseCase
         private DocumentDiffRepository $diffs,
     ) {}
 
-    public function handle(int $sourceId): array
-    {
+    /**
+     * force: changed=falseでも再抽出〜enqueueまで実行する（再試行用）
+     * mode : OCR制御（auto | force_ocr）
+     */
+    public function handle(
+        int $sourceId,
+        bool $force = false,
+        ?string $forceReason = null,
+        string $mode = 'auto',
+    ): array {
+        // ✅ allow-list（今のv4.2はこの2つで十分）
+        if (!in_array($mode, ['auto', 'force_ocr'], true)) {
+            $mode = 'auto';
+        }
+
         $source = $this->sources->find($sourceId);
         if (!$source) {
             throw new \DomainException('CatalogSource not found');
@@ -42,46 +55,51 @@ final class RunCatalogSourceUseCase
 
         $r = $this->fetcher->fetch($url);
 
-        // “raw body” hash（監査/差分起点）
+        // raw body hash（更新検知）
         $newHash = hash('sha256', $r['body']);
         $oldHash = $source->lastHash();
         $changed = ($oldHash === null) || !hash_equals($oldHash, $newHash);
 
-        if (!$changed) {
+        // ✅ changed=false かつ force=false なら完全に何もしない
+        if (!$changed && !$force) {
             return [
                 'changed' => false,
+                'forced' => false,
+                'mode' => $mode,
                 'old_hash' => $oldHash,
                 'new_hash' => $newHash,
-                'content_type' => $r['content_type'],
+                'content_type' => $r['content_type'] ?? null,
             ];
         }
 
-        // 1) text extract（html / pdf）
+        // --- ここから先は changed=true または force=true のとき必ず実行 ---
+
         $contentType = (string)($r['content_type'] ?? '');
-        $sourceType = (string) $source->sourceType(); // 'html' | 'pdf'
+        $sourceType  = (string)$source->sourceType(); // html|pdf
 
         $text = '';
         $extractMeta = [];
 
         if ($sourceType === 'pdf') {
+            // ✅ forceとは独立して mode を渡す（force=再抽出、mode=OCR）
             $ex = $this->pdfExtractor->extractWithFallbackFromPdfBytes(
-    pdfBytes: (string)$r['body'],
-    sourceUrl: (string)$url,
-    language: 'ja',
-);
-            $text = $ex['text'];
-            $extractMeta = $ex['meta'] ?? [];
+                pdfBytes: (string)$r['body'],
+                sourceUrl: (string)$url,
+                lang: 'jpn',
+                engine: 'tesseract',
+                mode: $mode,
+            );
+            $text = (string)($ex['text'] ?? '');
+            $extractMeta = is_array($ex['meta'] ?? null) ? $ex['meta'] : [];
         } else {
-            // html (default)
             $text = $this->htmlExtractor->extract((string)$r['body']);
-            $extractMeta = [];
         }
 
-        // 2) save extracted_document (after)
+        // extracted_document（content_hashはテキストのsha256）
         $afterDocId = $this->docs->save([
             'project_id' => $source->projectId(),
             'domain' => 'providerintel',
-            'source_type' => $sourceType, // 'html'|'pdf'
+            'source_type' => $sourceType,
             'source_url' => $source->sourceUrl(),
             'source_url_hash' => $source->sourceUrlHash(),
             'content_text' => $text,
@@ -89,47 +107,37 @@ final class RunCatalogSourceUseCase
             'extracted_at' => now(),
         ]);
 
-        // 3) find before doc（同URL hashで直近、ただし自分は除外）
-        $before = null;
-        if (method_exists($this->docs, 'findLatestBySourceUrlHashExcludingId')) {
-            $before = $this->docs->findLatestBySourceUrlHashExcludingId(
-                'providerintel',
-                $source->sourceUrlHash(),
-                $afterDocId
-            );
-        } else {
-            // 旧I/F fallback（v4.1時点の保険）
-            $before = $this->docs->findLatestBySourceUrlHash('providerintel', $source->sourceUrlHash());
-            if ($before && (int)($before['id'] ?? 0) === $afterDocId) {
-                $before = null;
-            }
-        }
+        // before doc（同URL hashで最新、ただし自分除外）
+        $before = $this->docs->findLatestBySourceUrlHashExcludingId(
+            'providerintel',
+            $source->sourceUrlHash(),
+            $afterDocId
+        );
 
         $beforeId = $before ? (int)($before['id'] ?? 0) : null;
         $beforeText = $before ? (string)($before['content_text'] ?? '') : null;
 
-        // 4) diff summary（SimpleDiffGeneratorは後で差し替え）
+        // diff summary
         $diffSummary = $this->diff->summarize($beforeText, $text);
-
-        // 初回判定をUIで読みやすくするため、最低限のメタも足す（v4.1）
         $diffSummary = array_merge($diffSummary, [
             'source_type' => $sourceType,
             'content_type' => $contentType,
-            'extract_meta' => $extractMeta,
+            'extract_meta' => $extractMeta, // pipeline/decision/budget等はここに入る
         ]);
 
+        // ✅ DocumentDiffRepositoryは positional のまま（named args禁止）
         $diffId = $this->diffs->save(
-    $source->projectId(),
-    $beforeId,
-    $afterDocId,
-    $diffSummary,
-);
+            $source->projectId(),
+            $beforeId,
+            $afterDocId,
+            $diffSummary,
+        );
 
-        // 5) update last_hash/last_fetched_at（既存）
+        // last_hashは「最新のraw body」を記録（force時も更新して良い）
         $updated = $source->withLastFetch($newHash, new \DateTimeImmutable('now'));
         $this->sources->updateLastFetch($updated);
 
-        // 6) enqueue review with doc/diff pointers
+        // enqueue review（pendingがある場合は上書き更新される前提）
         $this->enqueueReview->handle(
             projectId: $source->projectId(),
             queueType: 'providerintel',
@@ -144,15 +152,20 @@ final class RunCatalogSourceUseCase
                 'old_hash' => $oldHash,
                 'new_hash' => $newHash,
                 'content_type' => $contentType,
-
-                // v4 pointers
                 'after_document_id' => $afterDocId,
                 'diff_id' => $diffId,
+
+                // ✅ v4.2.1 “後戻りゼロ” 監査キー
+                'forced' => $force,
+                'force_reason' => $force ? ($forceReason ?? 'manual_force') : null,
+                'mode' => $mode,
             ]
         );
 
         return [
-            'changed' => true,
+            'changed' => $changed,
+            'forced' => $force,
+            'mode' => $mode,
             'old_hash' => $oldHash,
             'new_hash' => $newHash,
             'content_type' => $contentType,
