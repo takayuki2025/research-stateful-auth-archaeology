@@ -7,7 +7,9 @@ use App\Modules\ProviderIntel\Domain\Repository\CatalogSourceRepository;
 use App\Modules\Review\Application\UseCase\EnqueueReviewQueueItemUseCase;
 
 use App\Modules\ProviderIntel\Application\Service\HtmlTextExtractor;
+use App\Modules\ProviderIntel\Application\Service\PdfTextExtractorClient;
 use App\Modules\ProviderIntel\Application\Service\SimpleDiffGenerator;
+
 use App\Modules\ProviderIntel\Domain\Repository\ExtractedDocumentRepository;
 use App\Modules\ProviderIntel\Domain\Repository\DocumentDiffRepository;
 
@@ -18,12 +20,13 @@ final class RunCatalogSourceUseCase
         private ProviderIntelFetcher $fetcher,
         private EnqueueReviewQueueItemUseCase $enqueueReview,
 
-        private HtmlTextExtractor $extractor,
+        private HtmlTextExtractor $htmlExtractor,
+        private PdfTextExtractorClient $pdfExtractor,
+
         private ExtractedDocumentRepository $docs,
         private SimpleDiffGenerator $diff,
         private DocumentDiffRepository $diffs,
-    ) {
-    }
+    ) {}
 
     public function handle(int $sourceId): array
     {
@@ -39,84 +42,122 @@ final class RunCatalogSourceUseCase
 
         $r = $this->fetcher->fetch($url);
 
-        // raw body hash（差分判定の一次）
-        $rawBody = (string)($r['body'] ?? '');
-        $contentType = (string)($r['content_type'] ?? '');
-
-        $newHash = hash('sha256', $rawBody);
+        // “raw body” hash（監査/差分起点）
+        $newHash = hash('sha256', $r['body']);
         $oldHash = $source->lastHash();
-
         $changed = ($oldHash === null) || !hash_equals($oldHash, $newHash);
 
-        if ($changed) {
-            // 1) fulltext_extract（HTML→テキスト）
-            $text = $this->extractor->extract($rawBody);
+        if (!$changed) {
+            return [
+                'changed' => false,
+                'old_hash' => $oldHash,
+                'new_hash' => $newHash,
+                'content_type' => $r['content_type'],
+            ];
+        }
 
-            // 2) extracted_documents(after) 保存
-            $afterDocId = $this->docs->save([
-                'project_id' => $source->projectId(),
-                'domain' => 'providerintel',
-                'source_type' => 'html',
-                'source_url' => $source->sourceUrl(),
-                'source_url_hash' => $source->sourceUrlHash(),
-                'content_text' => $text,
-                'content_hash' => hash('sha256', $text),
-                'extracted_at' => now(),
-            ]);
+        // 1) text extract（html / pdf）
+        $contentType = (string)($r['content_type'] ?? '');
+        $sourceType = (string) $source->sourceType(); // 'html' | 'pdf'
 
-            // 3) before doc を同URLで探す（自分自身を除外する改善版）
-            // ⭐ 修正箇所: findLatestBySourceUrlHashExcludingId を使用
+        $text = '';
+        $extractMeta = [];
+
+        if ($sourceType === 'pdf') {
+            $ex = $this->pdfExtractor->extractFromPdfBytes(
+                pdfBytes: (string)$r['body'],
+                sourceUrl: (string)$url,
+                language: 'ja',
+            );
+            $text = $ex['text'];
+            $extractMeta = $ex['meta'] ?? [];
+        } else {
+            // html (default)
+            $text = $this->htmlExtractor->extract((string)$r['body']);
+            $extractMeta = [];
+        }
+
+        // 2) save extracted_document (after)
+        $afterDocId = $this->docs->save([
+            'project_id' => $source->projectId(),
+            'domain' => 'providerintel',
+            'source_type' => $sourceType, // 'html'|'pdf'
+            'source_url' => $source->sourceUrl(),
+            'source_url_hash' => $source->sourceUrlHash(),
+            'content_text' => $text,
+            'content_hash' => hash('sha256', $text),
+            'extracted_at' => now(),
+        ]);
+
+        // 3) find before doc（同URL hashで直近、ただし自分は除外）
+        $before = null;
+        if (method_exists($this->docs, 'findLatestBySourceUrlHashExcludingId')) {
             $before = $this->docs->findLatestBySourceUrlHashExcludingId(
                 'providerintel',
                 $source->sourceUrlHash(),
                 $afterDocId
             );
-
-            // ⭐ 修正箇所: 三項演算子で単純化
-            $beforeText = $before ? (string)($before['content_text'] ?? '') : null;
-            $beforeId = $before ? (int)($before['id'] ?? 0) : null;
-
-            // 4) diff 生成 & 保存
-            $diffSummary = $this->diff->summarize($beforeText, $text);
-            $diffId = $this->diffs->save(
-                $source->projectId(),
-                $beforeId,
-                $afterDocId,
-                $diffSummary
-            );
-
-            // 5) catalog_sources の last_hash/last_fetched_at 更新（既存挙動）
-            $updated = $source->withLastFetch($newHash, new \DateTimeImmutable('now'));
-            $this->sources->updateLastFetch($updated);
-
-            // 6) review_queue へ enqueue（doc/diff ポインタ付き）
-            $this->enqueueReview->handle(
-                projectId: $source->projectId(),
-                queueType: 'providerintel',
-                refType: 'catalog_source',
-                refId: $source->id(),
-                priority: 50,
-                summary: [
-                    'source_id' => $source->id(),
-                    'provider_id' => $source->providerId(),
-                    'source_type' => $source->sourceType(),
-                    'source_url' => $source->sourceUrl(),
-                    'old_hash' => $oldHash,
-                    'new_hash' => $newHash,
-                    'content_type' => $contentType,
-
-                    // ✅ v4 pointers
-                    'after_document_id' => $afterDocId,
-                    'diff_id' => $diffId,
-                ]
-            );
+        } else {
+            // 旧I/F fallback（v4.1時点の保険）
+            $before = $this->docs->findLatestBySourceUrlHash('providerintel', $source->sourceUrlHash());
+            if ($before && (int)($before['id'] ?? 0) === $afterDocId) {
+                $before = null;
+            }
         }
 
+        $beforeId = $before ? (int)($before['id'] ?? 0) : null;
+        $beforeText = $before ? (string)($before['content_text'] ?? '') : null;
+
+        // 4) diff summary（SimpleDiffGeneratorは後で差し替え）
+        $diffSummary = $this->diff->summarize($beforeText, $text);
+
+        // 初回判定をUIで読みやすくするため、最低限のメタも足す（v4.1）
+        $diffSummary = array_merge($diffSummary, [
+            'source_type' => $sourceType,
+            'content_type' => $contentType,
+            'extract_meta' => $extractMeta,
+        ]);
+
+        $diffId = $this->diffs->save(
+    $source->projectId(),
+    $beforeId,
+    $afterDocId,
+    $diffSummary,
+);
+
+        // 5) update last_hash/last_fetched_at（既存）
+        $updated = $source->withLastFetch($newHash, new \DateTimeImmutable('now'));
+        $this->sources->updateLastFetch($updated);
+
+        // 6) enqueue review with doc/diff pointers
+        $this->enqueueReview->handle(
+            projectId: $source->projectId(),
+            queueType: 'providerintel',
+            refType: 'catalog_source',
+            refId: $source->id(),
+            priority: 50,
+            summary: [
+                'source_id' => $source->id(),
+                'provider_id' => $source->providerId(),
+                'source_type' => $sourceType,
+                'source_url' => $source->sourceUrl(),
+                'old_hash' => $oldHash,
+                'new_hash' => $newHash,
+                'content_type' => $contentType,
+
+                // v4 pointers
+                'after_document_id' => $afterDocId,
+                'diff_id' => $diffId,
+            ]
+        );
+
         return [
-            'changed' => $changed,
+            'changed' => true,
             'old_hash' => $oldHash,
             'new_hash' => $newHash,
             'content_type' => $contentType,
+            'after_document_id' => $afterDocId,
+            'diff_id' => $diffId,
         ];
     }
 }

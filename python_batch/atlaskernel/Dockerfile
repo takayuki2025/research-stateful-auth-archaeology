@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 ENV PYTHONPATH=/app/src
@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-# ★ poetry.lock を使わない
 COPY pyproject.toml ./
 
 RUN pip install poetry \

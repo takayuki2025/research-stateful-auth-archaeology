@@ -19,7 +19,7 @@ final class UpsertCatalogSourceController extends Controller
             'id' => 'sometimes|integer|min:1',
             'project_id' => 'sometimes|integer|min:1',
             'provider_id' => 'required|integer|min:1',
-            'source_type' => 'required|string|in:html,pdf,manual',
+            'source_type' => 'required|string|in:html,pdf',
             'source_url' => 'nullable|string',
             'update_frequency' => 'required|string|in:daily,weekly,monthly',
             'status' => 'required|string|in:active,inactive',

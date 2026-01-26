@@ -1,23 +1,17 @@
-[project]
-name = "atlaskernel"
-version = "0.1.0"
-description = "AtlasKernel - Entity Analysis Engine (MVP)"
-requires-python = ">=3.11"
-
-dependencies = [
-  "pydantic>=2.6",
-  "rapidfuzz>=3.6",
-  "jsonschema>=4.23",
-  "PyYAML>=6.0",
-  "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.30.0",
-  "mysql-connector-python>=9.5.0,<10.0.0",
-  "sqlalchemy>=2.0",
-]
-
 [tool.poetry]
 name = "atlaskernel"
 version = "0.1.0"
-packages = [
-  { include = "atlaskernel", from = "src" }
-]
+description = "AtlasKernel - Entity Analysis Engine (MVP)"
+packages = [{ include = "atlaskernel", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.14,<3.15"
+pydantic = ">=2.6"
+rapidfuzz = ">=3.6"
+jsonschema = ">=4.23"
+PyYAML = ">=6.0"
+fastapi = ">=0.115.0"
+uvicorn = {extras = ["standard"], version = ">=0.30.0"}
+mysql-connector-python = "==9.5.0"
+sqlalchemy = ">=2.0"
+pdfminer-six = ">=20231228"

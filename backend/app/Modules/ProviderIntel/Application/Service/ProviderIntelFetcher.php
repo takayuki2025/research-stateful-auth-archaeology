@@ -3,27 +3,42 @@
 namespace App\Modules\ProviderIntel\Application\Service;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 final class ProviderIntelFetcher
 {
     /**
-     * Fetch raw content from source_url.
-     * Returns: ['content_type' => string|null, 'body' => string]
+     * @return array{body:string, content_type:string}
      */
     public function fetch(string $url): array
     {
-        // MVP: basic GET, follow redirects (Http client does)
-        $res = Http::timeout(20)
-            ->accept('*/*')
+        $verify = filter_var(env('PROVIDERINTEL_HTTP_VERIFY', 'true'), FILTER_VALIDATE_BOOL);
+
+        $res = Http::timeout(60)
+            ->withHeaders([
+                'User-Agent' => 'ProviderIntelBot/1.0 (+TrustLedger; OmniCommerceCore)',
+                'Accept'     => 'text/html,application/pdf,*/*',
+            ])
+            ->withOptions([
+                // Guzzle option
+                'allow_redirects' => true,
+                'verify'          => $verify,
+            ])
             ->get($url);
 
-        if (!$res->successful()) {
-            throw new \RuntimeException("Fetch failed: {$res->status()}");
+        if (!$res->ok()) {
+            Log::error('[ProviderIntelFetcher] fetch failed', [
+                'url' => $url,
+                'status' => $res->status(),
+                'content_type' => (string)($res->header('Content-Type') ?? ''),
+                'body_head' => substr((string)$res->body(), 0, 200),
+            ]);
+            throw new \RuntimeException("fetch failed: {$res->status()}");
         }
 
         return [
-            'content_type' => $res->header('Content-Type'),
-            'body' => (string)$res->body(),
+            'body' => (string) $res->body(), // PDFもバイナリstringとして保持
+            'content_type' => (string) ($res->header('Content-Type') ?? ''),
         ];
     }
 }
