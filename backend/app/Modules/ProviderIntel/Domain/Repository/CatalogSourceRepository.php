@@ -21,4 +21,6 @@ interface CatalogSourceRepository
      * Persist last_hash/last_fetched_at update.
      */
     public function updateLastFetch(CatalogSource $source): void;
+
+    public function markApproved(int $sourceId, string $approvedHash, ?int $approvedBy): void;
 }

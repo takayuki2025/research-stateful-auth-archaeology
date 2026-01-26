@@ -8,6 +8,8 @@ use App\Modules\Review\Infrastructure\Persistence\EloquentReviewDecisionReposito
 use App\Modules\Review\Infrastructure\Persistence\EloquentReviewQueryRepository;
 use App\Modules\Review\Domain\Repository\ReviewQueueRepository;
 use App\Modules\Review\Infrastructure\Persistence\EloquentReviewQueueRepository;
+use App\Modules\Review\Domain\Repository\ReviewRequestForInfoRepository;
+use App\Modules\Review\Infrastructure\Persistence\EloquentReviewRequestForInfoRepository;
 use Illuminate\Support\ServiceProvider;
 
 final class ReviewServiceProvider extends ServiceProvider
@@ -17,5 +19,6 @@ final class ReviewServiceProvider extends ServiceProvider
         $this->app->bind(ReviewDecisionRepository::class, EloquentReviewDecisionRepository::class);
         $this->app->bind(ReviewQueryRepository::class, EloquentReviewQueryRepository::class);
         $this->app->bind(ReviewQueueRepository::class, EloquentReviewQueueRepository::class);
+        $this->app->bind(ReviewRequestForInfoRepository::class, EloquentReviewRequestForInfoRepository::class);
     }
 }

@@ -11,9 +11,7 @@
 <% end %>
 
 <% if @item %>
-  <p>
-    <a href="/admin/dashboard/trustledger/review-queue">Back</a>
-  </p>
+  <p><a href="/admin/dashboard/trustledger/review-queue">Back</a></p>
 
   <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
     <tr><th>ID</th><td><%= @item["id"] %></td></tr>
@@ -29,25 +27,63 @@
   <h2 style="margin-top:16px;">Summary</h2>
   <pre style="white-space:pre-wrap; background:#f6f6f6; padding:12px;"><%= JSON.pretty_generate(@item["summary"] || {}) %></pre>
 
-  <h2 style="margin-top:16px;">Decide</h2>
-  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide">
-    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+  <h2 style="margin-top:16px;">Requests for Info</h2>
+  <% rfi = @item["requests_for_info"] || [] %>
+  <% if rfi.empty? %>
+    <p style="color:#666;">(none)</p>
+  <% else %>
+    <% rfi.each do |row| %>
+      <div style="border:1px solid #ddd; padding:12px; margin:12px 0;">
+        <div><strong>ID:</strong> <%= row["id"] %> / <strong>status:</strong> <%= row["status"] %></div>
+        <div><strong>requested_at:</strong> <%= row["requested_at"] %></div>
+        <div style="margin-top:8px;">
+          <strong>checklist</strong>
+          <pre style="white-space:pre-wrap; background:#fafafa; padding:12px;"><%= JSON.pretty_generate(row["checklist"] || {}) %></pre>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
 
-    <label>action:
-      <select name="action" required>
-        <option value="approve">approve</option>
-        <option value="reject">reject</option>
-        <option value="request_more_info">request_more_info</option>
-      </select>
+  <h2 style="margin-top:16px;">Decide</h2>
+
+  <!-- ✅ Approve -->
+  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
+    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+    <input type="hidden" name="action" value="approve">
+    <label>note:<br>
+      <textarea name="note" rows="2" style="width:720px;"></textarea>
+    </label><br>
+    <button type="submit" style="margin-top:8px;">Approve</button>
+  </form>
+
+  <!-- ✅ Reject -->
+  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
+    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+    <input type="hidden" name="action" value="reject">
+    <label>note:<br>
+      <textarea name="note" rows="2" style="width:720px;"></textarea>
+    </label><br>
+    <button type="submit" style="margin-top:8px;">Reject</button>
+  </form>
+
+  <!-- ✅ Request More Info -->
+  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide" style="margin: 12px 0;">
+    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+    <input type="hidden" name="action" value="request_more_info">
+    <label>note:<br>
+      <textarea name="note" rows="2" style="width:720px;">need evidence</textarea>
     </label>
 
-    <div style="margin-top:12px;">
-      <label>note:<br>
-        <textarea name="note" rows="4" style="width:720px;"></textarea>
+    <div style="margin-top:8px;">
+      <label>extra.checklist (JSON, optional):<br>
+        <textarea name="extra_checklist_json" rows="10" style="width:720px;" placeholder='{"type":"providerintel","message":"...","items":[...]}'></textarea>
       </label>
+      <div style="font-size:12px; color:#666; margin-top:6px;">
+        空ならLaravel側で自動生成します。ここにJSONを入れると上書きできます。
+      </div>
     </div>
 
-    <button type="submit" style="margin-top:12px;">Submit</button>
+    <button type="submit" style="margin-top:8px;">Request More Info</button>
   </form>
 
 <% else %>

@@ -116,4 +116,16 @@ final class EloquentCatalogSourceRepository implements CatalogSourceRepository
             notes: $r->notes !== null ? (string)$r->notes : null,
         );
     }
+
+    public function markApproved(int $sourceId, string $approvedHash, ?int $approvedBy): void
+{
+    DB::table('catalog_sources')
+        ->where('id', $sourceId)
+        ->update([
+            'approved_hash' => $approvedHash,
+            'approved_at' => now(),
+            'approved_by' => $approvedBy,
+            'updated_at' => now(),
+        ]);
+}
 }

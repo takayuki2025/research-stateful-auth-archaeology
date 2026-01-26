@@ -37,4 +37,8 @@ interface ReviewQueueRepository
         ?string $note,
         ?array $extra
     ): void;
+
+    public function updateStatus(int $id, string $status): void;
+
+    public function clearDecision(int $id): void;
 }

@@ -101,8 +101,29 @@ final class EloquentReviewQueueRepository implements ReviewQueueRepository
         $update['summary_json'] = json_encode($extra, JSON_UNESCAPED_UNICODE);
     }
 
+    DB::table('review_queue_items')->where('id', $id)->update($update);
+}
+
+public function updateStatus(int $id, string $status): void
+{
     DB::table('review_queue_items')
         ->where('id', $id)
-        ->update($update);
+        ->update([
+            'status' => $status,
+            'updated_at' => now(),
+        ]);
+}
+
+public function clearDecision(int $id): void
+{
+    DB::table('review_queue_items')
+        ->where('id', $id)
+        ->update([
+            'decided_action' => null,
+            'decided_by' => null,
+            'decided_at' => null,
+            'note' => null,
+            'updated_at' => now(),
+        ]);
 }
 }

@@ -26,21 +26,34 @@ module Admin
       end
 
       def decide
-        client = TrustLedger::AdminApi::Client.new
-        id = params.require(:id)
+  client = TrustLedger::AdminApi::Client.new
+  id = params.require(:id)
 
-        payload = {
-          action: params.require(:action),
-          note: params[:note].presence,
-        }.compact
+  payload = {
+    action: params.require(:action),
+    note: params[:note].presence,
+  }.compact
 
-        client.decide_review_queue_item(id, payload)
-        redirect_to "/admin/dashboard/trustledger/review-queue/#{id}", notice: "Decided."
-      rescue ActionController::ParameterMissing => e
-        redirect_to "/admin/dashboard/trustledger/review-queue/#{params[:id]}", alert: "Missing: #{e.param}"
-      rescue TrustLedger::AdminApi::Error => e
-        redirect_to "/admin/dashboard/trustledger/review-queue/#{params[:id]}", alert: "API error: #{e.status}"
-      end
+  # optional: checklist json
+  if params[:extra_checklist_json].present?
+    begin
+      checklist = JSON.parse(params[:extra_checklist_json])
+      payload[:extra] = { checklist: checklist }
+    rescue JSON::ParserError
+      return redirect_to(
+        "/admin/dashboard/trustledger/review-queue/#{id}",
+        alert: "Invalid JSON in extra.checklist"
+      )
+    end
+  end
+
+  client.decide_review_queue_item(id, payload)
+  redirect_to "/admin/dashboard/trustledger/review-queue/#{id}", notice: "Decided."
+rescue ActionController::ParameterMissing => e
+  redirect_to "/admin/dashboard/trustledger/review-queue/#{params[:id]}", alert: "Missing: #{e.param}"
+rescue TrustLedger::AdminApi::Error => e
+  redirect_to "/admin/dashboard/trustledger/review-queue/#{params[:id]}", alert: "API error: #{e.status}"
+end
     end
   end
 end
