@@ -64,11 +64,11 @@ final class RunCatalogSourceUseCase
         $extractMeta = [];
 
         if ($sourceType === 'pdf') {
-            $ex = $this->pdfExtractor->extractFromPdfBytes(
-                pdfBytes: (string)$r['body'],
-                sourceUrl: (string)$url,
-                language: 'ja',
-            );
+            $ex = $this->pdfExtractor->extractWithFallbackFromPdfBytes(
+    pdfBytes: (string)$r['body'],
+    sourceUrl: (string)$url,
+    language: 'ja',
+);
             $text = $ex['text'];
             $extractMeta = $ex['meta'] ?? [];
         } else {

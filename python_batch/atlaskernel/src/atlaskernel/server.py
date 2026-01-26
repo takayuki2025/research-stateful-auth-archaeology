@@ -8,9 +8,8 @@ from atlaskernel.api.routes.extract import router as extract_router
 
 app = FastAPI(title="AtlasKernel API", version="0.3.1")
 
-# API routes
-app.include_router(review_router)    # /v1/reviews/...
-app.include_router(analyze_router)   # /v1/analyze ✅
+app.include_router(review_router)
+app.include_router(analyze_router)
 app.include_router(extract_router)
 
 @app.get("/health")

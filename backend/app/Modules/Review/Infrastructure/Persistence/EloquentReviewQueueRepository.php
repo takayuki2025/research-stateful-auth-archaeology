@@ -10,7 +10,7 @@ final class EloquentReviewQueueRepository implements ReviewQueueRepository
 {
     public function enqueue(?int $projectId, string $queueType, string $refType, int $refId, int $priority, ?array $summary): int
     {
-        // 既に pending があるならそれを返す
+        // 既に pending があるなら「最新summaryへ更新」して返す（v4運用の要）
         $existing = DB::table('review_queue_items')
             ->where('queue_type', $queueType)
             ->where('ref_type', $refType)
@@ -19,19 +19,40 @@ final class EloquentReviewQueueRepository implements ReviewQueueRepository
             ->first();
 
         if ($existing) {
+            $update = [
+                'updated_at' => now(),
+            ];
+
+            // priority は「より高い方」へ寄せる（運用で優先度が上がるケースに備える）
+            $update['priority'] = max((int)$existing->priority, $priority);
+
+            // project_id は null→値 への昇格のみ許可（既存の監査を壊さない）
+            if ($existing->project_id === null && $projectId !== null) {
+                $update['project_id'] = $projectId;
+            }
+
+            // ✅ ここが本命：summary_json を最新へ上書き
+            if (is_array($summary)) {
+                $update['summary_json'] = json_encode($summary, JSON_UNESCAPED_UNICODE);
+            }
+
+            DB::table('review_queue_items')
+                ->where('id', (int)$existing->id)
+                ->update($update);
+
             return (int)$existing->id;
         }
 
         return (int) DB::table('review_queue_items')->insertGetId([
-            'project_id' => $projectId,
-            'queue_type' => $queueType,
-            'ref_type' => $refType,
-            'ref_id' => $refId,
-            'status' => 'pending',
-            'priority' => $priority,
+            'project_id'   => $projectId,
+            'queue_type'   => $queueType,
+            'ref_type'     => $refType,
+            'ref_id'       => $refId,
+            'status'       => 'pending',
+            'priority'     => $priority,
             'summary_json' => $summary ? json_encode($summary, JSON_UNESCAPED_UNICODE) : null,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_at'   => now(),
+            'updated_at'   => now(),
         ]);
     }
 
@@ -88,68 +109,72 @@ final class EloquentReviewQueueRepository implements ReviewQueueRepository
     }
 
     public function decide(int $id, string $action, ?int $decidedBy, ?string $note, ?array $extra): void
-{
-    $update = [
-        'status' => 'decided',
-        'decided_action' => $action,
-        'decided_by' => $decidedBy,
-        'decided_at' => now(),
-        'note' => $note,
-        'updated_at' => now(),
-    ];
+    {
+        $update = [
+            'status' => 'decided',
+            'decided_action' => $action,
+            'decided_by' => $decidedBy,
+            'decided_at' => now(),
+            'note' => $note,
+            'updated_at' => now(),
+        ];
 
-    if (is_array($extra) && !empty($extra)) {
-        $update['summary_json'] = json_encode($extra, JSON_UNESCAPED_UNICODE);
+        // ✅ extra で summary_json を「丸ごと上書き」しない（diff_id等が消える事故を防止）
+        if (is_array($extra) && !empty($extra)) {
+            $current = DB::table('review_queue_items')->where('id', $id)->value('summary_json');
+            $base = is_string($current) ? json_decode($current, true) : [];
+            if (!is_array($base)) $base = [];
+
+            $merged = array_merge($base, ['extra' => $extra]);
+            $update['summary_json'] = json_encode($merged, JSON_UNESCAPED_UNICODE);
+        }
+
+        DB::table('review_queue_items')->where('id', $id)->update($update);
     }
 
-    DB::table('review_queue_items')->where('id', $id)->update($update);
-}
+    public function updateStatus(int $id, string $status): void
+    {
+        try {
+            DB::table('review_queue_items')
+                ->where('id', $id)
+                ->update([
+                    'status' => $status,
+                    'updated_at' => now(),
+                ]);
+        } catch (UniqueConstraintViolationException $e) {
+            if ($status === 'in_review') {
+                return;
+            }
+            throw $e;
+        }
+    }
 
-public function updateStatus(int $id, string $status): void
-{
-    try {
+    public function clearDecision(int $id): void
+    {
         DB::table('review_queue_items')
             ->where('id', $id)
             ->update([
-                'status' => $status,
+                'decided_action' => null,
+                'decided_by' => null,
+                'decided_at' => null,
+                'note' => null,
                 'updated_at' => now(),
             ]);
-    } catch (UniqueConstraintViolationException $e) {
-        // ✅ in_review 競合は「すでに誰かが in_review を確保した」だけなので握る
-        if ($status === 'in_review') {
-            return;
-        }
-        throw $e;
     }
-}
 
-public function clearDecision(int $id): void
-{
-    DB::table('review_queue_items')
-        ->where('id', $id)
-        ->update([
-            'decided_action' => null,
-            'decided_by' => null,
-            'decided_at' => null,
-            'note' => null,
-            'updated_at' => now(),
-        ]);
-}
-
-public function closeInReviewForSameRef(string $queueType, string $refType, int $refId, int $excludeId): void
-{
-    DB::table('review_queue_items')
-        ->where('queue_type', $queueType)
-        ->where('ref_type', $refType)
-        ->where('ref_id', $refId)
-        ->where('status', 'in_review')
-        ->where('id', '<>', $excludeId)
-        ->update([
-            // ✅ superseded は decided ではなく archived に落とす（decided重複を避ける）
-            'status' => 'archived',
-            'decided_action' => 'superseded',
-            'decided_at' => now(),
-            'updated_at' => now(),
-        ]);
-}
+    public function closeInReviewForSameRef(string $queueType, string $refType, int $refId, int $excludeId): void
+    {
+        DB::table('review_queue_items')
+            ->where('queue_type', $queueType)
+            ->where('ref_type', $refType)
+            ->where('ref_id', $refId)
+            ->where('status', 'in_review')
+            ->where('id', '<>', $excludeId)
+            ->update([
+                'status' => 'archived',
+                'decided_action' => 'superseded',
+                'decided_at' => now(),
+                'updated_at' => now(),
+            ]);
+    }
 }
