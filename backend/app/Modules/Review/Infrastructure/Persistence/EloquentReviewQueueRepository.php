@@ -126,4 +126,21 @@ public function clearDecision(int $id): void
             'updated_at' => now(),
         ]);
 }
+
+public function closeInReviewForSameRef(string $queueType, string $refType, int $refId, int $excludeId): void
+{
+    DB::table('review_queue_items')
+        ->where('queue_type', $queueType)
+        ->where('ref_type', $refType)
+        ->where('ref_id', $refId)
+        ->where('status', 'in_review')
+        ->where('id', '<>', $excludeId)
+        ->update([
+            // ✅ 「審査中」を閉じる（decidedに落とすのが最小）
+            'status' => 'decided',
+            'decided_action' => 'superseded',
+            'decided_at' => now(),
+            'updated_at' => now(),
+        ]);
+}
 }

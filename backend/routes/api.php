@@ -641,3 +641,13 @@ Route::middleware(['admin.fixed_or_key'])
   ->group(function () {
       Route::get('documents/{id}', GetExtractedDocumentController::class)->whereNumber('id');
   });
+
+
+
+    use App\Modules\ProviderIntel\Presentation\Http\Controllers\Admin\Documents\GetDocumentDiffController;
+
+Route::middleware(['admin.fixed_or_key'])
+    ->prefix('admin/providerintel')
+    ->group(function () {
+        Route::get('diffs/{id}', GetDocumentDiffController::class)->whereNumber('id');
+    });

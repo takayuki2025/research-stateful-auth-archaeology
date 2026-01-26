@@ -52,6 +52,19 @@ final class DecideReviewQueueController extends Controller
 
                 $this->requestsForInfo->open($id, $checklist, $decidedBy);
 
+
+                // ✅ 同一refの既存in_reviewを先に閉じる（ユニーク制約回避）
+$this->queue->closeInReviewForSameRef(
+    $item['queue_type'],
+    $item['ref_type'],
+    (int)$item['ref_id'],
+    $id
+);
+
+// decided_* をクリアしてからin_review
+$this->queue->clearDecision($id);
+$this->queue->updateStatus($id, 'in_review');
+
                 // 運用上は in_review にする（pendingのままでも可だが、手戻りが増える）
                 $this->queue->updateStatus($id, 'in_review');
 

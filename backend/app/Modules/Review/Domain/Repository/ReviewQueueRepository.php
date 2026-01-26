@@ -41,4 +41,6 @@ interface ReviewQueueRepository
     public function updateStatus(int $id, string $status): void;
 
     public function clearDecision(int $id): void;
+
+    public function closeInReviewForSameRef(string $queueType, string $refType, int $refId, int $excludeId): void;
 }

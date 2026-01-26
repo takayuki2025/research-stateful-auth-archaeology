@@ -64,15 +64,17 @@ final class RunCatalogSourceUseCase
                 'extracted_at' => now(),
             ]);
 
-            // 3) before doc を同URLで探す（MVP）
-            $before = $this->docs->findLatestBySourceUrlHash('providerintel', $source->sourceUrlHash());
+            // 3) before doc を同URLで探す（自分自身を除外する改善版）
+            // ⭐ 修正箇所: findLatestBySourceUrlHashExcludingId を使用
+            $before = $this->docs->findLatestBySourceUrlHashExcludingId(
+                'providerintel',
+                $source->sourceUrlHash(),
+                $afterDocId
+            );
 
-            $beforeText = null;
-            $beforeId = null;
-            if ($before && (int)($before['id'] ?? 0) !== $afterDocId) {
-                $beforeId = (int)$before['id'];
-                $beforeText = (string)($before['content_text'] ?? '');
-            }
+            // ⭐ 修正箇所: 三項演算子で単純化
+            $beforeText = $before ? (string)($before['content_text'] ?? '') : null;
+            $beforeId = $before ? (int)($before['id'] ?? 0) : null;
 
             // 4) diff 生成 & 保存
             $diffSummary = $this->diff->summarize($beforeText, $text);

@@ -51,4 +51,16 @@ final class EloquentExtractedDocumentRepository implements ExtractedDocumentRepo
 
         return $r ? (array)$r : null;
     }
+
+    public function findLatestBySourceUrlHashExcludingId(string $domain, string $sourceUrlHash, int $excludeId): ?array
+{
+    $r = DB::table('extracted_documents')
+        ->where('domain', $domain)
+        ->where('source_url_hash', $sourceUrlHash)
+        ->where('id', '<>', $excludeId)
+        ->orderByDesc('id')
+        ->first();
+
+    return $r ? (array)$r : null;
+}
 }

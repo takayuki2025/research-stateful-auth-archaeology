@@ -13,4 +13,6 @@ interface ExtractedDocumentRepository
     public function find(int $id): ?array;
 
     public function findLatestBySourceUrlHash(string $domain, string $sourceUrlHash): ?array;
+
+    public function findLatestBySourceUrlHashExcludingId(string $domain, string $sourceUrlHash, int $excludeId): ?array;
 }

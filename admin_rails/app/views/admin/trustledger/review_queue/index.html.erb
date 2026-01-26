@@ -10,6 +10,14 @@
   </div>
 <% end %>
 
+<p style="margin: 8px 0;">
+  <a href="/admin/dashboard/trustledger/review-queue?queue_type=providerintel&status=pending">Pending</a>
+  |
+  <a href="/admin/dashboard/trustledger/review-queue?queue_type=providerintel&status=in_review">In Review</a>
+  |
+  <a href="/admin/dashboard/trustledger/review-queue?queue_type=providerintel&status=decided">Decided</a>
+</p>
+
 <form method="get" style="margin: 12px 0;">
   <label>queue_type:
     <input name="queue_type" value="<%= params[:queue_type] %>" style="width:160px;">

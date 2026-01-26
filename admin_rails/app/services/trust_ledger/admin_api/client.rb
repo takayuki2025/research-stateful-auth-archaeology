@@ -158,6 +158,10 @@ def get_providerintel_document(id)
   get_json("/api/admin/providerintel/documents/#{id}")
 end
 
+def get_providerintel_diff(id)
+  get_json("/api/admin/providerintel/diffs/#{id}")
+end
+
 
       # =========================================================
       # Internal HTTP helpers
