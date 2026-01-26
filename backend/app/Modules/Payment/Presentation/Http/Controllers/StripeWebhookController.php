@@ -57,19 +57,49 @@ $raw = $payload; // すでに $payload = $request->getContent();
 
 $hash = hash('sha256', $raw);
 
-DB::table('payment_webhook_events')->updateOrInsert(
-    ['provider' => 'stripe', 'event_id' => $input->eventId],
-    [
-        'event_type'   => $input->eventType,
-        'payload_hash' => $hash,      // ✅ DBに保存するpayloadから計算
-        'payload'      => $raw,       // ✅ rawそのまま
-        'signature'    => $sig,
-        // statusは既存運用によりけり。上書きしたくないなら削除可
-        'status'       => 'received',
-        'updated_at'   => now(),
-        'created_at'   => now(),
-    ]
-);
+$ids = $this->extractIdsFromStripePayload($input->payload);
+
+$existing = DB::table('payment_webhook_events')
+    ->where('provider', 'stripe')
+    ->where('event_id', $input->eventId)
+    ->first();
+
+if ($existing) {
+    DB::table('payment_webhook_events')
+        ->where('id', $existing->id)
+        ->update([
+            'event_type'   => $input->eventType,
+            'payload_hash' => $hash,
+            'payload'      => $raw,
+            'signature'    => $sig,
+
+            // ✅ 既存がNULLなら埋める（上書きしない）
+            'payment_id'   => $existing->payment_id ?? $ids['payment_id'],
+            'order_id'     => $existing->order_id ?? $ids['order_id'],
+
+            // statusは受信時点ではreceivedでOK（reserve/completeで更新される想定）
+            'status'       => $existing->status ?? 'received',
+
+            'updated_at'   => now(),
+        ]);
+} else {
+    DB::table('payment_webhook_events')->insert([
+        'provider'      => 'stripe',
+        'event_id'      => $input->eventId,
+        'event_type'    => $input->eventType,
+        'payload_hash'  => $hash,
+        'payload'       => $raw,
+        'signature'     => $sig,
+        'status'        => 'received',
+
+        // ✅ ここで埋める
+        'payment_id'    => $ids['payment_id'],
+        'order_id'      => $ids['order_id'],
+
+        'created_at'    => now(),
+        'updated_at'    => now(),
+    ]);
+}
 
         try {
             // Wallet系
@@ -87,5 +117,32 @@ DB::table('payment_webhook_events')->updateOrInsert(
         }
 
         return response()->json(['ok' => true], 200);
+    }
+
+    private function extractIdsFromStripePayload(array $payload): array
+    {
+        $object = $payload['data']['object'] ?? null;
+        if (!is_array($object)) {
+            return ['payment_id' => null, 'order_id' => null, 'shop_id' => null];
+        }
+
+        $meta = $object['metadata'] ?? null;
+        if (!is_array($meta)) {
+            return ['payment_id' => null, 'order_id' => null, 'shop_id' => null];
+        }
+
+        $paymentId = isset($meta['payment_id']) && is_numeric($meta['payment_id'])
+            ? (int)$meta['payment_id']
+            : null;
+
+        $orderId = isset($meta['order_id']) && is_numeric($meta['order_id'])
+            ? (int)$meta['order_id']
+            : null;
+
+        $shopId = isset($meta['shop_id']) && is_numeric($meta['shop_id'])
+            ? (int)$meta['shop_id']
+            : null;
+
+        return ['payment_id' => $paymentId, 'order_id' => $orderId, 'shop_id' => $shopId];
     }
 }

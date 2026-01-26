@@ -33,6 +33,11 @@ get  "/providerintel/sources/:source_id/edit", to: "providerintel_sources#edit"
 post "/providerintel/sources/:source_id",      to: "providerintel_sources#update"
 
 post "/providerintel/sources/:source_id/run",  to: "providerintel_sources#run"
+
+# Review Queue
+get  "/review-queue",            to: "review_queue#index"
+get  "/review-queue/:id",        to: "review_queue#show"
+post "/review-queue/:id/decide", to: "review_queue#decide"
     end
 
     # ✅ AtlasKernel dashboard（今はトップだけ用意。後で増やす）

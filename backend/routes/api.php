@@ -615,3 +615,19 @@ Route::middleware(['admin.fixed_or_key'])
         Route::post('sources', UpsertCatalogSourceController::class);
         Route::post('sources/{sourceId}/run', RunCatalogSourceController::class)->whereNumber('sourceId');
     });
+
+
+
+    use App\Modules\Review\Presentation\Http\Controllers\Admin\ReviewQueue\{
+    ListReviewQueueController,
+    GetReviewQueueController,
+    DecideReviewQueueController
+};
+
+Route::middleware(['admin.fixed_or_key'])
+    ->prefix('admin/review-queue')
+    ->group(function () {
+        Route::get('', ListReviewQueueController::class);
+        Route::get('{id}', GetReviewQueueController::class)->whereNumber('id');
+        Route::post('{id}/decide', DecideReviewQueueController::class)->whereNumber('id');
+    });

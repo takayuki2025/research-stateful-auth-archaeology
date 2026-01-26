@@ -1,0 +1,61 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>Review Queue</h1>
+
+<% if @error %>
+  <div style="padding:12px; border:1px solid #f00; margin:12px 0;">
+    <strong>API Error</strong><br>
+    status: <%= @error.status %><br>
+    <pre style="white-space:pre-wrap;"><%= @error.body %></pre>
+  </div>
+<% end %>
+
+<form method="get" style="margin: 12px 0;">
+  <label>queue_type:
+    <input name="queue_type" value="<%= params[:queue_type] %>" style="width:160px;">
+  </label>
+  <label style="margin-left:12px;">status:
+    <select name="status">
+      <% s = params[:status].to_s %>
+      <option value="" <%= "selected" if s == "" %>></option>
+      <option value="pending" <%= "selected" if s == "pending" %>>pending</option>
+      <option value="in_review" <%= "selected" if s == "in_review" %>>in_review</option>
+      <option value="decided" <%= "selected" if s == "decided" %>>decided</option>
+      <option value="archived" <%= "selected" if s == "archived" %>>archived</option>
+    </select>
+  </label>
+  <label style="margin-left:12px;">limit:
+    <input name="limit" value="<%= params[:limit] || 50 %>" style="width:80px;">
+  </label>
+  <label style="margin-left:12px;">offset:
+    <input name="offset" value="<%= params[:offset] || 0 %>" style="width:80px;">
+  </label>
+  <button type="submit" style="margin-left:12px;">Filter</button>
+</form>
+
+<table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>queue_type</th>
+      <th>ref</th>
+      <th>status</th>
+      <th>priority</th>
+      <th>created_at</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @items.each do |it| %>
+      <tr>
+        <td>
+          <a href="/admin/dashboard/trustledger/review-queue/<%= it["id"] %>"><%= it["id"] %></a>
+        </td>
+        <td><%= it["queue_type"] %></td>
+        <td><%= it["ref_type"] %>#<%= it["ref_id"] %></td>
+        <td><%= it["status"] %></td>
+        <td><%= it["priority"] %></td>
+        <td><%= it["created_at"] %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

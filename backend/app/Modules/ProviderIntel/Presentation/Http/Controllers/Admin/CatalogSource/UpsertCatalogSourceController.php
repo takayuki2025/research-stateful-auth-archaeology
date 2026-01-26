@@ -36,7 +36,7 @@ final class UpsertCatalogSourceController extends Controller
             status: (string)$data['status'],
             notes: $data['notes'] ?? null,
         );
-
+\Log::info('[🔥ProviderIntel Upsert] input', $request->all());
         return response()->json(['id' => $id], 200);
     }
 }

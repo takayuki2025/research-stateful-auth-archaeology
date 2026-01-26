@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             // ColorEntitySeeder::class,
             ItemDraftSeeder::class,
             AnalysisRequestSeeder::class,
+            ProviderSeeder::class,
         ]);
     }
 }

@@ -128,6 +128,31 @@ module TrustLedger
         post_json("/api/admin/providerintel/sources/#{source_id}/run", {})
       end
 
+
+
+      # =========================================================
+# Review Queue (v3.3)
+# =========================================================
+
+# GET /api/admin/review-queue?queue_type=&status=&limit=&offset=
+def list_review_queue(params = {})
+  query = URI.encode_www_form(params.compact)
+  path = "/api/admin/review-queue"
+  path += "?#{query}" unless query.empty?
+  get_json(path)
+end
+
+# GET /api/admin/review-queue/:id
+def get_review_queue_item(id)
+  get_json("/api/admin/review-queue/#{id}")
+end
+
+# POST /api/admin/review-queue/:id/decide
+# payload: { action: "approve|reject|request_more_info", note: "...", extra: {...} }
+def decide_review_queue_item(id, payload)
+  post_json("/api/admin/review-queue/#{id}/decide", payload)
+end
+
       # =========================================================
       # Internal HTTP helpers
       # =========================================================

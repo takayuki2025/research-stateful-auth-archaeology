@@ -1,0 +1,56 @@
+<%= render "admin/trustledger/nav" %>
+
+<h1>Review Queue Item</h1>
+
+<% if @error %>
+  <div style="padding:12px; border:1px solid #f00; margin:12px 0;">
+    <strong>API Error</strong><br>
+    status: <%= @error.status %><br>
+    <pre style="white-space:pre-wrap;"><%= @error.body %></pre>
+  </div>
+<% end %>
+
+<% if @item %>
+  <p>
+    <a href="/admin/dashboard/trustledger/review-queue">Back</a>
+  </p>
+
+  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
+    <tr><th>ID</th><td><%= @item["id"] %></td></tr>
+    <tr><th>queue_type</th><td><%= @item["queue_type"] %></td></tr>
+    <tr><th>ref</th><td><%= @item["ref_type"] %>#<%= @item["ref_id"] %></td></tr>
+    <tr><th>status</th><td><%= @item["status"] %></td></tr>
+    <tr><th>priority</th><td><%= @item["priority"] %></td></tr>
+    <tr><th>decided_action</th><td><%= @item["decided_action"] %></td></tr>
+    <tr><th>decided_at</th><td><%= @item["decided_at"] %></td></tr>
+    <tr><th>note</th><td><%= @item["note"] %></td></tr>
+  </table>
+
+  <h2 style="margin-top:16px;">Summary</h2>
+  <pre style="white-space:pre-wrap; background:#f6f6f6; padding:12px;"><%= JSON.pretty_generate(@item["summary"] || {}) %></pre>
+
+  <h2 style="margin-top:16px;">Decide</h2>
+  <form method="post" action="/admin/dashboard/trustledger/review-queue/<%= @item["id"] %>/decide">
+    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+
+    <label>action:
+      <select name="action" required>
+        <option value="approve">approve</option>
+        <option value="reject">reject</option>
+        <option value="request_more_info">request_more_info</option>
+      </select>
+    </label>
+
+    <div style="margin-top:12px;">
+      <label>note:<br>
+        <textarea name="note" rows="4" style="width:720px;"></textarea>
+      </label>
+    </div>
+
+    <button type="submit" style="margin-top:12px;">Submit</button>
+  </form>
+
+<% else %>
+  <p>Not found.</p>
+  <a href="/admin/dashboard/trustledger/review-queue">Back</a>
+<% end %>
